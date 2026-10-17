@@ -1,0 +1,31 @@
+Constants:
+    - "Top Panel"
+    - ShowNavigationButtons: 'Show navigation buttons'
+    - TopPanelSearchBoxWidthHelium(80,600): 'Width of Search box'
+    - "Details View Game Overview"
+    - DetailsViewLibraryGameShowFavorite: 'Show favorites icon in game list'
+    - DetailsViewDescriptionWidth(150,2400): 'Width of description'
+    - DetailsViewShowTitleInDescription: 'Show game title in description box if there is a logo'
+    - "Grid View Game Overview"
+    - GridViewDescriptionWidth(150,2400): 'Width of description'
+    - GridViewShowTitleInDescription: 'Show game title in description box if there is a logo'
+    - "Game Overview Panel"
+    - DetailsViewDisplayGameNameIfLogoVisible: 'Display game name if logo is visible'
+    - DetailsViewDescriptionDockToRight: 'Dock description to the right'
+    - GameOverviewShowGameSizeEvenIfInstalled: 'Show size in details panel even if the game is installed'
+    - DetailsViewShowInfoPanelDefault: 'Show information panel by default'
+    - DetailsViewBackgroundVerticalAlignment: 'Vertical alignment of the background image'
+    - DetailsViewBackgroundHorizontalAlignment: 'Horizontal alignment of the background image'
+    - DetailsViewAllowUseOfLogos: 'Allow use of logos (Requires Extra Metadata Loader extension)'
+    - DetailsViewShowHltbDataGrid: 'Show HowLongToBeat data grid'
+    - WebExplorerControlHeight(400,1800): 'Web view component height (Requires Web Explorer extension)'
+    - "Grid View Covers"
+    - GridViewCoverZoomOnHover: 'Zoom when hovered'
+    - GridViewCoverSubtitleVisibility: 'Visibility of time played under game covers'
+    - GridViewCoverCompStatusSubtitleVisibility: 'Visibility of Completion Status under game covers'
+    - GridViewEnableCoverShineAnimation: 'Enable cover highlight animation on hover'
+    - GridViewEnablePlayingGlowBorder: 'Show glow animation if game is running'
+    - GridViewLibraryGameShowFavorite: 'Show favorites icon'
+    - GridViewCoverDisplayLibraryBanner: 'Show banners (Requires ThemeExtras extension)'
+    - GridViewCoverUseRoundedCorners: 'Use rounded corners (Can cause performance degradation)'
+    - GridViewCoverDisplayDropShadowEffect: 'Use dropshadow effect (Can cause performance degradation)'
