@@ -8,24 +8,24 @@ class LogicTests
     static void Check(bool value, string label) { assertions++; if (!value) throw new Exception(label); }
     static void Main()
     {
-        Check(Logic.SearchKey("Pokémon — Edição").Contains(Logic.SearchKey("pokemon")), "Busca com acentos");
-        Check(Logic.SearchKey(null) == "", "Título ausente");
-        Check(Logic.SearchKey("GOD OF WAR").Contains(Logic.SearchKey("god of war")), "Busca sem distinção de caixa");
-        Check(Logic.Groups(null).Single() == "Sem grupo", "Sem série");
-        Check(Logic.Groups(new[]{"Série A", "Série A", "", " ", "Série B"}).Count() == 2, "Multigrupo sem duplicação");
-        Check(Logic.ClampWidth(-100) == 180 && Logic.ClampWidth(900) == 380 && Logic.ClampWidth(double.NaN) == 230, "Largura válida");
-        Check(Logic.Compact(0, false, 850, 420), "Entra em compacto com pouca largura");
-        Check(Logic.Compact(0, true, 910, 420), "Histerese impede alternância no limiar");
-        Check(!Logic.Compact(0, true, 1030, 420), "Volta ao amplo com folga");
-        Check(Logic.Compact(1, false, 3000, 420) && !Logic.Compact(2, true, 400, 420), "Modos manuais");
+        Check(Logic.SearchKey("Pokémon — Special Edition").Contains(Logic.SearchKey("pokemon")), "Accent-insensitive search");
+        Check(Logic.SearchKey(null) == "", "Missing title");
+        Check(Logic.SearchKey("GOD OF WAR").Contains(Logic.SearchKey("god of war")), "Case-insensitive search");
+        Check(Logic.Groups(null).Single() == "No group", "No series");
+        Check(Logic.Groups(new[]{"Series A", "Series A", "", " ", "Series B"}).Count() == 2, "Unique group membership");
+        Check(Logic.ClampWidth(-100) == 180 && Logic.ClampWidth(900) == 380 && Logic.ClampWidth(double.NaN) == 230, "Valid width");
+        Check(Logic.Compact(0, false, 850), "Compact at narrow width");
+        Check(Logic.Compact(0, true, 930), "Compact mode hysteresis");
+        Check(!Logic.Compact(0, true, 1000), "Return to wide mode");
+        Check(Logic.Compact(1, false, 2000) && !Logic.Compact(2, true, 400), "Manual modes");
         // Model a large library: no rows lost when assigning multiple memberships and searching.
         var watch = Stopwatch.StartNew();
-        var games = Enumerable.Range(0, 50000).Select(i => new { Id = i, Name = "Jogo " + i,
-            Groups = new[] { "Série " + i % 200, "Favoritos", "Favoritos" } }).ToArray();
+        var games = Enumerable.Range(0, 50000).Select(i => new { Id = i, Name = "Game " + i,
+            Groups = new[] { "Series " + i % 200, "Favorites", "Favorites" } }).ToArray();
         var rows = games.SelectMany(g => Logic.Groups(g.Groups).Select(group => new { g.Id, group, Key = Logic.SearchKey(g.Name) })).ToArray();
-        Check(rows.Length == 100000, "50 mil jogos / 100 mil participações");
-        Check(rows.Select(r=>r.Id).Distinct().Count() == 50000, "Sem perda de jogos");
-        Check(rows.Where(r => r.Key.Contains(Logic.SearchKey("Jogo 12345"))).Select(r=>r.Id).Distinct().Single() == 12345, "Filtro de jogo multigrupo");
-        Console.WriteLine("PASS: " + assertions + " verificações; cenário 50.000 jogos: " + watch.ElapsedMilliseconds + " ms.");
+        Check(rows.Length == 100000, "50,000 games / 100,000 memberships");
+        Check(rows.Select(r=>r.Id).Distinct().Count() == 50000, "No games lost");
+        Check(rows.Where(r => r.Key.Contains(Logic.SearchKey("Game 12345"))).Select(r=>r.Id).Distinct().Single() == 12345, "Grouped game search");
+        Console.WriteLine("PASS: " + assertions + " checks; 50,000-game scenario: " + watch.ElapsedMilliseconds + " ms.");
     }
 }

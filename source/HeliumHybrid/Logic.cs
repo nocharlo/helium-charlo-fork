@@ -18,17 +18,15 @@ namespace HeliumHybrid
         {
             var values = (names ?? Enumerable.Empty<string>()).Where(n => !string.IsNullOrWhiteSpace(n))
                 .Distinct(StringComparer.CurrentCultureIgnoreCase).OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase).ToArray();
-            return values.Length == 0 ? new[] { "Sem grupo" } : values;
+            return values.Length == 0 ? new[] { "No group" } : values;
         }
         public static double ClampWidth(double width) { return double.IsNaN(width) || double.IsInfinity(width) ? 230 : Math.Max(180, Math.Min(380, width)); }
-        // WPF ActualWidth is already in device-independent pixels: no manual DPI multiplication.
-        public static bool Compact(int mode, bool wasCompact, double mainWidth, double detailsWidth)
+        // The available library width is measured in WPF device-independent pixels.
+        public static bool Compact(int mode, bool wasCompact, double width)
         {
             if (mode == 1) return true;
             if (mode == 2) return false;
-            if (double.IsNaN(mainWidth) || mainWidth <= 0) return wasCompact;
-            var target = 500 + Math.Max(360, Math.Min(620, detailsWidth)) + 18;
-            return wasCompact ? mainWidth < target + 44 : mainWidth < target - 44;
+            return width < (wasCompact ? 980 : 900);
         }
     }
 }

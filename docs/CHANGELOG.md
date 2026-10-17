@@ -1,38 +1,20 @@
 # Changelog
 
-This file documents the **Helium Hybrid 0.1.0** release. The original 0.1.0 package did not contain a changelog; this entry was prepared afterward using its README, technical report, and delivered files.
+## v0.2.3 — current tested baseline
 
-## [0.1.0] — Initial working prototype
+The maintainer installed and validated this version in Playnite Desktop on Windows. It is based directly on the supplied working v0.2.2 package.
 
-### Added
+- Stabilized the Steam-style game Navigator beside native Grid and Details views, including search, icons, expandable groups and synchronized selection.
+- Added independent sidebar and grid-cover click selectors for native Full Details View or the existing Grid Details Panel.
+- Kept Back to Grid, selection and conditional grid scroll restoration.
+- Kept complete sidebar collapse, a floating expand control, resizing, responsive layout and native List View compatibility.
+- Migrated saved v0.2.2 navigation checkboxes to the two new selectors; retained the persistent theme and extension IDs.
+- Continued using the KKCD artwork, overview and extension integration points.
 
-- A scrollable game navigation sidebar alongside the existing Helium KKCD Grid View.
-- Game titles and icons, local search, and alphabetical browsing.
-- Grouping by series, category, or platform, using existing Playnite metadata.
-- Two-way selection synchronization between the sidebar and Playnite's main library.
-- An adapter to request the native game details panel when a game is selected from the sidebar.
-- A collapsible, resizable sidebar (250 px initial width; 180–480 px range; 36 px when collapsed).
-- Persistence for sidebar width, grouping, and collapsed state.
-- Basic game launching through double-click, Enter, or the sidebar's Play menu.
-- A separately packaged Playnite extension (`.pext`) and Desktop theme (`.pthm`).
+## v0.1.0 — initial published baseline
 
-### Kept from the KKCD base
+The original working Helium Hybrid (KKCD) prototype introduced a searchable, scrollable game sidebar with icons and grouping alongside the KKCD cover grid; two-way selection synchronization; basic collapse and resize; and separate theme and extension installers. The maintainer tested it on Windows. Its code and exact original metadata remain in Git history.
 
-- The original grid, details views, media resources, and existing extension placeholders.
-- Compatibility-oriented configuration for Details to Grid View Converter, ThemeExtras, and ThemeModifier.
-- Separate theme and extension identifiers so the original KKCD installation is not overwritten.
+## Experimental local builds
 
-### Validation
-
-- The extension compiled against PlayniteSDK 6.11.0 and .NET Framework 4.6.2 with zero reported compiler errors or warnings.
-- XML parsing and nine standalone logic checks passed in the build environment.
-- The user subsequently installed 0.1.0 on Windows and confirmed that the sidebar, selection synchronization, and existing grid/details interface worked.
-
-### Known limitations
-
-- The sidebar reserves 36 px even when collapsed, and can crowd the grid on smaller displays.
-- Some settings associated with the original theme ID may need to be configured again.
-- The complete Windows test checklist and compatibility matrix remain unverified.
-- Sidebar contents are checked periodically for filter changes, which could affect very large libraries.
-
-For technical details, see [TECHNICAL-REPORT.md](TECHNICAL-REPORT.md). For Windows checks, see [WINDOWS-TESTING.md](WINDOWS-TESTING.md).
+Development packages between these baselines explored layout, navigation, collapse and settings behavior. They were local iterations, not separate releases documented here. The functional v0.2.2 package was the direct source of v0.2.3. No release dates are asserted for these entries.

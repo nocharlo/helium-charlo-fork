@@ -1,6 +1,6 @@
-Id: HeliumCharlo_84fd550a-26c3-43d6-8c09-77c48e5a27a6
-Name: Helium (charlo fork) Navigator
+Id: HeliumCharlo_b59e3c9f-9c52-4582-a332-0716b56cf023
+Name: Helium Navigator v0.2.3
 Author: Helium Hybrid contributors
-Version: 0.2.0
+Version: 0.2.3
 Module: HeliumCharlo.dll
 Type: GenericPlugin

@@ -10,7 +10,7 @@
                 <ControlTemplate TargetType="{x:Type LibraryDetailsView}">
                     <DockPanel d:DesignWidth="1280" d:DesignHeight="960"
                                d:DataContext="{x:Static DesignMainViewModel.DesignIntance}">
-                        <Grid DockPanel.Dock="{Settings DetailsListPosition}"
+                        <Grid x:Name="HeliumCharlo_NativeDetailsList" DockPanel.Dock="{Settings DetailsListPosition}"
                               Width="{Settings DetailsListWitdh}">
                             <Border Background="{DynamicResource LibraryDetailsViewBackgroundBrush}"
                                     BorderBrush="{DynamicResource PanelSeparatorBrush}">
