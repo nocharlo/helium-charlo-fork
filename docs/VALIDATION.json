@@ -1,0 +1,17 @@
+{
+  "base_files": 194,
+  "base_xaml": 64,
+  "changed": [
+    "theme.yaml",
+    "themeExtras.yaml",
+    "Views/Library.xaml"
+  ],
+  "unchanged": 191,
+  "input_sha256": "734ecc42e5acd8620128c46deb6a3a4b667de859267d9a330a5709b263c9615a",
+  "dll_sha256": "4bf798d3b35e8742f47a1b8e3a1450625fb9cd2dc3bc8ec47ff43e7b661ed28d",
+  "compiler": "Roslyn 4.11, optimize+, .NET Framework 4.6.2, PlayniteSDK 6.11.0",
+  "compile_errors": 0,
+  "compile_warnings": 0,
+  "logic_tests": "PASS: 9; 50,000 games / 100,000 memberships; 244 ms",
+  "windows_runtime_tested": false
+}
