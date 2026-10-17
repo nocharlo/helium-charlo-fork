@@ -1,20 +1,27 @@
-# Helium Hybrid 0.1.0 — Windows Testing Checklist
+# Windows acceptance checklist — v0.2.3
 
-This checklist was written for testing the release in a real Playnite installation. **None of the items below were marked as passed in the original Linux build environment.** The user subsequently confirmed that the basic sidebar, grid, and selection worked on their Windows setup; the full checklist has not been formally completed.
+Test with the working v0.2.2 settings backed up. Record failures with layout mode, click action and Playnite log.
 
-1. Install both packages. Confirm that the original KKCD theme and Helium Hybrid are listed separately.
-2. Open Grid View and check that the game list, covers, and details panel are visible. Resize the window and check whether the main content still has enough usable space. Reduce the details-panel width if necessary.
-3. Click three games in the sidebar. Check the selected cover, game title, logo, and background. Close the details panel, then select another game from the sidebar; the panel should reopen.
-4. Select a game farther down in the grid. Check that the matching entry becomes highlighted and is brought into view in the sidebar. Scroll the sidebar and confirm that the grid's scroll position does not change.
-5. Use Playnite's native search and filters. Allow up to 1.5 seconds, then confirm that the sidebar reflects the filtered game set.
-6. Search for a game name with and without accents in the sidebar search. Confirm that local search does not modify the grid or the global filters.
-7. Group games by series, category, and platform. Expand and collapse group headers. Check games assigned to multiple groups and games with no group assignment.
-8. Drag the sidebar's edge to resize it, collapse it, and restart Playnite. Check whether width and grouping preferences are restored.
-9. Test the native grid context menu and the sidebar's **Play** menu. Use Enter or double-click on a game you actually want to launch. Double-clicking empty space or a group header should not launch a game.
-10. Check Extra Metadata Loader, ThemeExtras, ThemeModifier, Game Relations, GameActivity, and HowLongToBeat. Process only the Hybrid variant with Details to Grid View Converter if prompted. Switch back to the original KKCD theme to confirm that rollback works.
-
-## Reporting a problem
-
-Capture the entire Playnite window and include the Playnite version, window size, Windows display scaling, the action that caused the problem, and the relevant section of `playnite.log` containing **“Helium Hybrid”**.
-
-For implementation notes and the original build-time checks, see [TECHNICAL-REPORT.md](TECHNICAL-REPORT.md) and [VALIDATION.json](VALIDATION.json).
+- [ ] Theme selector shows exactly **Helium (charlo fork) v0.2.3**.
+- [ ] Add-on management shows **Helium Navigator v0.2.3**, without a conflicting Navigator installation.
+- [ ] Settings migration: enabled old checkbox → Full Details View; disabled → Grid Details Panel.
+- [ ] Sidebar click → Full Details View; native list hidden and Back to Grid available.
+- [ ] Sidebar click → Grid Details Panel for the selected game.
+- [ ] Grid cover click → Full Details View.
+- [ ] Grid cover click → Grid Details Panel for the selected game.
+- [ ] Existing grid `i` button and native panel close control work.
+- [ ] Automatic layout responds to width changes and explicit panel requests.
+- [ ] Always visible layout retains its default with both click actions.
+- [ ] Always hidden layout remains hidden by default.
+- [ ] Always hidden: explicit panel request opens temporarily; close restores hidden layout.
+- [ ] Back to Grid preserves selection and, where possible, grid scroll position.
+- [ ] From full Details View, clicking another sidebar game in Grid Details Panel mode switches to Grid and opens that game.
+- [ ] Double-click sidebar game and grid cover launches normally without unintended navigation.
+- [ ] Right-click context menus, keyboard navigation and native shortcuts work.
+- [ ] Selection synchronizes between Navigator and grid in both directions.
+- [ ] Collapse sidebar fully and reopen with the floating button; resizing and search work.
+- [ ] Restart Playnite: independent selectors, layout, width and collapsed state persist.
+- [ ] Native List View has no duplicate Navigator.
+- [ ] Backgrounds, logos, artwork, statistics and third-party integrations work.
+- [ ] No visual regressions in native Grid and Details views or converter panel placement.
+- [ ] All project-authored UI shown by the update is in English.

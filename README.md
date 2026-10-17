@@ -1,226 +1,53 @@
 # Helium (charlo fork)
 
-A Steam-inspired library navigation sidebar for [Playnite](https://github.com/JosefNemec/Playnite) Desktop Mode, based on [Helium](https://github.com/darklinkpower/Helium) by darklinkpower and the [KKCD fork](https://github.com/kushagr-m/Helium).
+A Steam-style game Navigator integrated into [Playnite](https://github.com/JosefNemec/Playnite) Desktop's native library views. This project modifies Brandon Balderas's [Helium](https://github.com/darklinkpower/Helium) through the Helium KKCD fork by Kush Mittal. The current version is **v0.2.3**, tested by the project maintainer in Playnite Desktop on Windows. The theme and companion extension display as **Helium (charlo fork) v0.2.3** and **Helium Navigator v0.2.3**.
 
-## About
+The goal is to keep a compact, searchable list of individual games beside the existing cover grid or full game details. Helium's artwork, logos, backgrounds and supported integrations remain in place. This is an unofficial community fork; inherited theme components are credited below.
 
-I've been using Playnite for a while, and one thing I've always missed from Steam is its library navigation.
+## What v0.2.3 does
 
-I like having a compact list of games on the left while the rest of the window displays my library or the details of whichever game I've selected. Playnite already has both Grid and Details views, but switching between them always felt a little inconvenient to me.
+- Shows a scrollable, independently scrolling game Navigator with icons, search and expandable groupings.
+- Synchronizes game selection between Navigator and Playnite's grid, preserving native filtering and sorting.
+- Lets sidebar games and grid covers independently open either the native Full Details View or the Grid Details Panel. The grid panel uses Playnite's existing sidebar command, also used by the cover's `i` button.
+- Offers Back to Grid with selected game and, where possible, prior grid scroll position.
+- Collapses the Navigator completely, with a floating expand button, adjustable width and responsive panel layout.
+- Keeps the native List View free of a duplicate Navigator. Settings persist through the extension's user-data file.
 
-I wanted to use both at the same time.
+The [architecture notes](docs/ARCHITECTURE.md) map the XAML host, Playnite commands, navigation state and settings migration to source files. [Windows testing](docs/WINDOWS-TESTING.md) covers the accepted behavior and additional installation checks.
 
-After looking around for themes and extensions, I couldn't find anything that worked quite the way I imagined. So I decided to experiment with AI-generated code, using the Helium KKCD fork I already had installed.
+## Requirements and installation
 
-Somehow, it worked.
+Use Playnite 10 Desktop on Windows. The theme integrates with [Details to Grid View Converter](https://playnite.link/addons.html#ThemesDetailsViewToGridViewConverter_ef8a7226-eedc-478d-a506-92ee6c088aa3); retain it for the intended grid details presentation. [Extra Metadata Loader](https://playnite.link/addons.html#ExtraMetadataLoader_705fdbca-e1fc-4004-b839-1d040b8b4429), ThemeModifier, ThemeExtras and other integrations may supply additional theme content. Their features depend on the respective extensions and your configuration. The project targets PlayniteSDK 6.11.0 and .NET Framework 4.6.2.
 
-The result is a custom navigation sidebar that sits alongside Helium's existing grid and details layout. I'm sharing it here in case anyone else has been looking for something similar, and hopefully to make further development a little easier.
+1. Close Playnite and back up your current working theme, extension and Navigator `navigator.xml` settings.
+2. Download the [theme](packages/Helium-charlo-fork-v0.2.3.pthm) and [Navigator extension](packages/Helium-Navigator-v0.2.3.pext) from this repository. Open each installer with Playnite, then restart.
+3. Select **Helium (charlo fork) v0.2.3** under Desktop theme settings. In add-on settings, open **Helium Navigator v0.2.3** and choose the sidebar and grid-cover click actions separately.
+4. Keep your other theme integrations enabled. Check that only one Navigator is active; the installer does not remove older installations.
 
-## Features
+For manual installation, extract the package contents into separate folders under `%AppData%\Playnite\Themes\Desktop` and `%AppData%\Playnite\Extensions`, respectively, then restart Playnite. The `theme/` and `install/` directories contain the corresponding unpacked contents. The v0.2.3 theme and extension retain stable IDs from v0.2.2 for settings compatibility; earlier v0.1.0 code remains accessible in Git history.
 
-The initial release includes:
+To roll back, reinstall your backed-up v0.2.2 packages and restore your backed-up `navigator.xml`. The new version saves navigation choices in new fields, so the settings backup matters for exact rollback. No game metadata is changed.
 
-- A scrollable game sidebar with titles and icons
-- Alphabetical navigation and game search
-- Synchronized selection between the sidebar and Playnite's main library
-- A collapsible sidebar
-- Independent scrolling between the game list and grid
-- Integration with Helium's existing Grid View and game details
-- A separate Playnite extension handling the navigation
+## Build and checks
 
-Selecting a game in the sidebar updates the selection in Playnite. Selecting a game from the grid also highlights it in the sidebar.
+Run `source/Build.ps1` in PowerShell on Windows with the .NET SDK and network access for the NuGet references. It builds the C# project in Release, copies the DLL and extension manifest into `install/`, and packages the theme and extension. The project uses .NET Framework 4.6.2 and PlayniteSDK 6.11.0. Run `python tests/validate_package.py` after packaging; `tests/LogicTests.csproj` covers platform-independent search and layout logic.
 
-The existing Helium interface, including backgrounds, logos, artwork, and supported extensions, remains available.
+The checked-in v0.2.3 DLL was compiled in Release with Roslyn against .NET Framework reference assemblies and PlayniteSDK 6.11.0. Static XML/XAML and package checks and 13 standalone logic checks passed. The maintainer installed and validated v0.2.3 in Playnite on Windows; the automated checks do not replace that runtime validation. See [technical validation](docs/TECHNICAL-REPORT.md) and the [change log](docs/CHANGELOG.md).
 
-## Current Status
+## Limits and development status
 
-### v0.1.0 — Initial Release
+The layout depends on Playnite Desktop's current view templates and the converter's grid overview. Different themes, extension combinations or future Playnite changes may require adjustments. The temporary panel override can take up to the existing 1.5-second layout refresh to return to its default after closing. Broad compatibility across other installations has not been established. v0.2.3 is the current tested baseline; earlier experimental local builds are not separate releases.
 
-The first working version.
+No screenshot of the approved v0.2.3 is included in this repository. Screenshots may be added after confirming their source and permission to publish.
 
-I've installed and tested it on my own Playnite setup, and the main functionality works as intended.
+Development used substantial AI assistance for code and documentation. charlo defined requirements, made interface decisions, tested in Playnite, identified failures and guided iterations. The source is published for review, improvement and independent reimplementation; contributions should explain changes and how they were tested.
 
-There are still some issues, particularly on smaller displays. The sidebar takes up a fair amount of space, and keeping the grid and details panel visible together can make the interface feel cramped.
+## Credits and license
 
-Still, I'm pretty happy with how the initial experiment turned out.
+- **Brandon Balderas (darklinkpower)** — original Helium theme.
+- **Kush Mittal** — Helium KKCD fork used as the theme base.
+- **Josef Nemec and Playnite contributors** — Playnite and its SDK.
+- **Third-party extension authors** — their own integrations and resources remain theirs.
+- **charlo** — concept, requirements, interface choices and Windows testing.
 
-### v0.2.0 — In Development
-
-The next version focuses on improving the interface for laptops and smaller windows.
-
-Planned changes include:
-
-- Responsive layouts based on available window space
-- A more compact, resizable sidebar
-- Persistent sidebar settings
-- Improved collapsing behavior across library views
-- Optional Steam-style navigation to full game details
-- Adaptive cover grid sizing
-- Better scroll position preservation
-- Performance and compatibility improvements
-
-Early development builds have introduced some visual regressions, so v0.1.0 remains the working reference for now.
-
-I also have some ideas for expandable game groups and additional navigation options, but those can wait until the current features are more reliable.
-
-## Installation
-
-You'll need **Playnite 10 Desktop** on Windows.
-
-1. Download the latest working version from [Releases](https://github.com/nocharlo/helium-charlo-fork/releases).
-2. Install the included `.pext` navigator extension.
-3. Install the `.pthm` theme.
-4. Restart Playnite if prompted.
-5. Go to **Settings → Appearance → General** and select the installed theme.
-6. Switch to Grid View.
-
-The v0.1.0 packages still use the name **Helium Hybrid (KKCD)** internally. The new project name will be reflected in future releases.
-
-Make sure the theme and navigator extension belong to the same compatible release.
-
-I recommend keeping your previous working theme installed, especially when testing experimental updates.
-
-### Manual Installation
-
-Playnite stores Desktop themes and extensions in these directories:
-
-**Themes:** `%AppData%\Playnite\Themes\Desktop`
-
-**Extensions:** `%AppData%\Playnite\Extensions`
-
-If you're installing manually, copy the extracted folders into their respective locations and restart Playnite.
-
-## Extension Compatibility
-
-This project was developed around my existing Helium setup, which includes:
-
-- [Details to Grid View Converter](https://playnite.link/addons.html#ThemesDetailsViewToGridViewConverter_ef8a7226-eedc-478d-a506-92ee6c088aa3)
-- [Extra Metadata Loader](https://playnite.link/addons.html#ExtraMetadataLoader_705fdbca-e1fc-4004-b839-1d040b8b4429)
-- [ThemeModifier](https://playnite.link/addons.html#playnite-thememodifier-plugin)
-- [ThemeExtras](https://playnite.link/addons.html#felixkmh_Extras_Plugin)
-- LibraryManagement
-- GameActivity
-- HowLongToBeat
-- Game Relations
-- SuccessStory
-- ScreenshotsVisualizer
-
-Many of these integrations were already supported by the original Helium theme or the KKCD fork. My changes focus primarily on the navigation sidebar and its interaction with Playnite's library.
-
-I haven't tested every possible combination of extensions, so your experience may vary depending on your setup.
-
-## Development
-
-The project consists of two main components.
-
-**Theme (XAML/WPF)**
-
-A modified Helium theme that integrates the custom sidebar into the existing Playnite Desktop layout.
-
-**Navigator Extension (C#)**
-
-A Playnite extension that handles the game list, navigation, and selection synchronization.
-
-The source code, build files, and technical documentation are available in this repository.
-
-### A Note About Vibe Coding
-
-**This project is entirely vibe-coded.**
-
-I have no programming background, and I'm not going to pretend otherwise.
-
-The custom code was generated with AI tools, mostly ChatGPT, based on my ideas, requirements, feedback, and testing. My involvement has been figuring out what I wanted, explaining it, testing the results, and trying to fix whatever broke along the way.
-
-I'm aware that AI-generated code can be inefficient, difficult to maintain, or contain problems I don't have the knowledge to identify. There's also a broader discussion worth having about the environmental costs of AI and the additional review work it can create for open-source developers.
-
-I take those concerns seriously, even if I'm still experimenting with the technology.
-
-I decided to publish the project because the feature itself might be useful to other people, and I'd like to see whether someone with actual development experience could take it further.
-
-### To Developers
-
-If you're familiar with Playnite development and find this interesting, I'd genuinely appreciate your help.
-
-Code reviews, bug fixes, refactoring, performance improvements, and alternative implementations are all welcome.
-
-I have no attachment to the AI-generated code. If there's a cleaner or more reliable way to implement this functionality, I'd be happy to see it.
-
-I'm particularly interested in how this could be better integrated with Playnite's native library views and selection system.
-
-I can help with testing, interface decisions, documentation, and feedback. My programming knowledge, unfortunately, remains nonexistent.
-
-If someone eventually develops a proper implementation of this feature from scratch, I'd be glad to see that happen too.
-
-For now, I'm treating this repository as a proof of concept that other people can inspect, improve, or learn from.
-
-## Contributing
-
-Feel free to open an issue or submit a pull request.
-
-For bug reports, please include:
-
-- Playnite version
-- Theme and navigator version
-- Relevant installed extensions
-- Steps to reproduce the problem
-- Screenshots or logs, if available
-
-If you're submitting code, please explain what changed and how it was tested.
-
-I may need help reviewing technical contributions, so patience is appreciated.
-
-## Known Issues
-
-As of v0.1.0:
-
-- The sidebar can occupy too much space on smaller displays.
-- Its collapsing behavior across different library views needs improvement.
-- The grid and details panel can become cramped.
-- Some layout behavior depends on Details to Grid View Converter.
-- The navigator uses periodic library updates that could be optimized.
-- Compatibility with other setups hasn't been thoroughly tested.
-
-Additional issues may exist. Feel free to report them.
-
-## Credits
-
-This project builds on the work of the Playnite community.
-
-**[Josef Nemec](https://github.com/JosefNemec)** — Creator of Playnite.
-
-**[Brandon Balderas (darklinkpower)](https://github.com/darklinkpower/Helium)** — Original Helium theme and several Playnite extensions.
-
-**[Kush Mittal (KKCD)](https://github.com/kushagr-m/Helium)** — Helium KKCD fork, used as the foundation for this project.
-
-**Playnite extension developers** — For the various extensions and integrations that make this setup possible.
-
-**charlo** — Project concept, design decisions, feature requirements, testing, and ongoing experiments.
-
-The custom implementation was generated with AI assistance.
-
-Special thanks to the original developers for making their work available to the community.
-
-## License
-
-Helium (charlo fork) is based on Helium by Brandon Balderas and the KKCD fork by Kush Mittal.
-
-The inherited theme code is distributed under the **MIT License**.
-
-The original copyright notices are preserved in the [LICENSE](LICENSE) file:
-
-- Copyright (c) 2020– Brandon Balderas
-- Copyright (c) 2025– Kush Mittal
-
-Any third-party components retain their applicable licenses. The licensing of newly generated extension code should also be checked independently.
-
-## Disclaimer
-
-This is an unofficial, experimental project with no affiliation to Playnite, Valve, Steam, or the original Helium developers.
-
-I've tested the initial version on my own setup, but I can't guarantee that everything will work correctly on yours.
-
-Please keep a backup of your working configuration before trying development builds.
-
----
-
-Made by someone who spends an unreasonable amount of time organizing his game library instead of actually playing it.
+The inherited MIT copyright notices for Balderas and Mittal are preserved in [license](license). Existing credits and third-party notices in theme resources remain in place. This project is not affiliated with Playnite or Valve.

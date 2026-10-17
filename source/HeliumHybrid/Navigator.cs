@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -13,60 +12,21 @@ using System.Windows.Input;
 using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Media.Media3D;
 using System.Windows.Threading;
 using System.Xml.Serialization;
+using System.Runtime.InteropServices;
 using Playnite.SDK;
 using Playnite.SDK.Controls;
 using Playnite.SDK.Models;
 namespace HeliumHybrid
 {
-    public class Preferences
+    public sealed class GameRow
     {
-        public double Width { get; set; } = 230;
-        public bool Collapsed { get; set; }
-        public bool CollapsedOther { get; set; } = true;
-        public int Grouping { get; set; }
-        public int LayoutMode { get; set; } // 0 auto; 1 compact; 2 wide
-        public bool SteamNavigation { get; set; }
-        public bool LocateCover { get; set; }
-        public bool PreserveScroll { get; set; } = true;
-
-        public static Preferences Load(string ownDirectory, string extensionDataPath)
-        {
-            var own = Path.Combine(ownDirectory, "navigator.xml");
-            var old = Path.Combine(extensionDataPath, "e9e0f96a-b087-4f96-a157-710e6b7da49c", "navigator.xml");
-            // Read a previous version only once. Never change the 0.1 file.
-            foreach (var path in new[] { own, old }) {
-                try {
-                    using (var reader = File.OpenRead(path)) {
-                        var result = (Preferences)new XmlSerializer(typeof(Preferences)).Deserialize(reader);
-                        result.Width = Logic.ClampWidth(result.Width);
-                        return result;
-                    }
-                } catch { }
-            }
-            return new Preferences();
-        }
-        public void Save(string directory)
-        {
-            Directory.CreateDirectory(directory);
-            var path = Path.Combine(directory, "navigator.xml");
-            var temp = path + ".tmp";
-            using (var writer = File.Create(temp)) new XmlSerializer(typeof(Preferences)).Serialize(writer, this);
-            File.Copy(temp, path, true); File.Delete(temp);
-        }
-    }
-    public sealed class GameRow : INotifyPropertyChanged
-    {
-        public event PropertyChangedEventHandler PropertyChanged;
-        public string SortName { get; set; }
         public Guid Id { get; set; }
         public string Name { get; set; }
         public string Group { get; set; }
         public string Key { get; set; }
-        private string iconPath;
-        public string IconPath { get => iconPath; set { if (iconPath != value) { iconPath = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Icon))); } } }
+        public string IconPath { get; set; }
         public ImageSource Icon => IconCache.Load(IconPath);
     }
     internal static class IconCache
@@ -99,36 +59,37 @@ namespace HeliumHybrid
         private readonly TextBlock count, status;
         private readonly Button toggle;
         private readonly Thumb grip;
-        private readonly Popup options;
-        private readonly Button optionsButton;
-        private readonly ComboBox layoutMode;
-        private readonly CheckBox steamMode, locateCover, preserveScroll;
-        private Control gridView;
-        private FrameworkElement hostPanel;
-        private FrameworkElement nativeDetails;
-        private ListBox nativeGridList;
-        private bool suppressNativeOpen;
-        private double rememberedDetailWidth = 420;
-        private double savedGridOffset;
-        private bool hasGridOffset;
-        private int refreshQueued;
-
+        private readonly FrameworkElement tools;
+        private readonly Button backButton;
+        private Button reopenButton;
         private readonly DispatcherTimer timer, searchTimer;
+        private readonly DispatcherTimer coverClickTimer, sidebarClickTimer;
+        private Guid pendingSidebarId;
+        private bool panelRequested;
+        private DateTime panelRequestedAt;
+        private ListBox nativeGridList;
+        private ListBoxItem coverDownItem;
+        private Point coverDownPosition;
+        private Guid pendingCoverId;
         private readonly Preferences prefs;
-
         private bool active, syncing, reportedError;
+        private bool compact, navigatedDetails;
+        private FrameworkElement detailsBorder;
+        private BindingBase detailsVisibilityBinding;
+        private FrameworkElement nativeDetailsList;
+        private double gridOffset;
+        private Guid[] gridIds;
+        private string gridSort, gridSortDirection, gridGrouping;
+        private Window window;
+        private DesktopView lastDesktopView;
         private int dirty = 1;
-        private int fullDirty = 1;
-        private readonly object updateGate = new object();
-        private readonly HashSet<Guid> pendingGameIds = new HashSet<Guid>();
-        private Guid? clickOnSelectedRow;
         private Guid[] lastIds = new Guid[0];
         private List<GameRow> rows = new List<GameRow>();
         private ListCollectionView view;
         public Navigator(IPlayniteAPI api, HybridPlugin plugin)
         {
             this.api = api; this.plugin = plugin;
-            prefs = plugin.Prefs;
+            prefs = plugin.Settings;
             prefs.Width = Logic.ClampWidth(prefs.Width);
             using (var stream = typeof(Navigator).Assembly.GetManifestResourceStream("HeliumHybrid.Navigator.xaml"))
                 root = (Grid)XamlReader.Load(stream);
@@ -136,52 +97,57 @@ namespace HeliumHybrid
             list = (ListBox)root.FindName("Games"); search = (TextBox)root.FindName("Search");
             grouping = (ComboBox)root.FindName("Grouping"); count = (TextBlock)root.FindName("Count");
             status = (TextBlock)root.FindName("Status"); toggle = (Button)root.FindName("CollapseButton");
-            grip = (Thumb)root.FindName("ResizeGrip");
-            optionsButton = (Button)root.FindName("OptionsButton");
-            options = (Popup)root.FindName("OptionsPopup");
-            layoutMode = (ComboBox)root.FindName("LayoutMode");
-            steamMode = (CheckBox)root.FindName("SteamMode");
-            locateCover = (CheckBox)root.FindName("LocateCover");
-            preserveScroll = (CheckBox)root.FindName("PreserveScroll");
-            layoutMode.SelectedIndex = Math.Max(0, Math.Min(2, prefs.LayoutMode));
-            steamMode.IsChecked = prefs.SteamNavigation; locateCover.IsChecked = prefs.LocateCover;
-            preserveScroll.IsChecked = prefs.PreserveScroll;
-            optionsButton.Click += (s,e) => options.IsOpen = !options.IsOpen;
-            layoutMode.SelectionChanged += (s,e) => { prefs.LayoutMode = layoutMode.SelectedIndex; RecomputeLayout(); Save(); };
-            steamMode.Checked += (s,e) => { prefs.SteamNavigation = true; Save(); };
-            steamMode.Unchecked += (s,e) => { prefs.SteamNavigation = false; ReturnToGrid(); Save(); };
-            locateCover.Checked += (s,e) => { prefs.LocateCover = true; Save(); };
-            locateCover.Unchecked += (s,e) => { prefs.LocateCover = false; Save(); };
-            preserveScroll.Checked += (s,e) => { prefs.PreserveScroll = true; Save(); };
-            preserveScroll.Unchecked += (s,e) => { prefs.PreserveScroll = false; Save(); };
+            grip = (Thumb)root.FindName("ResizeGrip"); tools = (FrameworkElement)root.FindName("Tools");
+            backButton = (Button)root.FindName("BackButton");
             grouping.SelectedIndex = Math.Max(0, Math.Min(3, prefs.Grouping));
-            timer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(2500) };
+            timer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(1500) };
             timer.Tick += (s, e) => { RecomputeLayout(); Refresh(); };
             searchTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(180) };
             searchTimer.Tick += (s, e) => { searchTimer.Stop(); ApplySearch(); };
+            coverClickTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher);
+            coverClickTimer.Tick += (s, e) => {
+                coverClickTimer.Stop();
+                if (active && api.MainView.ActiveDesktopView == DesktopView.Grid &&
+                    api.MainView.SelectedGames?.Any(game => game.Id == pendingCoverId) == true)
+                    Safe(() => Navigate(pendingCoverId, prefs.GridCoverClickAction));
+            };
+            sidebarClickTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher);
+            sidebarClickTimer.Tick += (s, e) => {
+                sidebarClickTimer.Stop();
+                if (active && api.MainView.SelectedGames?.Any(game => game.Id == pendingSidebarId) == true)
+                    Safe(() => Navigate(pendingSidebarId, prefs.SidebarClickAction));
+            };
             search.TextChanged += (s, e) => { searchTimer.Stop(); searchTimer.Start(); };
-            grouping.SelectionChanged += (s, e) => { prefs.Grouping = grouping.SelectedIndex; Interlocked.Exchange(ref fullDirty, 1); Interlocked.Exchange(ref dirty, 1); Refresh(); Save(); };
-            toggle.Click += (s, e) => SetCollapsed(true);
+            grouping.SelectionChanged += (s, e) => { prefs.Grouping = grouping.SelectedIndex; Interlocked.Exchange(ref dirty, 1); Refresh(); Save(); };
+            backButton.Click += (sender, args) => Safe(ReturnToGrid);
+            toggle.Click += (sender, args) => {
+                prefs.Collapsed = !prefs.Collapsed;
+                ApplySize(); RecomputeLayout(); Save(); if (!IsCollapsed()) Refresh();
+            };
             grip.DragDelta += (s, e) => { prefs.Width = Logic.ClampWidth(prefs.Width + e.HorizontalChange); ApplySize(); RecomputeLayout(); };
             grip.DragCompleted += (s, e) => Save();
-            list.PreviewMouseLeftButtonDown += (s, e) => {
-                var row = RowUnderPointer(e.OriginalSource as DependencyObject)?.DataContext as GameRow;
-                clickOnSelectedRow = row != null && (list.SelectedItem as GameRow)?.Id == row.Id ? (Guid?)row.Id : null;
-            };
-            list.AddHandler(UIElement.MouseLeftButtonUpEvent, new MouseButtonEventHandler((s, e) => {
-                var row = RowUnderPointer(e.OriginalSource as DependencyObject)?.DataContext as GameRow;
-                if (prefs.SteamNavigation && row != null && clickOnSelectedRow == row.Id && !plugin.State.IsDetailPage)
-                    Safe(() => SelectGame(row.Id));
-                clickOnSelectedRow = null;
-            }), true);
             list.SelectionChanged += (s, e) => {
                 if (!syncing && list.SelectedItem is GameRow row) Safe(() => SelectGame(row.Id));
             };
-            list.MouseDoubleClick += (s, e) => { if (RowUnderPointer(e.OriginalSource as DependencyObject) != null) StartSelected(); };
+            list.AddHandler(PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler((s, e) => {
+                if (e.ClickCount > 1) sidebarClickTimer.Stop();
+            }), true);
+            list.AddHandler(MouseLeftButtonUpEvent, new MouseButtonEventHandler((s, e) => {
+                if (e.ClickCount != 1 || Keyboard.Modifiers != ModifierKeys.None) return;
+                var item = RowUnderPointer(e.OriginalSource as DependencyObject);
+                if (!(item?.DataContext is GameRow row)) return;
+                pendingSidebarId = row.Id;
+                sidebarClickTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(200, (int)GetDoubleClickTime()) + 60);
+                sidebarClickTimer.Stop(); sidebarClickTimer.Start();
+            }), true);
+            list.MouseDoubleClick += (s, e) => {
+                sidebarClickTimer.Stop();
+                if (RowUnderPointer(e.OriginalSource as DependencyObject) != null) StartSelected();
+            };
             list.PreviewKeyDown += (s, e) => { if (e.Key == Key.Enter && list.SelectedItem != null) { StartSelected(); e.Handled = true; } };
             // These commands use public APIs. The native grid keeps its complete original menu.
             list.ContextMenuOpening += ContextOpening;
-            var menu = new ContextMenu(); var play = new MenuItem { Header = "Jogar" }; play.Click += (s, e) => StartSelected();
+            var menu = new ContextMenu(); var play = new MenuItem { Header = "Play" }; play.Click += (s, e) => StartSelected();
             
             menu.Items.Add(play); list.ContextMenu = menu;
             Loaded += OnLoaded; Unloaded += OnUnloaded;
@@ -195,156 +161,101 @@ namespace HeliumHybrid
         {
             var container = RowUnderPointer(Mouse.DirectlyOver as DependencyObject);
             if (container == null) { e.Handled = true; return; }
-            syncing = true;
-            try { list.SelectedItem = container.DataContext; } finally { syncing = false; }
+            list.SelectedItem = container.DataContext;
         }
-        private void SelectGame(Guid id)
+        private void SelectGame(Guid id) => api.MainView.SelectGame(id);
+        private void Navigate(Guid id, int action)
         {
-            if (prefs.SteamNavigation) CaptureGridOffset();
-            api.MainView.SelectGame(id);
-            // The selection event alone never opens the detail page; only this explicit action does.
-            if (prefs.SteamNavigation) plugin.State.IsDetailPage = true;
-            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => Safe(() => {
-                if (!active || !(api.MainView.SelectedGames?.Any(g => g.Id == id) ?? false)) return;
-                if (prefs.LocateCover && !prefs.SteamNavigation) LocateSelectedCover();
-                OpenNativeDetails(prefs.SteamNavigation);
-            })));
+            if (action == 0) OpenNativeDetails(id);
+            else OpenGridPanel(id);
         }
-        private void OpenNativeDetails(bool explicitPage)
+        private void OpenNativeDetails(Guid id)
         {
-            var host = GetHost();
-            var command = host?.Tag as ICommand;
-            if (host?.DataContext == null || command == null || !command.CanExecute(host.DataContext)) return;
-            suppressNativeOpen = !explicitPage;
-            try { command.Execute(host.DataContext); }
-            finally { suppressNativeOpen = false; }
+            if (!active || api.MainView.ActiveDesktopView != DesktopView.Grid ||
+                api.MainView.SelectedGames?.Any(game => game.Id == id) != true) return;
+            var switchButton = FindNamed(window, "HeliumCharlo_SwitchDetails") as Button;
+            if (switchButton?.Command == null || !switchButton.Command.CanExecute(null)) return;
+            CaptureGridScroll();
+            navigatedDetails = true;
+            panelRequested = false;
+            switchButton.Command.Execute(null);
+            RecomputeLayout();
         }
-        private static DependencyObject ParentOf(DependencyObject node)
+        private void OpenGridPanel(Guid id, int remainingSwitchChecks = 3)
         {
-            return node is Visual || node is Visual3D ? VisualTreeHelper.GetParent(node) : LogicalTreeHelper.GetParent(node);
-        }
-        private ContentControl GetHost()
-        {
-            DependencyObject parent = this;
-            while (parent != null) {
-                var host = parent as ContentControl;
-                if (host != null && host.Name == "HeliumCharlo_Navigator") return host;
-                parent = ParentOf(parent);
-            }
-            return null;
-        }
-        private ScrollViewer GridScroll()
-        {
-            if (nativeGridList == null) return null;
-            nativeGridList.ApplyTemplate();
-            return FindChild<ScrollViewer>(nativeGridList);
-        }
-        private static T FindChild<T>(DependencyObject parent) where T : DependencyObject
-        {
-            if (parent == null) return null;
-            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++) {
-                var child = VisualTreeHelper.GetChild(parent, i);
-                if (child is T found) return found;
-                var nested = FindChild<T>(child);
-                if (nested != null) return nested;
-            }
-            return null;
-        }
-        private void CaptureGridOffset()
-        {
-            if (!prefs.PreserveScroll) return;
-            var scroll = GridScroll();
-            if (scroll != null) { savedGridOffset = scroll.VerticalOffset; hasGridOffset = true; }
-        }
-        private void LocateSelectedCover()
-        {
-            if (nativeGridList?.SelectedItem != null) nativeGridList.ScrollIntoView(nativeGridList.SelectedItem);
-        }
-        internal void ReturnToGrid()
-        {
-            plugin.State.IsDetailPage = false;
-            if (!prefs.PreserveScroll || !hasGridOffset) return;
-            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
-                var scroll = GridScroll();
-                if (scroll != null) scroll.ScrollToVerticalOffset(savedGridOffset);
-                hasGridOffset = false;
-            }));
-        }
-        private void NativeDetailsVisibilityChanged(object sender, EventArgs e)
-        {
-            if (!active || nativeDetails == null || !plugin.State.InGrid) return;
-            if (nativeDetails.Visibility == Visibility.Collapsed && plugin.State.IsDetailPage) ReturnToGrid();
-            else if (nativeDetails.Visibility == Visibility.Visible && plugin.State.IsCompact && !suppressNativeOpen)
-                plugin.State.IsDetailPage = true;
-        }
-        private void GridMouseDown(object sender, MouseButtonEventArgs e)
-        {
-            if (!plugin.State.IsCompact || nativeGridList == null) return;
-            DependencyObject node = e.OriginalSource as DependencyObject;
-            while (node != null && node != nativeGridList) {
-                if ((node as FrameworkElement)?.Name == "PART_ButtonInfo") {
-                    CaptureGridOffset();
-                    Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
-                        if (active) { plugin.State.IsDetailPage = true; OpenNativeDetails(true); }
-                    }));
-                    break;
+            if (!active || api.MainView.SelectedGames?.Any(game => game.Id == id) != true) return;
+            if (api.MainView.ActiveDesktopView == DesktopView.Details) {
+                if (navigatedDetails) ReturnToGrid();
+                else {
+                    var button = FindNamed(window, "HeliumCharlo_SwitchGrid") as Button;
+                    if (button?.Command == null || !button.Command.CanExecute(null)) return;
+                    button.Command.Execute(null);
                 }
-                node = ParentOf(node);
+                if (remainingSwitchChecks > 0)
+                    Dispatcher.BeginInvoke(DispatcherPriority.Loaded,
+                        new Action(() => Safe(() => OpenGridPanel(id, remainingSwitchChecks - 1))));
+                return;
             }
+            if (api.MainView.ActiveDesktopView != DesktopView.Grid) return;
+            var host = FindNamed(window, "HeliumCharlo_Navigator");
+            var command = host?.Tag as ICommand;
+            var selected = host?.DataContext;
+            if (command == null || selected == null || !command.CanExecute(selected)) return;
+            // The theme binds this parameter to MainViewModel.SelectedGame, as the grid info button does.
+            panelRequested = true;
+            panelRequestedAt = DateTime.UtcNow;
+            command.Execute(selected);
+            RecomputeLayout();
         }
-        private void BindHost()
+        private void ReturnToGrid()
         {
-            var host = GetHost();
-            var owner = host?.TemplatedParent as Control;
-            gridView = owner?.Template?.FindName("PART_ViewGrid", owner) as Control;
-            hostPanel = host?.Parent as FrameworkElement;
-            if (gridView == null) return;
-            gridView.ApplyTemplate();
-            nativeGridList = gridView.Template.FindName("PART_ListGames", gridView) as ListBox;
-            nativeDetails = gridView.Template.FindName("PART_ControlGameView", gridView) as FrameworkElement;
-            if (hostPanel != null) hostPanel.SizeChanged += LayoutChanged;
-            gridView.SizeChanged += LayoutChanged;
-            gridView.IsVisibleChanged += LayoutVisibleChanged;
-            if (nativeDetails != null)
-                DependencyPropertyDescriptor.FromProperty(UIElement.VisibilityProperty, typeof(UIElement)).AddValueChanged(nativeDetails, NativeDetailsVisibilityChanged);
-            if (nativeGridList != null) nativeGridList.AddHandler(UIElement.PreviewMouseDownEvent, new MouseButtonEventHandler(GridMouseDown), true);
+            if (!navigatedDetails || api.MainView.ActiveDesktopView != DesktopView.Details) return;
+            var switchButton = FindNamed(window, "HeliumCharlo_SwitchGrid") as Button;
+            if (switchButton?.Command == null || !switchButton.Command.CanExecute(null)) return;
+            switchButton.Command.Execute(null);
+            navigatedDetails = false;
+            RecomputeLayout();
+            if (prefs.PreserveGridScroll) Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(RestoreGridScroll));
         }
-        private void UnbindHost()
+        private void CaptureGridScroll()
         {
-            if (hostPanel != null) hostPanel.SizeChanged -= LayoutChanged;
-            if (gridView != null) { gridView.SizeChanged -= LayoutChanged; gridView.IsVisibleChanged -= LayoutVisibleChanged; }
-            if (nativeDetails != null)
-                DependencyPropertyDescriptor.FromProperty(UIElement.VisibilityProperty, typeof(UIElement)).RemoveValueChanged(nativeDetails, NativeDetailsVisibilityChanged);
-            if (nativeGridList != null) nativeGridList.RemoveHandler(UIElement.PreviewMouseDownEvent, new MouseButtonEventHandler(GridMouseDown));
-            gridView = null; hostPanel = null; nativeDetails = null; nativeGridList = null;
+            gridIds = api.MainView.FilteredGames?.Select(game => game.Id).OrderBy(id => id).ToArray();
+            gridSort = api.MainView.SortOrder.ToString();
+            gridSortDirection = api.MainView.SortOrderDirection.ToString();
+            gridGrouping = api.MainView.Grouping.ToString();
+            var grid = FindNamed(window, "PART_ViewGrid") as Control;
+            var games = grid?.Template?.FindName("PART_ListGames", grid) as DependencyObject;
+            gridOffset = FindScroll(games)?.VerticalOffset ?? 0;
         }
-        private void LayoutChanged(object sender, SizeChangedEventArgs e) { RecomputeLayout(); }
-        private void LayoutVisibleChanged(object sender, DependencyPropertyChangedEventArgs e) { RecomputeLayout(); }
-        private void RecomputeLayout()
+        private void RestoreGridScroll()
         {
-            if (!active) return;
-            var isGrid = api.MainView.ActiveDesktopView == DesktopView.Grid;
-            plugin.State.InGrid = isGrid;
-            plugin.State.NavigatorVisible = isGrid ? !prefs.Collapsed : !prefs.CollapsedOther;
-            if (!isGrid) { plugin.State.IsDetailPage = false; return; }
-            if (nativeDetails != null && nativeDetails.ActualWidth > 300 && !plugin.State.IsDetailPage)
-                rememberedDetailWidth = nativeDetails.ActualWidth;
-            var available = gridView?.ActualWidth ?? 0;
-            plugin.State.IsCompact = Logic.Compact(prefs.LayoutMode, plugin.State.IsCompact, available, rememberedDetailWidth);
+            if (!active || api.MainView.ActiveDesktopView != DesktopView.Grid || gridIds == null) return;
+            var currentIds = api.MainView.FilteredGames?.Select(game => game.Id).OrderBy(id => id).ToArray();
+            if (currentIds == null || !gridIds.SequenceEqual(currentIds) ||
+                gridSort != api.MainView.SortOrder.ToString() ||
+                gridSortDirection != api.MainView.SortOrderDirection.ToString() ||
+                gridGrouping != api.MainView.Grouping.ToString()) { gridIds = null; return; }
+            var grid = FindNamed(window, "PART_ViewGrid") as Control;
+            var games = grid?.Template?.FindName("PART_ListGames", grid) as DependencyObject;
+            FindScroll(games)?.ScrollToVerticalOffset(gridOffset);
+            gridIds = null;
         }
-        internal void SetCollapsed(bool collapsed)
+        private static ScrollViewer FindScroll(DependencyObject node)
         {
-            if (api.MainView.ActiveDesktopView == DesktopView.Grid) prefs.Collapsed = collapsed;
-            else prefs.CollapsedOther = collapsed;
-            plugin.State.NavigatorVisible = !collapsed;
-            ApplySize(); RecomputeLayout(); Save();
-            if (!collapsed) Refresh();
+            if (node is ScrollViewer scroll) return scroll;
+            if (node == null) return null;
+            for (var i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++) {
+                var found = FindScroll(VisualTreeHelper.GetChild(node, i));
+                if (found != null) return found;
+            }
+            return null;
         }
         private void StartSelected() { if (list.SelectedItem is GameRow row) Safe(() => api.StartGame(row.Id)); }
         private void OnLoaded(object sender, RoutedEventArgs args)
         {
             if (active) return; active = true;
             plugin.SelectionChanged += SelectionChanged;
+            plugin.SettingsChanged += SettingsUpdated;
             api.Database.Games.ItemUpdated += GamesUpdated;
             api.Database.Games.ItemCollectionChanged += GamesChanged;
             api.Database.Series.ItemUpdated += MetadataUpdated;
@@ -353,13 +264,17 @@ namespace HeliumHybrid
             api.Database.Series.ItemCollectionChanged += MetadataChanged;
             api.Database.Categories.ItemCollectionChanged += MetadataChanged;
             api.Database.Platforms.ItemCollectionChanged += MetadataChanged;
-            BindHost(); RecomputeLayout();
+            lastDesktopView = api.MainView.ActiveDesktopView;
+            window = Window.GetWindow(this);
+            if (window != null) window.SizeChanged += WindowSizeChanged;
+            RecomputeLayout();
             Interlocked.Exchange(ref dirty, 1); Refresh(); timer.Start();
         }
         private void OnUnloaded(object sender, RoutedEventArgs args)
         {
-            if (!active) return; active = false; timer.Stop(); searchTimer.Stop(); UnbindHost();
+            if (!active) return; active = false; timer.Stop(); searchTimer.Stop(); coverClickTimer.Stop(); sidebarClickTimer.Stop(); panelRequested = false; UnbindGridClicks();
             plugin.SelectionChanged -= SelectionChanged;
+            plugin.SettingsChanged -= SettingsUpdated;
             api.Database.Games.ItemUpdated -= GamesUpdated;
             api.Database.Games.ItemCollectionChanged -= GamesChanged;
             api.Database.Series.ItemUpdated -= MetadataUpdated;
@@ -368,23 +283,24 @@ namespace HeliumHybrid
             api.Database.Series.ItemCollectionChanged -= MetadataChanged;
             api.Database.Categories.ItemCollectionChanged -= MetadataChanged;
             api.Database.Platforms.ItemCollectionChanged -= MetadataChanged;
+            if (window != null) window.SizeChanged -= WindowSizeChanged;
+            if (reopenButton != null) { reopenButton.Click -= ReopenClicked; reopenButton.Visibility = Visibility.Collapsed; reopenButton = null; }
+            window = null;
+            RestoreDetails();
+            ShowNativeList();
             Save();
         }
-        private void MetadataUpdated<T>(object sender, ItemUpdatedEventArgs<T> args) where T : DatabaseObject { Interlocked.Exchange(ref fullDirty, 1); Interlocked.Exchange(ref dirty, 1); QueueRefresh(); }
-        private void MetadataChanged<T>(object sender, ItemCollectionChangedEventArgs<T> args) where T : DatabaseObject { Interlocked.Exchange(ref fullDirty, 1); Interlocked.Exchange(ref dirty, 1); QueueRefresh(); }
-        private void GamesUpdated(object sender, ItemUpdatedEventArgs<Game> args)
+        private void SettingsUpdated()
         {
-            lock (updateGate) foreach (var entry in args.UpdatedItems) if (entry.NewData != null) pendingGameIds.Add(entry.NewData.Id);
-            Interlocked.Exchange(ref dirty, 1); QueueRefresh();
+            if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(SettingsUpdated)); return; }
+            if (!active) return;
+            prefs.Width = Logic.ClampWidth(prefs.Width);
+            ApplySize(); RecomputeLayout();
         }
-        private void GamesChanged(object sender, ItemCollectionChangedEventArgs<Game> args) { Interlocked.Exchange(ref fullDirty, 1); Interlocked.Exchange(ref dirty, 1); QueueRefresh(); }
-        private void QueueRefresh()
-        {
-            if (Interlocked.Exchange(ref refreshQueued, 1) != 0) return;
-            Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => {
-                Interlocked.Exchange(ref refreshQueued, 0); if (active) Refresh();
-            }));
-        }
+        private void MetadataUpdated<T>(object sender, ItemUpdatedEventArgs<T> args) where T : DatabaseObject { Interlocked.Exchange(ref dirty, 1); }
+        private void MetadataChanged<T>(object sender, ItemCollectionChangedEventArgs<T> args) where T : DatabaseObject { Interlocked.Exchange(ref dirty, 1); }
+        private void GamesUpdated(object sender, ItemUpdatedEventArgs<Game> args) { Interlocked.Exchange(ref dirty, 1); }
+        private void GamesChanged(object sender, ItemCollectionChangedEventArgs<Game> args) { Interlocked.Exchange(ref dirty, 1); }
         private void SelectionChanged()
         {
             if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(SelectionChanged)); return; }
@@ -393,20 +309,13 @@ namespace HeliumHybrid
         public override void GameContextChanged(Game oldContext, Game newContext) { SelectionChanged(); }
         private void Refresh()
         {
-            if (!active || !plugin.State.NavigatorVisible) return;
+            if (!active || IsCollapsed()) return;
             Safe(() => {
                 var games = api.MainView.FilteredGames ?? new List<Game>();
                 // Filters have no SDK change event; compare membership at background priority.
                 var ids = games.Select(g => g.Id).OrderBy(id => id).ToArray();
                 var changed = Interlocked.Exchange(ref dirty, 0) != 0;
-                bool sameMembership = ids.SequenceEqual(lastIds);
-                if (!changed && sameMembership) { SyncSelection(false); return; }
-                if (changed && sameMembership && Interlocked.CompareExchange(ref fullDirty, 0, 0) == 0 && TryPatch(games)) {
-                    SyncSelection(false); return;
-                }
-                if (!sameMembership) hasGridOffset = false;
-                Interlocked.Exchange(ref fullDirty, 0);
-                lock (updateGate) pendingGameIds.Clear();
+                if (!changed && ids.SequenceEqual(lastIds)) { SyncSelection(false); return; }
                 lastIds = ids;
                 var rebuilt = new List<GameRow>();
                 foreach (var game in games.OrderBy(g => string.IsNullOrEmpty(g.SortingName) ? g.Name : g.SortingName, StringComparer.CurrentCultureIgnoreCase)) {
@@ -419,7 +328,7 @@ namespace HeliumHybrid
                     string iconPath = null;
                     if (!string.IsNullOrWhiteSpace(game.Icon)) iconPath = api.Database.GetFullFilePath(game.Icon);
                     foreach (var name in prefs.Grouping == 0 ? new[] { "" } : Logic.Groups(names))
-                        rebuilt.Add(new GameRow { Id = game.Id, Name = game.Name ?? "Sem título", SortName = game.SortingName ?? game.Name ?? "", Key = Logic.SearchKey(game.Name), Group = name, IconPath = iconPath });
+                    rebuilt.Add(new GameRow { Id = game.Id, Name = game.Name ?? "Untitled", Key = Logic.SearchKey(game.Name), Group = name, IconPath = iconPath });
                 }
                 if (prefs.Grouping != 0) rebuilt = rebuilt.OrderBy(r => r.Group, StringComparer.CurrentCultureIgnoreCase).ToList();
                 rows = rebuilt; syncing = true;
@@ -431,24 +340,6 @@ namespace HeliumHybrid
                 SyncSelection(false); status.Text = ""; reportedError = false;
             });
         }
-        private bool TryPatch(List<Game> games)
-        {
-            if (prefs.Grouping != 0 || view == null) return false;
-            Guid[] updates;
-            lock (updateGate) updates = pendingGameIds.ToArray();
-            if (updates.Length == 0 || updates.Length > 16) return false;
-            var candidates = games.Where(g => updates.Contains(g.Id)).ToDictionary(g => g.Id);
-            var existing = rows.Where(r => candidates.ContainsKey(r.Id)).ToDictionary(r => r.Id);
-            if (candidates.Count != updates.Length || existing.Count != updates.Length) return false;
-            if (updates.Any(id => existing[id].Name != (candidates[id].Name ?? "Sem título") ||
-                existing[id].SortName != (candidates[id].SortingName ?? candidates[id].Name ?? ""))) return false;
-            foreach (var id in updates) {
-                var game = candidates[id];
-                existing[id].IconPath = string.IsNullOrWhiteSpace(game.Icon) ? null : api.Database.GetFullFilePath(game.Icon);
-            }
-            lock (updateGate) foreach (var id in updates) pendingGameIds.Remove(id);
-            return true;
-        }
         private void ApplySearch()
         {
             if (view == null) return;
@@ -456,8 +347,8 @@ namespace HeliumHybrid
             syncing = true;
             try { view.Filter = obj => ((GameRow)obj).Key.Contains(key); view.Refresh(); }
             finally { syncing = false; }
-            count.Text = view.Cast<GameRow>().Select(r => r.Id).Distinct().Count() + " jogos";
-            status.Text = view.IsEmpty ? "Nenhum jogo nesta busca. Confira também os filtros globais." : "";
+            count.Text = view.Cast<GameRow>().Select(r => r.Id).Distinct().Count() + " games";
+            status.Text = view.IsEmpty ? "No games found. Check the global filters too." : "";
             SyncSelection(false);
         }
         private void SyncSelection(bool scroll)
@@ -473,16 +364,160 @@ namespace HeliumHybrid
         }
         private void ApplySize()
         {
-            Width = prefs.Width;
+            if (active && (api.MainView.ActiveDesktopView == DesktopView.List ||
+                (api.MainView.ActiveDesktopView == DesktopView.Details && !navigatedDetails))) {
+                Visibility = Visibility.Collapsed;
+                Width = 0;
+                if (reopenButton != null) reopenButton.Visibility = Visibility.Collapsed;
+                return;
+            }
+            Visibility = Visibility.Visible;
+            bool collapsed = IsCollapsed();
+            Width = collapsed ? 0 : prefs.Width;
+            list.Visibility = tools.Visibility = status.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+            grip.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+            toggle.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+            if (reopenButton != null) reopenButton.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
+            backButton.Visibility = navigatedDetails && api.MainView.ActiveDesktopView == DesktopView.Details && !collapsed ? Visibility.Visible : Visibility.Collapsed;
+            toggle.Content = "<<";
         }
-        private void Save() { plugin.Save(); }
+        private void ReopenClicked(object sender, RoutedEventArgs args)
+        {
+            prefs.Collapsed = false;
+            ApplySize(); RecomputeLayout(); Save(); Refresh();
+        }
+        private void BindReopenButton(DependencyObject host)
+        {
+            var found = FindNamed(host, "HeliumCharlo_Reopen") as Button;
+            if (ReferenceEquals(reopenButton, found)) return;
+            if (reopenButton != null) { reopenButton.Click -= ReopenClicked; reopenButton.Visibility = Visibility.Collapsed; }
+            reopenButton = found;
+            if (reopenButton != null) reopenButton.Click += ReopenClicked;
+        }
+        private bool IsCollapsed() => prefs.Collapsed;
+        private void WindowSizeChanged(object sender, SizeChangedEventArgs args) { RecomputeLayout(); }
+        [DllImport("user32.dll")]
+        private static extern uint GetDoubleClickTime();
+        private void BindGridClicks(Control gridView)
+        {
+            var found = gridView?.Template?.FindName("PART_ListGames", gridView) as ListBox;
+            if (ReferenceEquals(nativeGridList, found)) return;
+            UnbindGridClicks();
+            nativeGridList = found;
+            if (nativeGridList == null) return;
+            nativeGridList.AddHandler(PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(GridCoverDown), true);
+            nativeGridList.AddHandler(MouseLeftButtonUpEvent, new MouseButtonEventHandler(GridCoverUp), true);
+        }
+        private void UnbindGridClicks()
+        {
+            coverClickTimer.Stop();
+            coverDownItem = null;
+            if (nativeGridList == null) return;
+            nativeGridList.RemoveHandler(PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(GridCoverDown));
+            nativeGridList.RemoveHandler(MouseLeftButtonUpEvent, new MouseButtonEventHandler(GridCoverUp));
+            nativeGridList = null;
+        }
+        private static bool IsInteractiveChild(DependencyObject source, DependencyObject item)
+        {
+            for (var current = source; current != null && current != item; current = VisualTreeHelper.GetParent(current))
+                if (current is ButtonBase || current is TextBox) return true;
+            return false;
+        }
+        private void GridCoverDown(object sender, MouseButtonEventArgs args)
+        {
+            coverClickTimer.Stop();
+            coverDownItem = null;
+            if (args.ClickCount != 1 ||
+                api.MainView.ActiveDesktopView != DesktopView.Grid || Keyboard.Modifiers != ModifierKeys.None) return;
+            var source = args.OriginalSource as DependencyObject;
+            var item = source == null ? null : ItemsControl.ContainerFromElement(nativeGridList, source) as ListBoxItem;
+            if (item == null || IsInteractiveChild(source, item)) return;
+            coverDownItem = item;
+            coverDownPosition = args.GetPosition(nativeGridList);
+        }
+        private void GridCoverUp(object sender, MouseButtonEventArgs args)
+        {
+            var item = coverDownItem;
+            coverDownItem = null;
+            if (item == null || args.ClickCount != 1 ||
+                api.MainView.ActiveDesktopView != DesktopView.Grid) return;
+            var source = args.OriginalSource as DependencyObject;
+            if (source == null || ItemsControl.ContainerFromElement(nativeGridList, source) != item) return;
+            var position = args.GetPosition(nativeGridList);
+            if (Math.Abs(position.X - coverDownPosition.X) > SystemParameters.MinimumHorizontalDragDistance ||
+                Math.Abs(position.Y - coverDownPosition.Y) > SystemParameters.MinimumVerticalDragDistance) return;
+            var selected = api.MainView.SelectedGames;
+            if (selected == null || selected.Count() != 1) return;
+            pendingCoverId = selected.First().Id;
+            coverClickTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(200, (int)GetDoubleClickTime()) + 60);
+            coverClickTimer.Start();
+        }
+        private static FrameworkElement FindNamed(DependencyObject node, string name)
+        {
+            if (node == null) return null;
+            if (node is FrameworkElement element && element.Name == name) return element;
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++) {
+                var found = FindNamed(VisualTreeHelper.GetChild(node, i), name);
+                if (found != null) return found;
+            }
+            return null;
+        }
+        private void RestoreDetails()
+        {
+            if (detailsBorder != null) {
+                detailsBorder.ClearValue(VisibilityProperty);
+                if (detailsVisibilityBinding != null) BindingOperations.SetBinding(detailsBorder, VisibilityProperty, detailsVisibilityBinding);
+            }
+            detailsBorder = null;
+            detailsVisibilityBinding = null;
+        }
+        private void ShowNativeList()
+        {
+            if (nativeDetailsList != null) nativeDetailsList.ClearValue(VisibilityProperty);
+            nativeDetailsList = null;
+        }
+        private void RecomputeLayout()
+        {
+            if (!active) return;
+            if (lastDesktopView != api.MainView.ActiveDesktopView) {
+                if (lastDesktopView == DesktopView.Details)
+                    navigatedDetails = false;
+                lastDesktopView = api.MainView.ActiveDesktopView;
+            }
+            ApplySize();
+            var host = window ?? Window.GetWindow(this);
+            if (host == null) return;
+            BindReopenButton(host);
+            ApplySize();
+            if (navigatedDetails && api.MainView.ActiveDesktopView == DesktopView.Details) {
+                nativeDetailsList = FindNamed(host, "HeliumCharlo_NativeDetailsList");
+                if (nativeDetailsList != null) nativeDetailsList.Visibility = Visibility.Collapsed;
+            } else ShowNativeList();
+            var gridView = FindNamed(host, "PART_ViewGrid") as Control;
+            BindGridClicks(gridView);
+            // Do not alter the converter's XAML or the overview itself. Its host border owns the space.
+            if (gridView == null || api.MainView.ActiveDesktopView != DesktopView.Grid) { RestoreDetails(); return; }
+            var overview = gridView.Template?.FindName("PART_ControlGameView", gridView) as FrameworkElement;
+            var border = overview == null ? null : VisualTreeHelper.GetParent(overview) as FrameworkElement;
+            if (border == null) return;
+            if (!ReferenceEquals(detailsBorder, border)) { RestoreDetails(); detailsBorder = border; detailsVisibilityBinding = BindingOperations.GetBindingBase(border, VisibilityProperty); }
+            compact = Logic.Compact(prefs.LayoutMode, compact, gridView.ActualWidth);
+            if (panelRequested && overview.Visibility == Visibility.Collapsed &&
+                DateTime.UtcNow - panelRequestedAt > TimeSpan.FromSeconds(2)) panelRequested = false;
+            if (compact && !panelRequested) border.Visibility = Visibility.Collapsed;
+            else {
+                border.ClearValue(VisibilityProperty);
+                if (detailsVisibilityBinding != null) BindingOperations.SetBinding(border, VisibilityProperty, detailsVisibilityBinding);
+            }
+        }
+        private void Save() => plugin.SaveSettings();
         private void Safe(Action action)
         {
             try { action(); }
             catch (Exception e) {
                 Interlocked.Exchange(ref dirty, 1);
-                status.Text = "Não foi possível atualizar. Consulte playnite.log (Helium Hybrid).";
-                if (!reportedError) LogManager.GetLogger().Error(e, "Helium Hybrid: erro no navegador.");
+                status.Text = "Could not refresh the game list. Check playnite.log (Helium Charlo).";
+                if (!reportedError) LogManager.GetLogger().Error(e, "Helium Charlo: navigator error.");
                 reportedError = true;
             }
         }
