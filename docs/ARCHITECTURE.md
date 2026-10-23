@@ -1,4 +1,4 @@
-# Architecture of the v0.2.3 library Navigator
+# Architecture of the v0.2.4 library Navigator
 
 ## Components
 
@@ -17,14 +17,14 @@ The extension is a `GenericPlugin` with `PluginUserControl` registered under sou
 
 The full-details action executes `SwitchDetailsViewCommand` through the theme's hidden command adapter. Back to Grid uses `SwitchGridViewCommand` and conditionally restores the captured scroll offset if filter, grouping and ordering are unchanged. The Navigator hides the redundant native Details list for this transition, and the native List View hides the Navigator.
 
-The grid-panel action uses the `ShowGameSideBarCommand` already bound to the grid information button. `Library.xaml` binds that command to the Navigator host's `Tag` and `MainViewModel.SelectedGame` to its `DataContext`. The extension executes the command with that selected entry. In Playnite Desktop source, it enables `GridViewSideBarVisible` and selects the entry. If the user is in full Details View, the Navigator first switches to Grid and then requests the same panel. The native overview and converter remain responsible for the panel content.
+The grid-panel action uses the `ShowGameSideBarCommand` already bound to the grid information button. `Library.xaml` binds that command to the Navigator host's `Tag` and `MainViewModel.SelectedGame` to its `DataContext`. The extension executes the command with that selected entry from Grid. In Playnite Desktop source, it enables `GridViewSideBarVisible` and selects the entry. In Full Details View, selecting another Navigator game changes selection and keeps that view open, regardless of the stored sidebar action. The native overview and converter remain responsible for panel content.
 
-Sidebar and cover click actions are separate selector values. A single click selects immediately; the navigation action waits for the Windows double-click interval plus a small margin. A second click cancels navigation, preserving native cover launch and sidebar double-click launch. Grid cover handlers ignore interactive child buttons, modifiers and drags. Native context menus and keyboard handling stay with Playnite where applicable.
+Sidebar and cover click actions are separate selector values. A single click selects immediately; navigation waits for the Windows double-click interval plus a small margin. A second click cancels navigation. Both handlers require matching mouse-down and mouse-up rows and reject significant movement, modifiers and interactive children. View changes cancel pending click actions. The sidebar's small Play menu uses its selected row for keyboard invocation; Playnite retains native grid menus and shortcuts.
 
 The Grid Details Panel layout selector controls the default host visibility independently. An explicit panel request temporarily reveals the overview host even in a compact or Always hidden layout. The Navigator observes native overview visibility during its existing 1.5-second layout refresh and restores the configured layout after the panel closes; it does not persist that temporary override.
 
 ## IDs, migration and reproduction
 
-The theme and extension GUIDs remain stable across v0.2.2 and v0.2.3; display names and versions changed. The plugin's `navigator.xml` stores width, collapse, grouping, panel layout and click actions. On reading an old XML file, true legacy navigation checkboxes map to Full Details View, false to Grid Details Panel. New saves omit the legacy fields. Back up the old file before upgrading if exact rollback is needed.
+The theme and extension GUIDs remain stable across v0.2.2, v0.2.3 and v0.2.4. The plugin's `navigator.xml` stores width, collapse, grouping, panel layout and click actions. Old navigation checkboxes still migrate. An unreadable settings file is copied to a timestamped `.corrupt-*` path before default settings may be saved; if copying fails, the plugin refuses to overwrite it. A successful save writes a temporary file and replaces the old file with a `.bak` of its prior contents.
 
 To reproduce the integration in another theme, start with a native `Library.xaml` view host and a native Grid overview. Add a custom control beside the native view host, bind the selected entry and `ShowGameSideBarCommand` to that host, register the control through Playnite's custom element API, and route clicks through the existing native commands. Keep the native grid list and overview templates intact. Read `Navigator.cs` before adapting element names: it locates named template parts in the visual tree, so these names are part of this theme's integration contract. Validate in a real Playnite Windows installation after building; parsing XAML and compiling C# cannot verify runtime binding resolution.

@@ -7,7 +7,7 @@ Copy-Item (Join-Path $PSScriptRoot 'HeliumHybrid/bin/Release/net462/HeliumCharlo
 Copy-Item (Join-Path $PSScriptRoot 'HeliumHybrid/extension.yaml') (Join-Path $root 'install/extension.yaml') -Force
 $packages = Join-Path $root 'packages'
 New-Item -ItemType Directory -Force $packages | Out-Null
-foreach ($pair in @(@('install', 'Helium-Navigator-v0.2.3.pext'), @('theme', 'Helium-charlo-fork-v0.2.3.pthm'))) {
+foreach ($pair in @(@('install', 'Helium-Navigator-v0.2.4.pext'), @('theme', 'Helium-charlo-fork-v0.2.4.pthm'))) {
     $zip = Join-Path $packages ($pair[1] + '.zip')
     Compress-Archive -Path (Join-Path $root ($pair[0] + '/*')) -DestinationPath $zip -Force
     Move-Item $zip (Join-Path $packages $pair[1]) -Force

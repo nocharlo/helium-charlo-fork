@@ -1,27 +1,23 @@
-# Windows acceptance checklist — v0.2.3
+# Windows acceptance checklist — v0.2.4 stability hotfix
 
-Test with the working v0.2.2 settings backed up. Record failures with layout mode, click action and Playnite log.
+Back up v0.2.3 before testing. Use the maintainer's configuration: **Sidebar game click: Open Grid Details Panel**, **Grid cover click: Open Full Details View**, **Restore grid scroll position: enabled**. Note the view, selected game and Playnite log for failures.
 
-- [ ] Theme selector shows exactly **Helium (charlo fork) v0.2.3**.
-- [ ] Add-on management shows **Helium Navigator v0.2.3**, without a conflicting Navigator installation.
-- [ ] Settings migration: enabled old checkbox → Full Details View; disabled → Grid Details Panel.
-- [ ] Sidebar click → Full Details View; native list hidden and Back to Grid available.
-- [ ] Sidebar click → Grid Details Panel for the selected game.
-- [ ] Grid cover click → Full Details View.
-- [ ] Grid cover click → Grid Details Panel for the selected game.
-- [ ] Existing grid `i` button and native panel close control work.
-- [ ] Automatic layout responds to width changes and explicit panel requests.
-- [ ] Always visible layout retains its default with both click actions.
-- [ ] Always hidden layout remains hidden by default.
-- [ ] Always hidden: explicit panel request opens temporarily; close restores hidden layout.
-- [ ] Back to Grid preserves selection and, where possible, grid scroll position.
-- [ ] From full Details View, clicking another sidebar game in Grid Details Panel mode switches to Grid and opens that game.
-- [ ] Double-click sidebar game and grid cover launches normally without unintended navigation.
-- [ ] Right-click context menus, keyboard navigation and native shortcuts work.
-- [ ] Selection synchronizes between Navigator and grid in both directions.
-- [ ] Collapse sidebar fully and reopen with the floating button; resizing and search work.
-- [ ] Restart Playnite: independent selectors, layout, width and collapsed state persist.
-- [ ] Native List View has no duplicate Navigator.
-- [ ] Backgrounds, logos, artwork, statistics and third-party integrations work.
-- [ ] No visual regressions in native Grid and Details views or converter panel placement.
-- [ ] All project-authored UI shown by the update is in English.
+## Maintainer's v0.2.4 results
+
+The maintainer installed the paired v0.2.4 packages in Playnite on Windows and reported **12 passed, 2 failed, 1 pending** checks. The failures are pressing one Navigator row and releasing over another, and dragging within the list then releasing over another game; either can leave the list behaving as though a mouse interaction is still active. The cause is unconfirmed. Preference persistence after a full Playnite restart remains pending. These results were reported by the maintainer, not reproduced by an automated test.
+
+## Checklist for future regression testing
+
+- [ ] From Grid, click a sidebar game: the selected game's native Grid Details Panel opens. Repeat with sidebar action set to Full Details View.
+- [ ] From Grid, click a cover: Full Details opens. Repeat with cover action set to Grid Details Panel; the grid `i` button and panel close still work.
+- [ ] Inside Full Details, click several different Navigator games in succession: selection and details update, and Full Details stays open with either sidebar action.
+- [ ] Enter Full Details through both a cover and the Navigator. Back to Grid preserves selection and restores scroll when filter, sort and grouping have not changed.
+- [ ] Rapidly switch Grid, Full Details and native List View with a pending single click: no delayed return or stray panel opens. Native List View has no duplicate Navigator.
+- [ ] Double-click a sidebar game and a grid cover: each launches only once without a delayed navigation action.
+- [ ] Press on one sidebar row and release on another; drag farther than the Windows minimum drag distance; drag to scroll; release over an interactive child if present: none opens a view or panel.
+- [ ] Right-click a sidebar row: Play applies to that row. Shift+F10 and the Menu key apply to the keyboard-selected row, regardless of pointer location. Grid context menus remain native.
+- [ ] Search, filtering, alphabetic and grouped rows, icons and two-way selection still work. Check whether expanded groups reset on refresh and record it.
+- [ ] Collapse, reopen and resize the Navigator. Restart Playnite: layout, width, grouping and both click actions persist.
+- [ ] Grid panel layout modes Automatic, Always hidden and Always visible retain their defaults; an explicit request opens temporarily in Always hidden, and closing restores the configured layout after the refresh interval.
+- [ ] Test settings recovery with a backed-up disposable copy: corrupt `navigator.xml`, start Playnite, confirm a `.corrupt-*` copy contains the original bytes and defaults load; save settings, restart and confirm persistence. Restore the real backup afterward.
+- [ ] Artwork, logos, backgrounds, metadata and existing third-party integrations remain as in v0.2.3. No background or converter behavior should change.

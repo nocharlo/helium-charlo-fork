@@ -1,9 +1,9 @@
 {
-  "version": "v0.2.3 local test",
-  "base": "User-supplied working v0.2.2 package",
+  "version": "v0.2.4 stability hotfix",
+  "base": "Approved v0.2.3 Git commit d95b0246a924d5ded53346d499a8137f9b6b2e41",
   "assembly": "Roslyn optimized .NET Framework 4.6.2 Release build, PlayniteSDK 6.11.0",
-  "windows_playnite_tested": false,
-  "github_modified": false,
-  "maintainer_windows_playnite_tested": true,
-  "note": "Maintainer confirmed installation and functional validation after the local v0.2.3 build; automated checks do not execute Playnite."
+  "windows_playnite_tested": true,
+  "maintainer_windows_results": { "passed": 12, "failed": 2, "pending": 1 },
+  "maintainer_windows_playnite_tested_v023": true,
+  "note": "Earlier reports recorded compilation and offline checks. The maintainer installed v0.2.4 in Playnite on Windows and accepted it for normal use. Two mouse-release interactions remain unresolved; preference persistence after a full restart remains untested."
 }
