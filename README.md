@@ -122,14 +122,14 @@ This project was developed around my existing Helium setup, which includes:
 
 - [Details to Grid View Converter](https://playnite.link/addons.html#ThemesDetailsViewToGridViewConverter_ef8a7226-eedc-478d-a506-92ee6c088aa3)
 - [Extra Metadata Loader](https://playnite.link/addons.html#ExtraMetadataLoader_705fdbca-e1fc-4004-b839-1d040b8b4429)
-- ThemeModifier
-- ThemeExtras
-- LibraryManagement
-- GameActivity
-- HowLongToBeat
-- Game Relations
-- SuccessStory
-- ScreenshotsVisualizer
+- [ThemeModifier](https://github.com/Lacro59/playnite-thememodifier-plugin)
+- [ThemeExtras](https://github.com/felixkmh/ThemeExtras-for-Playnite)
+- [LibraryManagement](https://github.com/Lacro59/playnite-librarymanagement-plugin)
+- [GameActivity](https://github.com/Lacro59/playnite-gameactivity-plugin)
+- [HowLongToBeat](https://github.com/Lacro59/playnite-howlongtobeat-plugin)
+- [Game Relations](https://github.com/darklinkpower/PlayniteExtensionsCollection/wiki/Game-Relations)
+- [SuccessStory](https://github.com/Lacro59/playnite-successstory-plugin)
+- [ScreenshotsVisualizer](https://github.com/Lacro59/playnite-screenshotsvisualizer-plugin)
 
 Many of these integrations were already supported by the original Helium theme or the KKCD fork.
 
