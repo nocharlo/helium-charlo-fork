@@ -53,7 +53,7 @@
       </GroupStyle></ListBox.GroupStyle>
     </ListBox>
   </DockPanel>
-  <Thumb x:Name="ResizeGrip" Grid.Column="1" Cursor="SizeWE" Background="#FF35414D" ToolTip="Arrastar para ajustar a largura">
+  <Thumb x:Name="ResizeGrip" Grid.Column="1" Cursor="SizeWE" Background="#FF35414D" ToolTip="Drag to resize the sidebar">
     <Thumb.Template><ControlTemplate TargetType="Thumb"><Border Background="{TemplateBinding Background}"/></ControlTemplate></Thumb.Template>
   </Thumb>
 </Grid>

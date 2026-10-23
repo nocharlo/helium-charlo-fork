@@ -1,6 +1,14 @@
 # Changelog
 
-## v0.2.3 — current tested baseline
+## v0.2.4 — stability hotfix, accepted for normal use
+
+- Kept Navigator selection inside Full Details View without an automatic return to Grid, independent of sidebar click preference.
+- Added guards for sidebar drag releases, mismatched rows and interactive children before scheduling a single-click action; double-click launch remains separate. Two uncommon mouse-release interactions remain unresolved.
+- Preserved and logged unreadable Navigator settings before default fallback; normal saves use a temporary file and previous-file backup.
+- Corrected keyboard context-menu row targeting and an inherited tooltip translation.
+- Retained the approved v0.2.3 backgrounds, ThemeModifier resources, converter integrations, stable IDs and existing navigation settings.
+
+## v0.2.3 — previous tested baseline
 
 The maintainer installed and validated this version in Playnite Desktop on Windows. It is based directly on the supplied working v0.2.2 package.
 

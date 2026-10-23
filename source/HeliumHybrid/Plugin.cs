@@ -1,14 +1,13 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Windows.Controls;
-using System.Xml.Serialization;
+using System.IO;
 using Playnite.SDK;
 using Playnite.SDK.Events;
 using Playnite.SDK.Plugins;
 using System.Reflection;
-[assembly: AssemblyVersion("0.2.3.0")]
-[assembly: AssemblyFileVersion("0.2.3.0")]
+[assembly: AssemblyVersion("0.2.4.0")]
+[assembly: AssemblyFileVersion("0.2.4.0")]
 namespace HeliumHybrid
 {
     public sealed class HybridPlugin : GenericPlugin
@@ -18,13 +17,13 @@ namespace HeliumHybrid
         internal event Action SettingsChanged;
         internal string DataDirectory => GetPluginUserDataPath();
         internal Preferences Settings { get; }
+        private readonly bool canSaveSettings;
         public HybridPlugin(IPlayniteAPI api) : base(api)
         {
             Properties = new GenericPluginProperties { HasSettings = true };
-            try {
-                using (var reader = File.OpenRead(Path.Combine(DataDirectory, "navigator.xml")))
-                    Settings = (Preferences)new XmlSerializer(typeof(Preferences)).Deserialize(reader);
-            } catch { Settings = new Preferences(); }
+            Settings = SettingsFile.Load<Preferences>(Path.Combine(DataDirectory, "navigator.xml"),
+                error => LogManager.GetLogger().Warn(error, "Helium Charlo: could not read navigator settings; preserving original."),
+                out canSaveSettings);
             Settings.MigrateNavigation();
             Settings.Changed = () => SettingsChanged?.Invoke();
             Settings.Save = SaveSettings;
@@ -36,13 +35,12 @@ namespace HeliumHybrid
         public override UserControl GetSettingsView(bool firstRunView) => new NavigatorSettingsView();
         internal void SaveSettings()
         {
+            if (!canSaveSettings) {
+                LogManager.GetLogger().Warn("Helium Charlo: settings backup failed; refusing to overwrite the original file.");
+                return;
+            }
             try {
-                Directory.CreateDirectory(DataDirectory);
-                var file = Path.Combine(DataDirectory, "navigator.xml");
-                var temporary = file + ".tmp";
-                using (var writer = File.Create(temporary)) new XmlSerializer(typeof(Preferences)).Serialize(writer, Settings);
-                File.Copy(temporary, file, true);
-                File.Delete(temporary);
+                SettingsFile.Save(Path.Combine(DataDirectory, "navigator.xml"), Settings);
             } catch (Exception error) { LogManager.GetLogger().Warn(error, "Helium Charlo: could not save settings."); }
         }
         public override Control GetGameViewControl(GetGameViewControlArgs args)

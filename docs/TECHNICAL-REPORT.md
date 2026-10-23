@@ -1,24 +1,33 @@
-# Technical report — v0.2.3
+# Technical report — v0.2.4 stability hotfix
 
-## Base and mechanism
+## Baseline and audit
 
-The supplied `Helium-charlo-fork-v0.2.2-test(1).zip` is the exact source base. Its Navigator source matched the earlier v0.2.2 source by SHA-256. The KKCD Grid and Details templates and converter configuration are unchanged. The approved build was prepared locally before this repository publication.
+The clean local checkout is exactly `d95b0246a924d5ded53346d499a8137f9b6b2e41`, the approved v0.2.3 commit. At checkout, remote `main` pointed to that commit. The separate experimental background v0.2.4 was not used. No remote writes were made. The requested Playnite Development Specialist skill was unavailable; official Playnite SDK documentation and Playnite Desktop source were checked for `IMainViewAPI.SelectGame`, plugin custom controls, user-data paths, and native view/sidebar commands.
 
-Playnite Desktop's `ShowGameSideBarCommand` accepts a `GamesCollectionViewEntry`, sets `GridViewSideBarVisible = true`, and selects its game. The theme's grid `i` button uses this command. `Views/Library.xaml` already binds the Navigator host's `Tag` to this command and its `DataContext` to `MainViewModel.SelectedGame`. The extension executes that same command with the selected entry. It adds no second overview. The existing view switch adapters are retained.
+**A — fixed confirmed defects:** `Navigator.cs` deliberately switched Full Details back to Grid in `OpenGridPanel`. The delayed sidebar action now runs only in Grid; a Details selection still uses the existing `SelectGame` call. The old Details-to-Grid recursion was private and reachable only through that guarded action, so it was removed. Sidebar mouse-up previously had no corresponding row or drag validation. It now requires a matching mouse-down row, movement within Windows thresholds, no modifiers and no interactive child. `Plugin.cs` previously swallowed settings deserialization errors; a later save could overwrite unreadable bytes. `SettingsFile.cs` logs the error, preserves a unique `.corrupt-*` copy, and blocks saves if backup fails. Successful saves use a flushed temporary file and `File.Replace` with a `.bak` of the prior file.
+
+**B — small correction:** keyboard context menu invocation previously used `Mouse.DirectlyOver`, which can point at another game. It now targets the selected row for keyboard invocation; right-click still targets the pointer row. The inherited Portuguese resize tooltip was translated to English.
+
+**C — deferred:** group expansion resets when a grouped collection is rebuilt after a game or metadata refresh. Persisting group state involves the generated `GroupItem` containers and virtualization. The 1.5-second filtered-game comparison, icon cache, and visual-tree searches had no measured regression here. The temporary `panelRequested` override and the three panel visibility modes remain unchanged; Always hidden allows an explicit panel request, then restores its default after native close and the next refresh. This wording describes the actual behavior rather than a strict permanent hide.
 
 ## Changed files
 
-- `source/HeliumHybrid/Navigator.cs`: routes sidebar and cover clicks independently. Sidebar selection stays immediate while navigation waits for the double-click interval and cancels on a second click. A request from full Details View switches to Grid before opening the panel. `panelRequested` temporarily reveals the existing overview host. Its native visibility is checked during the 1.5-second layout refresh; a two-second grace allows opening to finish.
-- `source/HeliumHybrid/Settings.cs`, `Plugin.cs`: new selector fields. Legacy XML booleans deserialize and migrate (true → Full Details View, false → Grid Details Panel), then are omitted from new saves. Cancel restores selector values. Persistent IDs and settings location are unchanged.
-- `theme/theme.yaml`, `source/HeliumHybrid/extension.yaml`, `install/extension.yaml`, `source/Build.ps1`: version metadata and package names. `theme/Views/Library.xaml` already contains the command bridge and is unchanged.
-- `tests/validate_package.py` and documentation: migration and package checks, installation and acceptance guidance.
+- `source/HeliumHybrid/Navigator.cs`: context guard, drag validation, stale timer cancellation, keyboard menu target.
+- `source/HeliumHybrid/Plugin.cs` and new `SettingsFile.cs`: recovery, logging and failure-resistant saves.
+- `source/HeliumHybrid/Navigator.xaml`: English resize tooltip.
+- `theme/theme.yaml`, extension manifests, `source/Build.ps1`: display, assembly and package version 0.2.4. Persistent GUIDs unchanged.
+- `tests/SettingsFileTests.cs`, `tests/validate_package.py`: recovery behavior and package checks; the existing logic test remains.
+- `README.md`, `docs/ARCHITECTURE.md`, `docs/WINDOWS-TESTING.md`, `docs/TECHNICAL-REPORT.md`, `docs/CHANGELOG.md`: navigation contract, audit and installation.
+- `install/HeliumCharlo.dll`, `packages/*.pext`, `packages/*.pthm`: rebuilt from this checkout.
 
-## Validation and limits
+The theme view templates, Grid Details background, ThemeModifier values, converter settings and other extension integration resources are unchanged from the approved commit.
 
-Roslyn compiled an optimized .NET Framework 4.6.2 DLL against PlayniteSDK 6.11.0. XML/XAML parsed; manifests, embedded resource and package contents were checked. Standalone logic tests exercise search, grouping, widths and a large synthetic library. Static checks inspect migration and navigation wiring. They cannot execute WPF or Playnite commands.
+## Validation and limitations
 
-The selected-entry binding, temporary panel close behavior, converter interaction, context menus and double-click launches require Windows testing. Restoration after closing a temporarily opened panel may take up to the 1.5-second layout refresh interval. A failed native panel request may leave the host visible until the opening grace expires. The Windows checklist is the acceptance gate.
+After this report was written, the maintainer tested the paired v0.2.4 packages in Playnite on Windows and accepted them for normal use: 12 checks passed, 2 mouse-release interactions failed, and preference persistence after a full restart remains untested. The mouse failures are not claimed fixed. The source and package verification in this report predates that acceptance test.
 
-## Maintainer acceptance
+The extension compiled as an optimized .NET Framework 4.6.2 DLL against PlayniteSDK 6.11.0. Standalone settings tests exercised missing, valid and corrupt XML, original-byte backup, save and reload. Existing logic tests cover search, groups and layout. XAML/XML parsing, manifests and package integrity were checked. Static checks verify the native command bridge and persistent IDs. Linux cannot run Playnite Desktop or WPF interactions, so mouse, keyboard, view transitions, converter and installed extension combinations require the maintainer's Windows checklist. The normal save uses `File.Replace`, supported by the target Windows filesystem; storage errors are logged and leave the original file intact whenever replacement fails.
 
-The maintainer subsequently installed and validated the delivered v0.2.3 build in Playnite Desktop on Windows. This is a user-reported runtime acceptance, separate from the Linux compilation and static checks above.
+## Install and rollback
+
+Back up the installed v0.2.3 theme, Navigator extension and its plugin user-data `navigator.xml`. Close Playnite; install both v0.2.4 packages and restart. The stable IDs update the same add-ons and user-data path. Check that no second Navigator is enabled. To roll back, close Playnite, reinstall the backed-up v0.2.3 packages and restore the settings backup if exact preferences are required. The extension does not modify game metadata.

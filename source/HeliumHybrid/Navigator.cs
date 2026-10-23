@@ -70,6 +70,8 @@ namespace HeliumHybrid
         private ListBox nativeGridList;
         private ListBoxItem coverDownItem;
         private Point coverDownPosition;
+        private ListBoxItem sidebarDownItem;
+        private Point sidebarDownPosition;
         private Guid pendingCoverId;
         private readonly Preferences prefs;
         private bool active, syncing, reportedError;
@@ -129,17 +131,8 @@ namespace HeliumHybrid
             list.SelectionChanged += (s, e) => {
                 if (!syncing && list.SelectedItem is GameRow row) Safe(() => SelectGame(row.Id));
             };
-            list.AddHandler(PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler((s, e) => {
-                if (e.ClickCount > 1) sidebarClickTimer.Stop();
-            }), true);
-            list.AddHandler(MouseLeftButtonUpEvent, new MouseButtonEventHandler((s, e) => {
-                if (e.ClickCount != 1 || Keyboard.Modifiers != ModifierKeys.None) return;
-                var item = RowUnderPointer(e.OriginalSource as DependencyObject);
-                if (!(item?.DataContext is GameRow row)) return;
-                pendingSidebarId = row.Id;
-                sidebarClickTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(200, (int)GetDoubleClickTime()) + 60);
-                sidebarClickTimer.Stop(); sidebarClickTimer.Start();
-            }), true);
+            list.AddHandler(PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(SidebarDown), true);
+            list.AddHandler(MouseLeftButtonUpEvent, new MouseButtonEventHandler(SidebarUp), true);
             list.MouseDoubleClick += (s, e) => {
                 sidebarClickTimer.Stop();
                 if (RowUnderPointer(e.OriginalSource as DependencyObject) != null) StartSelected();
@@ -159,13 +152,47 @@ namespace HeliumHybrid
         }
         private void ContextOpening(object sender, ContextMenuEventArgs e)
         {
+            // Keyboard invocation belongs to the selected row, independent of cursor position.
+            if (e.CursorLeft < 0 || e.CursorTop < 0) {
+                if (!(list.SelectedItem is GameRow)) e.Handled = true;
+                return;
+            }
             var container = RowUnderPointer(Mouse.DirectlyOver as DependencyObject);
             if (container == null) { e.Handled = true; return; }
             list.SelectedItem = container.DataContext;
         }
+        private void SidebarDown(object sender, MouseButtonEventArgs args)
+        {
+            sidebarClickTimer.Stop();
+            sidebarDownItem = null;
+            if (args.ClickCount != 1 || Keyboard.Modifiers != ModifierKeys.None) return;
+            var source = args.OriginalSource as DependencyObject;
+            var item = RowUnderPointer(source);
+            if (item == null || IsInteractiveChild(source, item)) return;
+            sidebarDownItem = item;
+            sidebarDownPosition = args.GetPosition(list);
+        }
+        private void SidebarUp(object sender, MouseButtonEventArgs args)
+        {
+            var item = sidebarDownItem;
+            sidebarDownItem = null;
+            if (item == null || args.ClickCount != 1 || Keyboard.Modifiers != ModifierKeys.None) return;
+            var source = args.OriginalSource as DependencyObject;
+            if (RowUnderPointer(source) != item || IsInteractiveChild(source, item)) return;
+            var position = args.GetPosition(list);
+            if (Math.Abs(position.X - sidebarDownPosition.X) > SystemParameters.MinimumHorizontalDragDistance ||
+                Math.Abs(position.Y - sidebarDownPosition.Y) > SystemParameters.MinimumVerticalDragDistance) return;
+            if (!(item.DataContext is GameRow row) ||
+                api.MainView.SelectedGames?.Any(game => game.Id == row.Id) != true) return;
+            pendingSidebarId = row.Id;
+            sidebarClickTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(200, (int)GetDoubleClickTime()) + 60);
+            sidebarClickTimer.Start();
+        }
         private void SelectGame(Guid id) => api.MainView.SelectGame(id);
         private void Navigate(Guid id, int action)
         {
+            // Selection is already synchronized. Click actions only open views from Grid.
+            if (api.MainView.ActiveDesktopView != DesktopView.Grid) return;
             if (action == 0) OpenNativeDetails(id);
             else OpenGridPanel(id);
         }
@@ -181,22 +208,10 @@ namespace HeliumHybrid
             switchButton.Command.Execute(null);
             RecomputeLayout();
         }
-        private void OpenGridPanel(Guid id, int remainingSwitchChecks = 3)
+        private void OpenGridPanel(Guid id)
         {
-            if (!active || api.MainView.SelectedGames?.Any(game => game.Id == id) != true) return;
-            if (api.MainView.ActiveDesktopView == DesktopView.Details) {
-                if (navigatedDetails) ReturnToGrid();
-                else {
-                    var button = FindNamed(window, "HeliumCharlo_SwitchGrid") as Button;
-                    if (button?.Command == null || !button.Command.CanExecute(null)) return;
-                    button.Command.Execute(null);
-                }
-                if (remainingSwitchChecks > 0)
-                    Dispatcher.BeginInvoke(DispatcherPriority.Loaded,
-                        new Action(() => Safe(() => OpenGridPanel(id, remainingSwitchChecks - 1))));
-                return;
-            }
-            if (api.MainView.ActiveDesktopView != DesktopView.Grid) return;
+            if (!active || api.MainView.ActiveDesktopView != DesktopView.Grid ||
+                api.MainView.SelectedGames?.Any(game => game.Id == id) != true) return;
             var host = FindNamed(window, "HeliumCharlo_Navigator");
             var command = host?.Tag as ICommand;
             var selected = host?.DataContext;
@@ -272,7 +287,7 @@ namespace HeliumHybrid
         }
         private void OnUnloaded(object sender, RoutedEventArgs args)
         {
-            if (!active) return; active = false; timer.Stop(); searchTimer.Stop(); coverClickTimer.Stop(); sidebarClickTimer.Stop(); panelRequested = false; UnbindGridClicks();
+            if (!active) return; active = false; timer.Stop(); searchTimer.Stop(); coverClickTimer.Stop(); sidebarClickTimer.Stop(); sidebarDownItem = null; panelRequested = false; UnbindGridClicks();
             plugin.SelectionChanged -= SelectionChanged;
             plugin.SettingsChanged -= SettingsUpdated;
             api.Database.Games.ItemUpdated -= GamesUpdated;
@@ -480,6 +495,9 @@ namespace HeliumHybrid
         {
             if (!active) return;
             if (lastDesktopView != api.MainView.ActiveDesktopView) {
+                sidebarClickTimer.Stop();
+                coverClickTimer.Stop();
+                sidebarDownItem = null;
                 if (lastDesktopView == DesktopView.Details)
                     navigatedDetails = false;
                 lastDesktopView = api.MainView.ActiveDesktopView;
