@@ -2,7 +2,7 @@
 param(
  [Parameter(Mandatory)][ValidateSet('Initialize','Build','Deploy','Start','Restore','Verify')][string]$Action,
  [string]$ProductionRoot, [string]$SandboxRoot, [string]$OutputRoot,
- [string]$ThemePackage, [string]$ExtensionPackage, [string]$BackupRoot, [string]$DotnetExe
+ [string]$ThemePackage, [string]$ExtensionPackage, [string]$BackupRoot, [string]$DotnetExe, [string]$NugetPackagesRoot, [string]$NugetConfig
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
@@ -149,8 +149,18 @@ switch($Action){
   $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1';$env:DOTNET_CLI_TELEMETRY_OPTOUT='1';$env:DOTNET_ADD_GLOBAL_TOOLS_TO_PATH='false'
   if(-not $dotnet -or -not (& $dotnet.FullName --list-sdks)){throw '.NET SDK unavailable; no packages created'}
   New-Item -ItemType Directory -Path (Join-Path $out 'bin'),(Join-Path $out 'obj'),(Join-Path $out 'packages') -Force|Out-Null
-  $env:NUGET_PACKAGES=Join-Path $out 'nuget';$env:NUGET_HTTP_CACHE_PATH=Join-Path $out 'nuget-http';$env:NUGET_SCRATCH=Join-Path $out 'nuget-scratch'
-  & $dotnet.FullName build (Join-Path $repo 'source\HeliumHybrid\HeliumHybrid.csproj') --configuration Release "-p:BaseOutputPath=$out\bin\" "-p:BaseIntermediateOutputPath=$out\obj\"
+  $env:NUGET_PACKAGES=if($NugetPackagesRoot){Full $NugetPackagesRoot}else{Join-Path $out 'nuget'}
+  if($NugetPackagesRoot -and -not(Test-Path -LiteralPath $env:NUGET_PACKAGES -PathType Container)){throw 'NuGet package cache is missing'}
+  $env:NUGET_HTTP_CACHE_PATH=Join-Path $out 'nuget-http';$env:NUGET_SCRATCH=Join-Path $out 'nuget-scratch'
+  $project=Join-Path $repo 'source\HeliumHybrid\HeliumHybrid.csproj'
+  $buildArgs=@($project,'--configuration','Release',"-p:BaseOutputPath=$out\bin\","-p:BaseIntermediateOutputPath=$out\obj\")
+  if($NugetConfig){
+   if(-not(Test-Path -LiteralPath $NugetConfig -PathType Leaf)){throw 'NuGet configuration is missing'}
+   & $dotnet.FullName restore $project --configfile $NugetConfig "-p:BaseIntermediateOutputPath=$out\obj\"
+   if($LASTEXITCODE -ne 0){throw "Dependency restore failed: $LASTEXITCODE"}
+   $buildArgs+= '--no-restore'
+  }
+  & $dotnet.FullName build @buildArgs
   if($LASTEXITCODE -ne 0){throw "Compilation failed: $LASTEXITCODE"}
   $dlls=@(Get-ChildItem -LiteralPath (Join-Path $out 'bin') -Filter HeliumCharlo.dll -File -Recurse)
   if($dlls.Count -ne 1){throw "Expected one DLL, got $($dlls.Count)"}
@@ -164,7 +174,8 @@ switch($Action){
   ExpandChecked $pext (Join-Path $out 'verify-extension');ExpandChecked $pthm (Join-Path $out 'verify-theme')
   $null=Pair (Join-Path $out 'verify-theme\theme.yaml') (Join-Path $out 'verify-extension\extension.yaml')
   if((Get-FileHash (Join-Path $out 'verify-extension\HeliumCharlo.dll')).Hash -ne (Get-FileHash $dlls[0].FullName).Hash){throw 'Packaged DLL mismatch'}
-  Json (Join-Path $out 'build.json') ([ordered]@{version=$version;sourceCommit=(& git -C $repo rev-parse HEAD).Trim();themePackage=$pthm;extensionPackage=$pext;themeSha256=(Get-FileHash $pthm).Hash;extensionSha256=(Get-FileHash $pext).Hash;builtUtc=[DateTime]::UtcNow.ToString('o')})
+  $sourceDirty=@(& git -C $repo status --porcelain).Count -gt 0
+  Json (Join-Path $out 'build.json') ([ordered]@{version=$version;sourceCommit=(& git -C $repo rev-parse HEAD).Trim();sourceDirty=$sourceDirty;themePackage=$pthm;extensionPackage=$pext;themeSha256=(Get-FileHash $pthm).Hash;extensionSha256=(Get-FileHash $pext).Hash;builtUtc=[DateTime]::UtcNow.ToString('o')})
   "PASS: compiled and packaged $version in $out"
  }
  'Deploy'{
