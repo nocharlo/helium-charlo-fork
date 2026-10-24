@@ -33,7 +33,7 @@ For a fresh build, choose a **new** output folder and use a .NET SDK. The C# pro
 & $tool -Action Build -OutputRoot $newBuild -DotnetExe 'C:\Users\Carlos\Documents\Codex\2026-10-22\files-mentioned-by-the-user-helium\work\toolchains\dotnet\dotnet.exe'
 ```
 
-The script stops when compilation, ZIP validation, manifest pairing, or packaged DLL verification fails. It writes `build.json` and paired `.pext`/`.pthm` packages only to the build output. An installation requires both package paths:
+The script stops when dependency restore, compilation, ZIP validation, manifest pairing, or packaged DLL verification fails. It writes `build.json` (including source commit, dirty-worktree flag, and package hashes) and paired `.pext`/`.pthm` packages only to the build output. For offline work, pass `-NugetPackagesRoot <existing cache>` and `-NugetConfig <config with packageSources cleared>`; all required packages must already be cached. An installation requires both package paths:
 
 ```powershell
 & $tool -Action Deploy -SandboxRoot $sandbox -ThemePackage "$newBuild\packages\Helium-charlo-fork-v0.2.4.pthm" -ExtensionPackage "$newBuild\packages\Helium-Navigator-v0.2.4.pext"
