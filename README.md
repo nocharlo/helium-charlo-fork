@@ -30,9 +30,11 @@ To roll back, reinstall your backed-up v0.2.3 packages and restore your backed-u
 
 ## Build and checks
 
+For isolated Windows deployment, backup, rollback and visual regression evidence, use the [test harness](docs/TEST-HARNESS.md). It prepares a separate portable Playnite copy and keeps the stable v0.2.4 installation untouched. The [infrastructure audit](docs/INFRASTRUCTURE-AUDIT.md) records the external development-extension path found in the first sandbox and the working Computer Use launch procedure.
+
 Run `source/Build.ps1` in PowerShell on Windows with the .NET SDK and network access for the NuGet references. It builds the C# project in Release, copies the DLL and extension manifest into `install/`, and packages the theme and extension. The project uses .NET Framework 4.6.2 and PlayniteSDK 6.11.0. Run `python tests/validate_package.py` after packaging. `dotnet run --project tests/LogicTests.csproj` and `dotnet run --project tests/SettingsFileTests.csproj` exercise portable logic and real settings-file recovery.
 
-The included v0.2.4 DLL was compiled in Release with Roslyn against .NET Framework reference assemblies and PlayniteSDK 6.11.0. Earlier build reports recorded static XML/XAML and package checks, 13 logic checks and a settings recovery test. The maintainer installed v0.2.4 in Playnite on Windows and reported 12 passed checks, two unresolved mouse-interaction failures, and one pending preference-persistence check. See [technical validation](docs/TECHNICAL-REPORT.md) and the [change log](docs/CHANGELOG.md).
+The included v0.2.4 DLL was compiled in Release with Roslyn against .NET Framework reference assemblies and PlayniteSDK 6.11.0. Earlier build reports recorded static XML/XAML and package checks, 13 logic checks and a settings recovery test. The maintainer installed v0.2.4 in Playnite on Windows and reported 12 passed checks, two unresolved mouse-interaction failures, and one pending preference-persistence check. A later isolated Playnite run confirmed that the Navigator grouping preference survived a full exit and restart; the earlier maintainer checklist remains a historical record. See [technical validation](docs/TECHNICAL-REPORT.md) and the [change log](docs/CHANGELOG.md).
 
 ## Limits and development status
 
