@@ -332,21 +332,14 @@ namespace HeliumHybrid
                 var changed = Interlocked.Exchange(ref dirty, 0) != 0;
                 if (!changed && ids.SequenceEqual(lastIds)) { SyncSelection(false); return; }
                 lastIds = ids;
-                var rebuilt = new List<GameRow>();
-                foreach (var game in games.OrderBy(g => string.IsNullOrEmpty(g.SortingName) ? g.Name : g.SortingName, StringComparer.CurrentCultureIgnoreCase)) {
-                    IEnumerable<string> names = null;
-                    switch (prefs.Grouping) {
-                        case 1: names = game.Series?.Select(v => v.Name); break;
-                        case 2: names = game.Categories?.Select(v => v.Name); break;
-                        case 3: names = game.Platforms?.Select(v => v.Name); break;
-                    }
-                    string iconPath = null;
-                    if (!string.IsNullOrWhiteSpace(game.Icon)) iconPath = api.Database.GetFullFilePath(game.Icon);
-                    foreach (var name in prefs.Grouping == 0 ? new[] { "" } : Logic.Groups(names))
-                    rebuilt.Add(new GameRow { Id = game.Id, Name = game.Name ?? "Untitled", Key = Logic.SearchKey(game.Name), Group = name, IconPath = iconPath });
-                }
-                if (prefs.Grouping != 0) rebuilt = rebuilt.OrderBy(r => r.Group, StringComparer.CurrentCultureIgnoreCase).ToList();
-                rows = rebuilt; syncing = true;
+                var projected = NavigatorProjection.Build(games.Select(game => new NavigatorSource {
+                    Id = game.Id, Name = game.Name, SortingName = game.SortingName,
+                    Icon = game.Icon, GroupNames = GroupNames(game, prefs.Grouping)
+                }), prefs.Grouping, icon => api.Database.GetFullFilePath(icon));
+                rows = projected.Select(row => new GameRow {
+                    Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group, IconPath = row.IconPath
+                }).ToList();
+                syncing = true;
                 try {
                     view = new ListCollectionView(rows);
                     if (prefs.Grouping != 0) view.GroupDescriptions.Add(new PropertyGroupDescription("Group"));
@@ -355,14 +348,23 @@ namespace HeliumHybrid
                 SyncSelection(false); status.Text = ""; reportedError = false;
             });
         }
+        private static IEnumerable<string> GroupNames(Game game, int grouping)
+        {
+            switch (grouping) {
+                case 1: return game.Series?.Select(value => value.Name);
+                case 2: return game.Categories?.Select(value => value.Name);
+                case 3: return game.Platforms?.Select(value => value.Name);
+                default: return null;
+            }
+        }
         private void ApplySearch()
         {
             if (view == null) return;
-            var key = Logic.SearchKey(search.Text);
+            var key = NavigatorProjection.SearchKey(search.Text);
             syncing = true;
-            try { view.Filter = obj => ((GameRow)obj).Key.Contains(key); view.Refresh(); }
+            try { view.Filter = obj => NavigatorProjection.Matches(((GameRow)obj).Key, key); view.Refresh(); }
             finally { syncing = false; }
-            count.Text = view.Cast<GameRow>().Select(r => r.Id).Distinct().Count() + " games";
+            count.Text = NavigatorProjection.DistinctGameCount(view.Cast<GameRow>().Select(r => r.Id)) + " games";
             status.Text = view.IsEmpty ? "No games found. Check the global filters too." : "";
             SyncSelection(false);
         }
