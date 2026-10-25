@@ -68,23 +68,20 @@ You can also return to Grid View while preserving the relevant library state.
 
 That sounds obvious, but getting it to behave consistently took a surprising number of iterations.
 
-Current Release
+## Current Release
 
-v0.2.5 — Architecture Foundation
+### v0.2.5 — Architecture Foundation
 
 This update focuses on improving the Navigator's internal architecture, making future development easier and more reliable.
 
-Highlights:
+**Highlights:**
+- Refactored and modularized the Navigator's code.
+- Improved synchronization with Playnite's global filters.
+- Improved search, sorting, and grouping logic.
+- Added automated tests and safer build and rollback procedures.
+- Preserved existing features, settings, and visual behavior.
 
-Refactored and modularized the Navigator's code.
-
-Improved synchronization with Playnite's global filters.
-
-Improved search, sorting, and grouping logic.
-
-Added automated tests and safer build and rollback procedures.
-
-Preserved existing features, settings, and visual behavior.
+See the [full changelog](docs/CHANGELOG.md) for technical details.
 
 ### Previous Releases
 
