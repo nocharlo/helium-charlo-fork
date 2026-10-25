@@ -21,6 +21,7 @@ namespace HeliumHybrid
     public sealed class Navigator : PluginUserControl
     {
         private readonly IPlayniteAPI api;
+        private readonly LibraryStateAdapter library;
         private readonly HybridPlugin plugin;
         private readonly Grid root;
         private readonly ListBox list;
@@ -60,7 +61,7 @@ namespace HeliumHybrid
         private ListCollectionView view;
         public Navigator(IPlayniteAPI api, HybridPlugin plugin)
         {
-            this.api = api; this.plugin = plugin;
+            this.api = api; this.plugin = plugin; library = new LibraryStateAdapter(api);
             prefs = plugin.Settings;
             prefs.Width = Logic.ClampWidth(prefs.Width);
             using (var stream = typeof(Navigator).Assembly.GetManifestResourceStream("HeliumHybrid.Navigator.xaml"))
@@ -79,14 +80,14 @@ namespace HeliumHybrid
             coverClickTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher);
             coverClickTimer.Tick += (s, e) => {
                 coverClickTimer.Stop();
-                if (active && api.MainView.ActiveDesktopView == DesktopView.Grid &&
-                    api.MainView.SelectedGames?.Any(game => game.Id == pendingCoverId) == true)
+                if (active && library.ActiveDesktopView == DesktopView.Grid &&
+                    library.IsSelected(pendingCoverId))
                     Safe(() => Navigate(pendingCoverId, prefs.GridCoverClickAction));
             };
             sidebarClickTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher);
             sidebarClickTimer.Tick += (s, e) => {
                 sidebarClickTimer.Stop();
-                if (active && api.MainView.SelectedGames?.Any(game => game.Id == pendingSidebarId) == true)
+                if (active && library.IsSelected(pendingSidebarId))
                     Safe(() => Navigate(pendingSidebarId, prefs.SidebarClickAction));
             };
             search.TextChanged += (s, e) => { searchTimer.Stop(); searchTimer.Start(); };
@@ -153,7 +154,7 @@ namespace HeliumHybrid
             if (Math.Abs(position.X - sidebarDownPosition.X) > SystemParameters.MinimumHorizontalDragDistance ||
                 Math.Abs(position.Y - sidebarDownPosition.Y) > SystemParameters.MinimumVerticalDragDistance) return;
             if (!(item.DataContext is GameRow row) ||
-                api.MainView.SelectedGames?.Any(game => game.Id == row.Id) != true) return;
+                !library.IsSelected(row.Id)) return;
             pendingSidebarId = row.Id;
             sidebarClickTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(200, (int)GetDoubleClickTime()) + 60);
             sidebarClickTimer.Start();
@@ -162,14 +163,14 @@ namespace HeliumHybrid
         private void Navigate(Guid id, int action)
         {
             // Selection is already synchronized. Click actions only open views from Grid.
-            if (api.MainView.ActiveDesktopView != DesktopView.Grid) return;
+            if (library.ActiveDesktopView != DesktopView.Grid) return;
             if (action == 0) OpenNativeDetails(id);
             else OpenGridPanel(id);
         }
         private void OpenNativeDetails(Guid id)
         {
-            if (!active || api.MainView.ActiveDesktopView != DesktopView.Grid ||
-                api.MainView.SelectedGames?.Any(game => game.Id == id) != true) return;
+            if (!active || library.ActiveDesktopView != DesktopView.Grid ||
+                !library.IsSelected(id)) return;
             var switchButton = FindNamed(window, "HeliumCharlo_SwitchDetails") as Button;
             if (switchButton?.Command == null || !switchButton.Command.CanExecute(null)) return;
             CaptureGridScroll();
@@ -180,8 +181,8 @@ namespace HeliumHybrid
         }
         private void OpenGridPanel(Guid id)
         {
-            if (!active || api.MainView.ActiveDesktopView != DesktopView.Grid ||
-                api.MainView.SelectedGames?.Any(game => game.Id == id) != true) return;
+            if (!active || library.ActiveDesktopView != DesktopView.Grid ||
+                !library.IsSelected(id)) return;
             var host = FindNamed(window, "HeliumCharlo_Navigator");
             var command = host?.Tag as ICommand;
             var selected = host?.DataContext;
@@ -194,7 +195,7 @@ namespace HeliumHybrid
         }
         private void ReturnToGrid()
         {
-            if (!navigatedDetails || api.MainView.ActiveDesktopView != DesktopView.Details) return;
+            if (!navigatedDetails || library.ActiveDesktopView != DesktopView.Details) return;
             var switchButton = FindNamed(window, "HeliumCharlo_SwitchGrid") as Button;
             if (switchButton?.Command == null || !switchButton.Command.CanExecute(null)) return;
             switchButton.Command.Execute(null);
@@ -204,22 +205,22 @@ namespace HeliumHybrid
         }
         private void CaptureGridScroll()
         {
-            gridIds = api.MainView.FilteredGames?.Select(game => game.Id).OrderBy(id => id).ToArray();
-            gridSort = api.MainView.SortOrder.ToString();
-            gridSortDirection = api.MainView.SortOrderDirection.ToString();
-            gridGrouping = api.MainView.Grouping.ToString();
+            gridIds = library.SortedFilteredIds();
+            gridSort = library.SortOrder;
+            gridSortDirection = library.SortDirection;
+            gridGrouping = library.Grouping;
             var grid = FindNamed(window, "PART_ViewGrid") as Control;
             var games = grid?.Template?.FindName("PART_ListGames", grid) as DependencyObject;
             gridOffset = FindScroll(games)?.VerticalOffset ?? 0;
         }
         private void RestoreGridScroll()
         {
-            if (!active || api.MainView.ActiveDesktopView != DesktopView.Grid || gridIds == null) return;
-            var currentIds = api.MainView.FilteredGames?.Select(game => game.Id).OrderBy(id => id).ToArray();
+            if (!active || library.ActiveDesktopView != DesktopView.Grid || gridIds == null) return;
+            var currentIds = library.SortedFilteredIds();
             if (currentIds == null || !gridIds.SequenceEqual(currentIds) ||
-                gridSort != api.MainView.SortOrder.ToString() ||
-                gridSortDirection != api.MainView.SortOrderDirection.ToString() ||
-                gridGrouping != api.MainView.Grouping.ToString()) { gridIds = null; return; }
+                gridSort != library.SortOrder ||
+                gridSortDirection != library.SortDirection ||
+                gridGrouping != library.Grouping) { gridIds = null; return; }
             var grid = FindNamed(window, "PART_ViewGrid") as Control;
             var games = grid?.Template?.FindName("PART_ListGames", grid) as DependencyObject;
             FindScroll(games)?.ScrollToVerticalOffset(gridOffset);
@@ -249,7 +250,7 @@ namespace HeliumHybrid
             api.Database.Series.ItemCollectionChanged += MetadataChanged;
             api.Database.Categories.ItemCollectionChanged += MetadataChanged;
             api.Database.Platforms.ItemCollectionChanged += MetadataChanged;
-            lastDesktopView = api.MainView.ActiveDesktopView;
+            lastDesktopView = library.ActiveDesktopView;
             window = Window.GetWindow(this);
             if (window != null) window.SizeChanged += WindowSizeChanged;
             RecomputeLayout();
@@ -296,16 +297,13 @@ namespace HeliumHybrid
         {
             if (!active || IsCollapsed()) return;
             Safe(() => {
-                var games = api.MainView.FilteredGames ?? new List<Game>();
+                var games = library.FilteredGames;
                 // Filters have no SDK change event; compare membership at background priority.
                 var ids = games.Select(g => g.Id).OrderBy(id => id).ToArray();
                 var changed = Interlocked.Exchange(ref dirty, 0) != 0;
                 if (!changed && ids.SequenceEqual(lastIds)) { SyncSelection(false); return; }
                 lastIds = ids;
-                var projected = NavigatorProjection.Build(games.Select(game => new NavigatorSource {
-                    Id = game.Id, Name = game.Name, SortingName = game.SortingName,
-                    Icon = game.Icon, GroupNames = GroupNames(game, prefs.Grouping)
-                }), prefs.Grouping, icon => api.Database.GetFullFilePath(icon));
+                var projected = NavigatorProjection.Build(library.Sources(games, prefs.Grouping), prefs.Grouping, library.ResolveIcon);
                 rows = projected.Select(row => new GameRow {
                     Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group, IconPath = row.IconPath
                 }).ToList();
@@ -317,15 +315,6 @@ namespace HeliumHybrid
                 } finally { syncing = false; }
                 SyncSelection(false); status.Text = ""; reportedError = false;
             });
-        }
-        private static IEnumerable<string> GroupNames(Game game, int grouping)
-        {
-            switch (grouping) {
-                case 1: return game.Series?.Select(value => value.Name);
-                case 2: return game.Categories?.Select(value => value.Name);
-                case 3: return game.Platforms?.Select(value => value.Name);
-                default: return null;
-            }
         }
         private void ApplySearch()
         {
@@ -341,7 +330,7 @@ namespace HeliumHybrid
         private void SyncSelection(bool scroll)
         {
             if (syncing || view == null) return;
-            var selected = api.MainView.SelectedGames?.Select(g => g.Id).ToHashSetCompat() ?? new HashSet<Guid>();
+            var selected = library.SelectedIds();
             var current = list.SelectedItem as GameRow;
             if (current != null && selected.Contains(current.Id) && view.Contains(current)) return;
             var row = view.Cast<GameRow>().FirstOrDefault(r => selected.Contains(r.Id));
@@ -351,8 +340,8 @@ namespace HeliumHybrid
         }
         private void ApplySize()
         {
-            if (active && (api.MainView.ActiveDesktopView == DesktopView.List ||
-                (api.MainView.ActiveDesktopView == DesktopView.Details && !navigatedDetails))) {
+            if (active && (library.ActiveDesktopView == DesktopView.List ||
+                (library.ActiveDesktopView == DesktopView.Details && !navigatedDetails))) {
                 Visibility = Visibility.Collapsed;
                 Width = 0;
                 if (reopenButton != null) reopenButton.Visibility = Visibility.Collapsed;
@@ -365,7 +354,7 @@ namespace HeliumHybrid
             grip.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
             toggle.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
             if (reopenButton != null) reopenButton.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
-            backButton.Visibility = navigatedDetails && api.MainView.ActiveDesktopView == DesktopView.Details && !collapsed ? Visibility.Visible : Visibility.Collapsed;
+            backButton.Visibility = navigatedDetails && library.ActiveDesktopView == DesktopView.Details && !collapsed ? Visibility.Visible : Visibility.Collapsed;
             toggle.Content = "<<";
         }
         private void ReopenClicked(object sender, RoutedEventArgs args)
@@ -415,7 +404,7 @@ namespace HeliumHybrid
             coverClickTimer.Stop();
             coverDownItem = null;
             if (args.ClickCount != 1 ||
-                api.MainView.ActiveDesktopView != DesktopView.Grid || Keyboard.Modifiers != ModifierKeys.None) return;
+                library.ActiveDesktopView != DesktopView.Grid || Keyboard.Modifiers != ModifierKeys.None) return;
             var source = args.OriginalSource as DependencyObject;
             var item = source == null ? null : ItemsControl.ContainerFromElement(nativeGridList, source) as ListBoxItem;
             if (item == null || IsInteractiveChild(source, item)) return;
@@ -427,13 +416,13 @@ namespace HeliumHybrid
             var item = coverDownItem;
             coverDownItem = null;
             if (item == null || args.ClickCount != 1 ||
-                api.MainView.ActiveDesktopView != DesktopView.Grid) return;
+                library.ActiveDesktopView != DesktopView.Grid) return;
             var source = args.OriginalSource as DependencyObject;
             if (source == null || ItemsControl.ContainerFromElement(nativeGridList, source) != item) return;
             var position = args.GetPosition(nativeGridList);
             if (Math.Abs(position.X - coverDownPosition.X) > SystemParameters.MinimumHorizontalDragDistance ||
                 Math.Abs(position.Y - coverDownPosition.Y) > SystemParameters.MinimumVerticalDragDistance) return;
-            var selected = api.MainView.SelectedGames;
+            var selected = library.SelectedGames;
             if (selected == null || selected.Count() != 1) return;
             pendingCoverId = selected.First().Id;
             coverClickTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(200, (int)GetDoubleClickTime()) + 60);
@@ -466,27 +455,27 @@ namespace HeliumHybrid
         private void RecomputeLayout()
         {
             if (!active) return;
-            if (lastDesktopView != api.MainView.ActiveDesktopView) {
+            if (lastDesktopView != library.ActiveDesktopView) {
                 sidebarClickTimer.Stop();
                 coverClickTimer.Stop();
                 sidebarDownItem = null;
                 if (lastDesktopView == DesktopView.Details)
                     navigatedDetails = false;
-                lastDesktopView = api.MainView.ActiveDesktopView;
+                lastDesktopView = library.ActiveDesktopView;
             }
             ApplySize();
             var host = window ?? Window.GetWindow(this);
             if (host == null) return;
             BindReopenButton(host);
             ApplySize();
-            if (navigatedDetails && api.MainView.ActiveDesktopView == DesktopView.Details) {
+            if (navigatedDetails && library.ActiveDesktopView == DesktopView.Details) {
                 nativeDetailsList = FindNamed(host, "HeliumCharlo_NativeDetailsList");
                 if (nativeDetailsList != null) nativeDetailsList.Visibility = Visibility.Collapsed;
             } else ShowNativeList();
             var gridView = FindNamed(host, "PART_ViewGrid") as Control;
             BindGridClicks(gridView);
             // Do not alter the converter's XAML or the overview itself. Its host border owns the space.
-            if (gridView == null || api.MainView.ActiveDesktopView != DesktopView.Grid) { RestoreDetails(); return; }
+            if (gridView == null || library.ActiveDesktopView != DesktopView.Grid) { RestoreDetails(); return; }
             var overview = gridView.Template?.FindName("PART_ControlGameView", gridView) as FrameworkElement;
             var border = overview == null ? null : VisualTreeHelper.GetParent(overview) as FrameworkElement;
             if (border == null) return;

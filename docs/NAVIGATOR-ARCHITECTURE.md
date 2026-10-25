@@ -22,10 +22,15 @@ The candidate was built as paired v0.2.5 packages in a separate output directory
 ## Second extraction: presentation and icons
 
 `NavigatorPresentation.cs` now owns `GameRow` and the 512-entry `IconCache`. Their class bodies were compared with the prior commit and are identical; only their file location and required `using` directives changed. The Playnite build compiled offline with zero warnings/errors, the projection checks passed, and candidate package/XAML validation passed. Portable deployment and visual testing are deferred to the next related-extractions milestone.
+
+## Third extraction: Playnite library reads
+
+`LibraryStateAdapter.cs` now owns read-only access to filtered games, selected games, active desktop view, sort/group state, icon paths, and Playnite metadata used for projection. `Navigator.cs` still issues selection and launch commands and owns WPF state. The existing null handling, filtering poll, source order, and UI-thread call sites are unchanged. The offline Playnite build, 12 projection checks, and package/XAML validation passed. Portable deployment and visual testing are deferred to the related-extractions milestone.
+
 ## Safest continuation
 
 1. Completed: presentation adapter move, with lazy icon decoding and cache unchanged.
-2. Add a read-only `LibraryStateAdapter` that centralizes `FilteredGames`, selected IDs, sort/group state and Playnite metadata access. Keep UI-thread access and existing 1.5-second filter polling; do not add SDK subscriptions that are not available.
+2. Completed: read-only `LibraryStateAdapter`; UI-thread access and the 1.5-second filter poll remain in place.
 3. Isolate selection synchronization from click navigation. Preserve the current timer delays, drag thresholds, double-click launch and Grid-only click actions. Require a focused Windows milestone test before committing navigation behavior.
 4. Separate width, collapse and view-layout operations, preserving the theme's named controls and converter-owned templates.
 5. Review event/timer lifecycle last, pairing every subscription with its current unsubscription and retaining dispatcher marshaling.
