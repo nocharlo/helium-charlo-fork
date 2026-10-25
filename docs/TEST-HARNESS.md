@@ -13,12 +13,16 @@ This infrastructure prepares the next release without changing Navigator behavio
 
 ## Paths used in this run
 
+The following example uses paths relative to the current Windows user profile. Adjust them to match your local environment.
+
 ```powershell
-$production = 'C:\Users\Carlos\Documents\Playnite'
-$sandbox = 'C:\Users\Carlos\Documents\Codex\2026-10-22\files-mentioned-by-the-user-helium\work\helium-playnite-test3'
-$build = 'C:\Users\Carlos\Documents\Codex\2026-10-22\files-mentioned-by-the-user-helium\work\helium-build-v024-check3'
+$production = Join-Path $env:USERPROFILE 'Documents\Playnite'
+$sandbox = Join-Path $env:USERPROFILE 'HeliumDev\playnite-test'
+$build = Join-Path $env:USERPROFILE 'HeliumDev\build'
 $tool = '.\scripts\Helium-TestHarness.ps1'
 ```
+
+Keep the sandbox and build directories outside the repository. Never use your production Playnite directory as `SandboxRoot`.
 
 To create another sandbox, choose a **new** folder and run:
 
