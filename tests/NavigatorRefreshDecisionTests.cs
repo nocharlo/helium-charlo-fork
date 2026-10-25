@@ -107,6 +107,9 @@ class NavigatorRefreshDecisionTests
             "Default follows supported native groups");
         Check(NavigatorRefreshDecision.EffectiveGrouping(2, "CompletionStatus") == 2,
             "Explicit Navigator grouping takes precedence");
+        Check(NavigatorRefreshDecision.EffectiveGrouping(1, "Category") == 1 &&
+            NavigatorRefreshDecision.EffectiveGrouping(0, "Category") == 6,
+            "Custom rating categories follow native grouping only in default mode");
         Check(NavigatorRefreshDecision.EffectiveGrouping(0, "Name") == 0,
             "Unsupported native group remains flat");
         var groupState = new NavigatorGroupState();
