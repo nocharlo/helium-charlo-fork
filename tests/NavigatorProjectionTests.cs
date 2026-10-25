@@ -49,6 +49,12 @@ class NavigatorProjectionTests
         Check(groupedReverse.Select(row => row.Id).SequenceEqual(new[]{gamma,alpha,beta,beta}),
             "Independent group headings stay sorted while members follow native order");
         Check(grouped.Count(row => row.Id == beta) == 2 && iconCalls == 2, "Duplicate memberships removed; icon resolved once per game");
+        var ratingCategories = NavigatorProjection.Build(new[] {
+            new NavigatorSource { Id = alpha, Name = "Unrated item", GroupNames = new[] { "☆" } },
+            new NavigatorSource { Id = beta, Name = "Rated item", GroupNames = new[] { "★★★★★" } }
+        }, 6, icon => icon);
+        Check(ratingCategories.Select(row => row.Group).OrderBy(value => value).SequenceEqual(new[] { "☆", "★★★★★" }.OrderBy(value => value)),
+            "Native Category grouping preserves custom star categories including unrated");
         Check(NavigatorProjection.DistinctGameCount(grouped.Select(row => row.Id)) == 3, "Displayed count deduplicates games");
         Check(NavigatorProjection.Build(null, 0, icon => icon).Count == 0, "Missing collection projects to empty list");
         Console.WriteLine("PASS: " + checks + " NavigatorProjection checks.");
