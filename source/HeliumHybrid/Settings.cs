@@ -31,6 +31,7 @@ namespace HeliumHybrid
             if (GridCoverClickAction < 0 || GridCoverClickAction > 1) GridCoverClickAction = OpenFromGridCover ? 0 : 1;
         }
         public bool PreserveGridScroll { get; set; } = true;
+        public bool AutomaticallyRevealSelectedGame { get; set; } = true;
         [XmlIgnore] public Action Changed { get; set; }
         [XmlIgnore] public Action Save { get; set; }
         private Preferences backup;
@@ -62,12 +63,13 @@ namespace HeliumHybrid
         private Preferences Copy() => new Preferences { Width = Width, Collapsed = Collapsed, Grouping = Grouping,
             LayoutMode = LayoutMode, SteamMode = SteamMode, OpenFromGridCover = OpenFromGridCover,
             SidebarClickAction = SidebarClickAction, GridCoverClickAction = GridCoverClickAction,
-            PreserveGridScroll = PreserveGridScroll };
+            PreserveGridScroll = PreserveGridScroll, AutomaticallyRevealSelectedGame = AutomaticallyRevealSelectedGame };
         private void Assign(Preferences value)
         {
             Width = value.Width; Collapsed = value.Collapsed; Grouping = value.Grouping;
             LayoutMode = value.LayoutMode; SteamMode = value.SteamMode;
             OpenFromGridCover = value.OpenFromGridCover; PreserveGridScroll = value.PreserveGridScroll;
+            AutomaticallyRevealSelectedGame = value.AutomaticallyRevealSelectedGame;
             SidebarClickAction = value.SidebarClickAction; GridCoverClickAction = value.GridCoverClickAction;
         }
     }
@@ -81,6 +83,7 @@ namespace HeliumHybrid
             panel.Children.Add(NavigationChoice("Sidebar game click", "SidebarClickAction"));
             panel.Children.Add(NavigationChoice("Grid cover click", "GridCoverClickAction"));
             panel.Children.Add(BoundCheck("Restore grid scroll position when returning", "PreserveGridScroll"));
+            panel.Children.Add(BoundCheck("Automatically reveal selected game", "AutomaticallyRevealSelectedGame"));
             panel.Children.Add(new TextBlock { Text = "Grid details panel", FontWeight = FontWeights.Bold, Margin = new Thickness(0,16,0,7) });
             var mode = new ComboBox { Margin = new Thickness(0,0,0,8), MaxWidth = 260, HorizontalAlignment = HorizontalAlignment.Left };
             mode.Items.Add("Automatic"); mode.Items.Add("Always hidden"); mode.Items.Add("Always visible");
