@@ -80,6 +80,11 @@ namespace HeliumHybrid
             }
         }
 
+        internal void VisualUpdate(int occurrences)
+        {
+            if (enabled) Emit("visual-update occurrences=" + occurrences);
+        }
+
         private static string Format(double value)
         {
             return value.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
