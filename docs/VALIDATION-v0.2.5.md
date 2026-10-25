@@ -26,13 +26,13 @@ The build output is `work/helium-v025-final-build-5aa2c2b` in the local task wor
 
 The broad regression run used clean build `9db5a0e`. The installed DLL SHA-256 was `4B6967DFE39207C2A288A162336649902D7C495FB7646F3602E849C977ECEFB0`, matching that build. Screenshots `01`–`07` belong to this build:
 
-- Navigator loaded in the portable Playnite. Selecting BioShock in full Details updated its details without launching it.
-- Switching to Grid and selecting Assassin's Creed IV in Navigator highlighted its cover and updated the Grid details panel. Grid/Details transitions remained usable.
-- Local search for BioShock showed two Navigator entries while the Grid retained the full library. Global Playnite search for Sonic reduced both Grid and Navigator to three games.
-- Platform showed 21 PC games and one Nintendo 64 game; Series and Category / collection groups rendered with their members.
+- Navigator loaded in the portable Playnite. Selecting a test game in full Details updated its details without launching it.
+- Switching to Grid and selecting a test game in Navigator highlighted its cover and updated the Grid details panel. Grid/Details transitions remained usable.
+- Local search showed matching Navigator entries while the Grid retained the full library. Global Playnite search reduced both Grid and Navigator to matching games.
+- Platform, Series and Category / collection groups rendered with their members.
 - Category grouping saved as `Grouping=2` in the sandbox's `navigator.xml` and reappeared after a full exit and restart.
 
-Commit `5aa2c2b` changed only the internal construction of the selected-ID set and removed an unused compatibility helper. After a clean rebuild and redeployment, screenshot `08-final-selection-5aa2c2b.jpg` confirmed that selecting BioShock in Navigator again highlighted its Grid cover and updated the details panel. Its installed DLL hash matched the final build. The other GUI scenarios were not redundantly rerun after this isolated cleanup.
+Commit `5aa2c2b` changed only the internal construction of the selected-ID set and removed an unused compatibility helper. After a clean rebuild and redeployment, screenshot `08-final-selection-5aa2c2b.jpg` confirmed that selecting a test game in Navigator again highlighted its Grid cover and updated the details panel. Its installed DLL hash matched the final build. The other GUI scenarios were not redundantly rerun after this isolated cleanup.
 
 ## Limits
 
