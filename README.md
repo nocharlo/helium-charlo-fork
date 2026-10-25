@@ -1,6 +1,6 @@
 # Helium (charlo fork)
 
-A Steam-inspired library Navigator for [Playnite](https://github.com/JosefNemec/Playnite) Desktop Mode, based on [Helium](https://github.com/darklinkpower/Helium) by darklinkpower and the [Helium KKCD fork](https://github.com/kushagr-m/Helium).
+A Steam-style game Navigator integrated into [Playnite](https://github.com/JosefNemec/Playnite) Desktop's native library views. This project modifies Brandon Balderas's [Helium](https://github.com/darklinkpower/Helium) through the Helium KKCD fork by Kush Mittal. **v0.2.4 remains the approved published stability release.** v0.2.5 Architecture Foundation is a locally validated, unpublished candidate. The checked-in installers remain the v0.2.4 packages; the v0.2.5 packages were built separately from the local branch.
 
 **Latest version: v0.2.4 — Stability Hotfix**
 
@@ -22,19 +22,11 @@ I'm sharing it here in case anyone else has been looking for something similar, 
 
 ## Features
 
-The current version includes:
+For isolated Windows deployment, backup, rollback and visual regression evidence, use the [test harness](docs/TEST-HARNESS.md). The [v0.2.5 validation record](docs/VALIDATION-v0.2.5.md) lists the exact local build and test scope. The harness prepares a separate portable Playnite copy and keeps the stable v0.2.4 installation untouched. The [infrastructure audit](docs/INFRASTRUCTURE-AUDIT.md) records the external development-extension path found in the first sandbox and the working Computer Use launch procedure.
 
-- A scrollable game sidebar with titles and icons.
-- Game search and expandable groupings.
-- Synchronized selection between the Navigator and Playnite's main library.
-- Independent scrolling between the game list and cover grid.
-- Configurable click actions for sidebar games and grid covers.
-- Navigation between Grid View, Full Details View, and the existing Grid Details Panel.
-- Back to Grid with game selection and conditional scroll-position restoration.
-- A collapsible, resizable sidebar with a floating expand button.
-- Persistent Navigator settings.
-- Double-click to launch games.
-- Integration with Helium's existing artwork, backgrounds, logos, and supported extensions.
+The checked-in v0.2.4 packages remain the approved release. `source/Build.ps1` is the legacy v0.2.4 packaging command and refuses to overwrite those paths while source manifests identify a v0.2.5 candidate. For v0.2.5 development, use `scripts/Helium-TestHarness.ps1 -Action Build` with a new output directory, then run `python tests/validate_package.py --build-dir <output directory>`. The project targets .NET Framework 4.6.2 and PlayniteSDK 6.11.0. `dotnet run --project tests/LogicTests.csproj` and `dotnet run --project tests/SettingsFileTests.csproj` exercise portable logic and real settings-file recovery.
+
+The included v0.2.4 DLL was compiled in Release with Roslyn against .NET Framework reference assemblies and PlayniteSDK 6.11.0. Earlier build reports recorded static XML/XAML and package checks, 13 logic checks and a settings recovery test. The maintainer installed v0.2.4 in Playnite on Windows and reported 12 passed checks, two unresolved mouse-interaction failures, and one pending preference-persistence check. A later isolated Playnite run confirmed that the Navigator grouping preference survived a full exit and restart; the earlier maintainer checklist remains a historical record. See [technical validation](docs/TECHNICAL-REPORT.md) and the [change log](docs/CHANGELOG.md).
 
 The Navigator works alongside Playnite's existing library rather than maintaining a separate game database.
 
