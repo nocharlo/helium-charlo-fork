@@ -65,6 +65,7 @@ namespace HeliumHybrid
         private NavigatorViewSnapshot lastViewState;
         private List<GameRow> rows = new List<GameRow>();
         private ListCollectionView view;
+        private int rebuildGeneration;
         public Navigator(IPlayniteAPI api, HybridPlugin plugin)
         {
             this.api = api; this.plugin = plugin; library = new LibraryStateAdapter(api);
@@ -335,6 +336,9 @@ namespace HeliumHybrid
                 lastIds = ids;
                 lastOrderIds = orderIds;
                 lastViewState = viewState;
+                var selectedRow = list.SelectedItem as GameRow;
+                var scrollOffset = FindScroll(list)?.VerticalOffset ?? 0;
+                var expandedGroups = CaptureExpandedGroups(list);
                 var projectionStart = diagnostics.Enabled ? Stopwatch.GetTimestamp() : 0;
                 var projected = NavigatorProjection.Build(library.Sources(games, prefs.Grouping), prefs.Grouping, library.ResolveIcon);
                 rows = projected.Select(row => new GameRow {
@@ -348,8 +352,19 @@ namespace HeliumHybrid
                     view = new ListCollectionView(rows);
                     if (prefs.Grouping != 0) view.GroupDescriptions.Add(new PropertyGroupDescription("Group"));
                     list.ItemsSource = view; ApplySearch();
+                    if (selectedRow != null) {
+                        var occurrence = rows.FirstOrDefault(row => row.Id == selectedRow.Id && row.Group == selectedRow.Group && view.Contains(row));
+                        if (occurrence != null && library.IsSelected(occurrence.Id)) list.SelectedItem = occurrence;
+                    }
                 } finally { syncing = false; }
                 SyncSelection(false); status.Text = ""; reportedError = false;
+                var generation = ++rebuildGeneration;
+                var currentView = view;
+                Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
+                    if (!active || generation != rebuildGeneration || !ReferenceEquals(view, currentView)) return;
+                    RestoreExpandedGroups(list, expandedGroups);
+                    FindScroll(list)?.ScrollToVerticalOffset(scrollOffset);
+                }));
                 diagnostics.Record(diagnosticState, changed, membershipChanged, orderChanged,
                     viewStateChanged, true,
                     diagnostics.Enabled ? NavigatorDiagnostics.MillisecondsSince(refreshStart) : 0,
@@ -389,6 +404,31 @@ namespace HeliumHybrid
                 }
             }
             return false;
+        }
+        private static Dictionary<string, bool> CaptureExpandedGroups(DependencyObject root)
+        {
+            var result = new Dictionary<string, bool>(StringComparer.Ordinal);
+            VisitExpanders(root, expander => {
+                if (expander.DataContext is CollectionViewGroup group)
+                    result[group.Name?.ToString() ?? string.Empty] = expander.IsExpanded;
+            });
+            return result;
+        }
+        private static void RestoreExpandedGroups(DependencyObject root, Dictionary<string, bool> states)
+        {
+            if (states.Count == 0) return;
+            VisitExpanders(root, expander => {
+                if (expander.DataContext is CollectionViewGroup group &&
+                    states.TryGetValue(group.Name?.ToString() ?? string.Empty, out var expanded))
+                    expander.IsExpanded = expanded;
+            });
+        }
+        private static void VisitExpanders(DependencyObject node, Action<Expander> visit)
+        {
+            if (node == null) return;
+            if (node is Expander expander) visit(expander);
+            for (var i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++)
+                VisitExpanders(VisualTreeHelper.GetChild(node, i), visit);
         }
         private void ApplySearch()
         {
@@ -537,7 +577,6 @@ namespace HeliumHybrid
                     navigatedDetails = false;
                 lastDesktopView = library.ActiveDesktopView;
             }
-            ApplySize();
             var host = window ?? Window.GetWindow(this);
             if (host == null) return;
             BindReopenButton(host);
