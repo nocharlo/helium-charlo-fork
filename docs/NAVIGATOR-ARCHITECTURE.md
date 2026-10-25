@@ -21,18 +21,25 @@ The candidate was built as paired v0.2.5 packages in a separate output directory
 
 ## Second extraction: presentation and icons
 
-`NavigatorPresentation.cs` now owns `GameRow` and the 512-entry `IconCache`. Their class bodies were compared with the prior commit and are identical; only their file location and required `using` directives changed. The Playnite build compiled offline with zero warnings/errors, the projection checks passed, and candidate package/XAML validation passed. Portable deployment and visual testing are deferred to the next related-extractions milestone.
+`NavigatorPresentation.cs` now owns `GameRow` and the 512-entry `IconCache`. Their class bodies were compared with the prior commit and are identical; only their file location and required `using` directives changed. The Playnite build compiled offline with zero warnings/errors, the projection checks passed, and candidate package/XAML validation passed. Portable deployment and visual testing were completed for this extraction together with the library adapter.
 
 ## Third extraction: Playnite library reads
 
-`LibraryStateAdapter.cs` now owns read-only access to filtered games, selected games, active desktop view, sort/group state, icon paths, and Playnite metadata used for projection. `Navigator.cs` still issues selection and launch commands and owns WPF state. The existing null handling, filtering poll, source order, and UI-thread call sites are unchanged. The offline Playnite build, 12 projection checks, and package/XAML validation passed. Portable deployment and visual testing are deferred to the related-extractions milestone.
+`LibraryStateAdapter.cs` now owns read-only access to filtered games, selected games, active desktop view, sort/group state, icon paths, and Playnite metadata used for projection. `Navigator.cs` still issues selection and launch commands and owns WPF state. The existing null handling, filtering poll, source order, and UI-thread call sites are unchanged. The offline Playnite build, 12 projection checks, and package/XAML validation passed. The related portable milestone covered selection, Grid and Details, local and global search, Platform, Series and Category grouping, and preference persistence across a full restart.
 
-## Safest continuation
+## Final architecture audit
 
-1. Completed: presentation adapter move, with lazy icon decoding and cache unchanged.
-2. Completed: read-only `LibraryStateAdapter`; UI-thread access and the 1.5-second filter poll remain in place.
-3. Isolate selection synchronization from click navigation. Preserve the current timer delays, drag thresholds, double-click launch and Grid-only click actions. Require a focused Windows milestone test before committing navigation behavior.
-4. Separate width, collapse and view-layout operations, preserving the theme's named controls and converter-owned templates.
-5. Review event/timer lifecycle last, pairing every subscription with its current unsubscription and retaining dispatcher marshaling.
+The dependency direction is now `Navigator.cs` → `LibraryStateAdapter.cs` → plain `NavigatorSource`, and `Navigator.cs` → `NavigatorProjection.cs` → `Logic.cs`. `NavigatorPresentation.cs` supplies the WPF-facing row and icon cache. The adapter no longer calls a helper defined in `Navigator.cs`; no source-level cycle remains among these extracted classes. SDK reads of filtered/selected games, active view, sort/group state, icon paths, and group metadata are centralized. SDK commands, database subscriptions, timers, WPF view manipulation and settings saves remain in `Navigator.cs`.
 
-Each step should be a small commit after relevant C# checks and build validation. Related steps can share one portable Playnite/Computer Use milestone, as long as failures are localized and no unverified behavior is reported as passed. The known v0.2.4 drag-release issues remain outside this architecture work.
+No new duplicate game projection or event subscription was found in this focused review. `OnLoaded` and `OnUnloaded` still pair the database and plugin subscriptions, and four timers retain their original intervals and stop points. The periodic 1.5-second poll remains necessary because the relevant filter change has no SDK notification in this integration. This area deserves focused lifecycle tests before extraction. `Navigator.cs` remains about 500 lines because input gestures, native navigation, layout and lifecycle are intentionally left for a later milestone.
+
+The clean local v0.2.5 candidate from commit `5aa2c2b` was deployed to the isolated portable Playnite with matching installed/package DLL hashes, stable component IDs and one Navigator. Automated build, projection, logic, settings and package checks passed. Visual regression on `9db5a0e` covered the broad scenarios; after a five-line selection-collection cleanup, `5aa2c2b` was retested for selection and details synchronization. The last portable log showed no warnings or errors. See `docs/VALIDATION-v0.2.5.md` for exact provenance and limitations.
+
+## Next architecture milestone
+
+1. `SelectionController`: move selected-ID reconciliation and sidebar/grid selection state first. Keep the SDK read in `LibraryStateAdapter`; verify one-click selection and Details updates.
+2. `NavigationController`: then separate click timers, drag guards, double-click launch, native view commands and Grid/Details transitions. This is the highest behavior risk and needs focused Windows tests.
+3. `LayoutController`: separate width, collapse, native list visibility and overview host adjustments, preserving named theme controls and converter bindings.
+4. `LifecycleController`: last, isolate subscription/timer ownership with explicit load/unload symmetry and dispatcher tests.
+
+Plan these as separate, small changes with focused C# and portable UI checks. Do not start them in v0.2.5. The known v0.2.4 drag-release issues remain outside this architecture work.

@@ -1,6 +1,6 @@
 # Helium (charlo fork)
 
-A Steam-style game Navigator integrated into [Playnite](https://github.com/JosefNemec/Playnite) Desktop's native library views. This project modifies Brandon Balderas's [Helium](https://github.com/darklinkpower/Helium) through the Helium KKCD fork by Kush Mittal. **v0.2.4 is the current stability hotfix, accepted by the maintainer for normal use after Windows testing.** The installers display as **Helium (charlo fork) v0.2.4** and **Helium Navigator v0.2.4**.
+A Steam-style game Navigator integrated into [Playnite](https://github.com/JosefNemec/Playnite) Desktop's native library views. This project modifies Brandon Balderas's [Helium](https://github.com/darklinkpower/Helium) through the Helium KKCD fork by Kush Mittal. **v0.2.4 remains the approved published stability release.** v0.2.5 Architecture Foundation is a locally validated, unpublished candidate. The checked-in installers remain the v0.2.4 packages; the v0.2.5 packages were built separately from the local branch.
 
 The goal is to keep a compact, searchable list of individual games beside the existing cover grid or full game details. Helium's artwork, logos, backgrounds and supported integrations remain in place. This is an unofficial community fork; inherited theme components are credited below.
 
@@ -30,7 +30,7 @@ To roll back, reinstall your backed-up v0.2.3 packages and restore your backed-u
 
 ## Build and checks
 
-For isolated Windows deployment, backup, rollback and visual regression evidence, use the [test harness](docs/TEST-HARNESS.md). It prepares a separate portable Playnite copy and keeps the stable v0.2.4 installation untouched. The [infrastructure audit](docs/INFRASTRUCTURE-AUDIT.md) records the external development-extension path found in the first sandbox and the working Computer Use launch procedure.
+For isolated Windows deployment, backup, rollback and visual regression evidence, use the [test harness](docs/TEST-HARNESS.md). The [v0.2.5 validation record](docs/VALIDATION-v0.2.5.md) lists the exact local build and test scope. The harness prepares a separate portable Playnite copy and keeps the stable v0.2.4 installation untouched. The [infrastructure audit](docs/INFRASTRUCTURE-AUDIT.md) records the external development-extension path found in the first sandbox and the working Computer Use launch procedure.
 
 The checked-in v0.2.4 packages remain the approved release. `source/Build.ps1` is the legacy v0.2.4 packaging command and refuses to overwrite those paths while source manifests identify a v0.2.5 candidate. For v0.2.5 development, use `scripts/Helium-TestHarness.ps1 -Action Build` with a new output directory, then run `python tests/validate_package.py --build-dir <output directory>`. The project targets .NET Framework 4.6.2 and PlayniteSDK 6.11.0. `dotnet run --project tests/LogicTests.csproj` and `dotnet run --project tests/SettingsFileTests.csproj` exercise portable logic and real settings-file recovery.
 
