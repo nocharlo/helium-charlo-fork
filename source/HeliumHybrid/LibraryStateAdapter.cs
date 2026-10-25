@@ -52,7 +52,8 @@ namespace HeliumHybrid
         {
             return games.Select(game => new NavigatorSource {
                 Id = game.Id, Name = game.Name, SortingName = game.SortingName,
-                Icon = game.Icon, GroupNames = GroupNames(game, grouping)
+                Icon = game.Icon, GroupNames = GroupNames(game, grouping),
+                IsInstalled = game.IsInstalled, Favorite = game.Favorite
             });
         }
 

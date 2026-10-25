@@ -11,6 +11,8 @@ namespace HeliumHybrid
         internal string Name { get; set; }
         internal string SortingName { get; set; }
         internal string Icon { get; set; }
+        internal bool IsInstalled { get; set; }
+        internal bool Favorite { get; set; }
         internal IEnumerable<string> GroupNames { get; set; }
     }
 
@@ -21,6 +23,8 @@ namespace HeliumHybrid
         internal string Group { get; set; }
         internal string Key { get; set; }
         internal string IconPath { get; set; }
+        internal bool IsInstalled { get; set; }
+        internal bool Favorite { get; set; }
     }
 
     internal static class NavigatorProjection
@@ -35,7 +39,8 @@ namespace HeliumHybrid
                 foreach (var group in grouping == 0 ? new[] { "" } : Logic.Groups(game.GroupNames))
                     rows.Add(new NavigatorProjectedRow {
                         Id = game.Id, Name = game.Name ?? "Untitled", Key = Logic.SearchKey(game.Name),
-                        Group = group, IconPath = iconPath
+                        Group = group, IconPath = iconPath,
+                        IsInstalled = game.IsInstalled, Favorite = game.Favorite
                     });
             }
             if (grouping != 0) rows = rows.OrderBy(row => row.Group, StringComparer.CurrentCultureIgnoreCase).ToList();

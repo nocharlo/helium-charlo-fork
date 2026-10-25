@@ -15,8 +15,26 @@ namespace HeliumHybrid
         internal int NavigatorGrouping { get; set; }
     }
 
+    internal enum NavigatorRowChange { None, Visual, Structural }
+
     internal static class NavigatorRefreshDecision
     {
+        internal static NavigatorRowChange ClassifyRows(IEnumerable<NavigatorProjectedRow> before,
+            IEnumerable<NavigatorProjectedRow> after)
+        {
+            var oldRows = (before ?? Enumerable.Empty<NavigatorProjectedRow>()).ToArray();
+            var newRows = (after ?? Enumerable.Empty<NavigatorProjectedRow>()).ToArray();
+            if (oldRows.Length != newRows.Length) return NavigatorRowChange.Structural;
+            var visual = false;
+            for (var i = 0; i < oldRows.Length; i++) {
+                var oldRow = oldRows[i]; var newRow = newRows[i];
+                if (oldRow.Id != newRow.Id || oldRow.Name != newRow.Name ||
+                    oldRow.Key != newRow.Key || oldRow.Group != newRow.Group ||
+                    oldRow.IconPath != newRow.IconPath) return NavigatorRowChange.Structural;
+                visual |= oldRow.IsInstalled != newRow.IsInstalled || oldRow.Favorite != newRow.Favorite;
+            }
+            return visual ? NavigatorRowChange.Visual : NavigatorRowChange.None;
+        }
         internal static Guid[] SortedIds(IEnumerable<Guid> ids)
         {
             return (ids ?? Enumerable.Empty<Guid>()).OrderBy(id => id).ToArray();
