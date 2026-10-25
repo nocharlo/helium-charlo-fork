@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Windows;
@@ -22,6 +23,7 @@ namespace HeliumHybrid
     {
         private readonly IPlayniteAPI api;
         private readonly LibraryStateAdapter library;
+        private readonly NavigatorDiagnostics diagnostics;
         private readonly HybridPlugin plugin;
         private readonly Grid root;
         private readonly ListBox list;
@@ -62,6 +64,8 @@ namespace HeliumHybrid
         public Navigator(IPlayniteAPI api, HybridPlugin plugin)
         {
             this.api = api; this.plugin = plugin; library = new LibraryStateAdapter(api);
+            diagnostics = new NavigatorDiagnostics(NavigatorDiagnostics.Requested(),
+                message => LogManager.GetLogger().Info(message));
             prefs = plugin.Settings;
             prefs.Width = Logic.ClampWidth(prefs.Width);
             using (var stream = typeof(Navigator).Assembly.GetManifestResourceStream("HeliumHybrid.Navigator.xaml"))
@@ -297,16 +301,28 @@ namespace HeliumHybrid
         {
             if (!active || IsCollapsed()) return;
             Safe(() => {
+                var refreshStart = diagnostics.Enabled ? Stopwatch.GetTimestamp() : 0;
                 var games = library.FilteredGames;
                 // Filters have no SDK change event; compare membership at background priority.
-                var ids = games.Select(g => g.Id).OrderBy(id => id).ToArray();
+                var ids = NavigatorRefreshDecision.SortedIds(games.Select(g => g.Id));
                 var changed = Interlocked.Exchange(ref dirty, 0) != 0;
-                if (!changed && ids.SequenceEqual(lastIds)) { SyncSelection(false); return; }
+                var membershipChanged = NavigatorRefreshDecision.MembershipChanged(ids, lastIds);
+                var rebuild = NavigatorRefreshDecision.ShouldRebuild(changed, membershipChanged);
+                var state = diagnostics.Enabled ? diagnostics.Capture(() => library.DiagnosticViewState(prefs.Grouping)) : null;
+                if (!rebuild) {
+                    SyncSelection(false);
+                    diagnostics.Record(state, changed, membershipChanged, false,
+                        diagnostics.Enabled ? NavigatorDiagnostics.MillisecondsSince(refreshStart) : 0, 0, 0);
+                    return;
+                }
                 lastIds = ids;
+                var projectionStart = diagnostics.Enabled ? Stopwatch.GetTimestamp() : 0;
                 var projected = NavigatorProjection.Build(library.Sources(games, prefs.Grouping), prefs.Grouping, library.ResolveIcon);
                 rows = projected.Select(row => new GameRow {
                     Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group, IconPath = row.IconPath
                 }).ToList();
+                var projectionMs = diagnostics.Enabled ? NavigatorDiagnostics.MillisecondsSince(projectionStart) : 0;
+                var viewStart = diagnostics.Enabled ? Stopwatch.GetTimestamp() : 0;
                 syncing = true;
                 try {
                     view = new ListCollectionView(rows);
@@ -314,6 +330,9 @@ namespace HeliumHybrid
                     list.ItemsSource = view; ApplySearch();
                 } finally { syncing = false; }
                 SyncSelection(false); status.Text = ""; reportedError = false;
+                diagnostics.Record(state, changed, membershipChanged, true,
+                    diagnostics.Enabled ? NavigatorDiagnostics.MillisecondsSince(refreshStart) : 0,
+                    projectionMs, diagnostics.Enabled ? NavigatorDiagnostics.MillisecondsSince(viewStart) : 0);
             });
         }
         private void ApplySearch()
