@@ -1,2 +1,17 @@
 /tests/bin/
 /tests/obj/
+/source/HeliumHybrid/bin/
+/source/HeliumHybrid/obj/
+**/test-runs/
+**/ExtensionsData/
+**/library/
+**/playnite.log*
+**/*.log
+**/*.log.*
+**/*.bak
+**/*.tmp
+**/*.user
+/outputs/
+/evidence/
+/screenshots/
+/sandbox/

@@ -1,11 +1,11 @@
 # Isolated Playnite test harness
 
-This infrastructure prepares the next release without changing Navigator behavior. The source manifests and IDs stay at v0.2.4 until the next release is intentionally versioned. The harness is Windows PowerShell 7 code and uses a portable Playnite copy in a separate directory. Run it from the repository root.
+This infrastructure prepares the next release without changing Navigator behavior. The source manifests and IDs remain paired and are versioned only for an approved release candidate. The harness is Windows PowerShell 7 code and uses a portable Playnite copy in a separate directory. Run it from the repository root.
 
 ## Safety boundary
 
 - The production Playnite directory is read only during `Initialize`. Never pass it as `SandboxRoot`.
-- The copied config originally contained an external development extension path to C:\Users\Carlos\Documents\FranchiseTimeline-0.1\ExternalExtension. That caused Franchise Timeline 0.1.0 to load from outside the sandbox even though its Extensions folder held only Navigator. Initialize now clears DevelExtenions and Verify rejects nonempty entries. A fresh Computer Use launch showed only Helium Navigator loaded in the log.
+- A copied configuration once referenced an external development extension outside the sandbox. Initialize now clears DevelExtenions and Verify rejects nonempty entries. A fresh Computer Use launch showed only Helium Navigator loaded in the log.
 - `Initialize` requires Playnite to be fully exited, a new destination, disjoint paths, and the known v0.2.4 IDs. It copies the library, the active Helium theme, one Navigator extension, and Navigator's `navigator.xml`. It does not copy third party extensions. It clears external development-extension paths (`DevelExtenions` in Playnite config) and copied startup/shutdown scripts. It verifies copied file hashes.
 - `Deploy` and `Restore` require the sandbox marker and an exited Playnite. They only replace the exact theme and extension ID directories inside that sandbox. They keep a verified backup and a quarantine directory. No broad wildcard removal is used.
 - Playnite has one application mutex for all portable instances. Exit the main instance using Playnite > Exit before starting the sandbox, then exit the sandbox before reopening the main instance. Closing the window with X can leave Playnite running in the system tray.
@@ -66,18 +66,18 @@ Use Computer Use against the window whose executable path exactly matches `$sand
 After observing a check, save its screenshot from Computer Use and record the result, screenshot hash, and current Playnite logs with scripts/Save-TestEvidence.ps1. For example:
 
 ```powershell
-& .\scripts\Save-TestEvidence.ps1 -SandboxRoot $sandbox -EvidenceRoot '<local evidence directory>' -TestName 'navigator-selection' -Result PASS -Observation 'Navigator and grid select BioShock; detail panel updated; no launch.' -ScreenshotPath '<Computer Use screenshot path>'
+& .\scripts\Save-TestEvidence.ps1 -SandboxRoot $sandbox -EvidenceRoot '<local evidence directory>' -TestName 'navigator-selection' -Result PASS -Observation 'Navigator and grid select the same game; detail panel updated; no launch.' -ScreenshotPath '<Computer Use screenshot path>'
 ```
 
 | Check | v0.2.4 sandbox result |
 | --- | --- |
 | Helium starts active; Navigator visible | PASS, observed |
 | Collapse and expand Navigator | PASS, observed |
-| Single click selects without launching | PASS, observed with BioShock |
+| Single click selects without launching | PASS, observed with a test game |
 | Navigator and grid selection agree | PASS, observed |
 | Detail panel updates | PASS, observed |
-| Navigator local search | PASS, observed; three BioShock results |
-| Global search/filter reflected in Navigator | PASS, observed; same three results in grid and Navigator |
+| Navigator local search | PASS, observed; matching test results |
+| Global search/filter reflected in Navigator | PASS, observed; matching results in grid and Navigator |
 | Grid and Details switch | PASS, observed both directions |
 | Grouping preference survives full process exit and restart | PASS, observed with Series |
 | No second Navigator installation | PASS, one exact extension ID directory and one matching manifest |

@@ -1,18 +1,23 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace HeliumHybrid
 {
-    public sealed class GameRow
+    public sealed class GameRow : INotifyPropertyChanged
     {
         public Guid Id { get; set; }
         public string Name { get; set; }
         public string Group { get; set; }
         public string Key { get; set; }
         public string IconPath { get; set; }
+        private bool isInstalled, favorite;
+        public bool IsInstalled { get => isInstalled; set { if (isInstalled == value) return; isInstalled = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsInstalled))); } }
+        public bool Favorite { get => favorite; set { if (favorite == value) return; favorite = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Favorite))); } }
+        public event PropertyChangedEventHandler PropertyChanged;
         public ImageSource Icon => IconCache.Load(IconPath);
     }
     internal static class IconCache

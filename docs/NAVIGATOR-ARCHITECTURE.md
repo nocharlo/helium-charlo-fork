@@ -17,7 +17,7 @@ This branch starts from the approved v0.2.4 commit `e94fc44`. The v0.2.5 work is
 
 `NavigatorProjection.cs` receives plain C# game snapshots and an injected icon-path resolver. It performs the existing case-insensitive sort by `SortingName`/`Name`, expands memberships with the existing `Logic.Groups` rules, computes search keys and distinct game counts. It contains no WPF or Playnite SDK references. `Navigator.cs` remains the adapter from Playnite `Game` objects and retains `ListCollectionView`, UI selection, icons, timers and navigation. No input gesture or view-routing code was changed.
 
-The candidate was built as paired v0.2.5 packages in a separate output directory. Its Playnite runtime checks covered Series, Category and Platform groupings, local and global BioShock searches, sidebar/grid/details synchronization, Grid↔Details, and Platform preference after a full process restart. The screenshots and exact package hashes are held in the local task evidence folder, not in Git. A transient Computer Use capture error was recovered by reselecting the exact sandbox window; the app log contained no Navigator or other error during the candidate run.
+The candidate was built as paired v0.2.5 packages in a separate output directory. Its Playnite runtime checks covered Series, Category and Platform groupings, local and global searches, sidebar/grid/details synchronization, Grid↔Details, and Platform preference after a full process restart. The screenshots and exact package hashes are held in the local task evidence folder, not in Git. A transient Computer Use capture error was recovered by reselecting the exact sandbox window; the app log contained no Navigator or other error during the candidate run.
 
 ## Second extraction: presentation and icons
 

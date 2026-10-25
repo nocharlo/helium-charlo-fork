@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.6 — Navigator Essentials (local release candidate)
+
+- Follows native filtered game order and supported native grouping, including custom Rating categories; explicit Navigator grouping remains independent.
+- Shows favorite and installation indicators and updates existing rows for visual-only game changes.
+- Avoids unnecessary rebuilds, preserves selection and scroll on structural refresh, and retains group expansion across view replacement and virtualization.
+- Portable Playnite confirmed Rating and Completion Status grouping, custom unrated category, group state after scrolling and preset changes, and earlier preset, search, selection, view, layout and preference checks on the same functional candidate.
+- Runtime diagnostic evidence for no-rebuild updates remains pending; pure refresh-decision tests pass. No release has been published.
 ## v0.2.5 — Architecture Foundation, locally validated candidate
 
 - Extracted plain C# game ordering, group expansion, search matching and distinct counts into `NavigatorProjection`, with 12 directed checks.

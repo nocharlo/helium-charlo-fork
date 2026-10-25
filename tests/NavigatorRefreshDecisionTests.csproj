@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="NavigatorRefreshDecisionTests.cs" />
+    <Compile Include="../source/HeliumHybrid/NavigatorRefreshDecision.cs" Link="NavigatorRefreshDecision.cs" />
+    <Compile Include="../source/HeliumHybrid/NavigatorGroupStateModel.cs" Link="NavigatorGroupStateModel.cs" />
+    <Compile Include="../source/HeliumHybrid/NavigatorProjection.cs" Link="NavigatorProjection.cs" />
+    <Compile Include="../source/HeliumHybrid/Logic.cs" Link="Logic.cs" />
+    <Compile Include="../source/HeliumHybrid/NavigatorDiagnostics.cs" Link="NavigatorDiagnostics.cs" />
+  </ItemGroup>
+</Project>
