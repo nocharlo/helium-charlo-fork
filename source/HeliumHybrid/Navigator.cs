@@ -307,7 +307,7 @@ namespace HeliumHybrid
         public override void GameContextChanged(Game oldContext, Game newContext) { SelectionChanged(); }
         private void Refresh()
         {
-            if (!active || IsCollapsed()) return;
+            if (!active || IsCollapsed() || Visibility != Visibility.Visible) return;
             Safe(() => {
                 var refreshStart = diagnostics.Enabled ? Stopwatch.GetTimestamp() : 0;
                 var games = library.FilteredGames.ToList();
