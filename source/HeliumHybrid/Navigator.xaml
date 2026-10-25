@@ -38,11 +38,16 @@
       <ListBox.ItemTemplate><DataTemplate>
         <Grid ToolTip="{Binding Name}"><Grid.ColumnDefinitions><ColumnDefinition Width="22"/><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/></Grid.ColumnDefinitions>
           <Image Source="{Binding Icon}" Width="16" Height="16" Stretch="Uniform"/>
-          <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontSize="12"/>
-          <TextBlock Grid.Column="2" Text="★" Foreground="#FFD8B86A" FontSize="10" VerticalAlignment="Center" ToolTip="Favorite">
+          <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontSize="12">
+            <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#FFA3AAB9"/><Style.Triggers>
+              <DataTrigger Binding="{Binding IsInstalled}" Value="True"><Setter Property="Foreground" Value="#FFF1F7FF"/></DataTrigger>
+              <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True"><Setter Property="Foreground" Value="#FFF1F7FF"/></DataTrigger>
+              <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True"><Setter Property="Foreground" Value="#FFF1F7FF"/></DataTrigger>
+            </Style.Triggers></Style></TextBlock.Style>
+          </TextBlock>
+          <TextBlock Grid.Column="2" Text="★" Foreground="#FF67B3FF" FontSize="10" VerticalAlignment="Center" ToolTip="Favorite">
             <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Favorite}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
           </TextBlock>
-          <Grid.Style><Style TargetType="Grid"><Setter Property="Opacity" Value="0.62"/><Style.Triggers><DataTrigger Binding="{Binding IsInstalled}" Value="True"><Setter Property="Opacity" Value="1"/></DataTrigger></Style.Triggers></Style></Grid.Style>
         </Grid>
       </DataTemplate></ListBox.ItemTemplate>
       <ListBox.GroupStyle><GroupStyle>
