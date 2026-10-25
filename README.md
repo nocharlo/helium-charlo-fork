@@ -10,6 +10,8 @@ It brings a compact, searchable game list alongside Playnite's native Grid and D
 
 [**Download v0.2.5**](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.2.5) · [Changelog](docs/CHANGELOG.md) · [Report an issue](https://github.com/nocharlo/helium-charlo-fork/issues)
 
+**Local v0.2.6 candidate:** Navigator Essentials follows native ordering and supported groups, adds favorite and installation indicators, and reduces unnecessary refreshes. It is not published; see the [changelog](docs/CHANGELOG.md) for validation limits.
+
 ---
 
 ## About
