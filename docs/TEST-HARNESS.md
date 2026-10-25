@@ -34,7 +34,9 @@ To create another sandbox, choose a **new** folder and run:
 For a fresh build, choose a **new** output folder and use a .NET SDK. The C# project targets .NET Framework 4.6.2 and compiles against the reference assemblies in `source/HeliumHybrid/lib`.
 
 ```powershell
-& $tool -Action Build -OutputRoot $newBuild -DotnetExe 'C:\Users\Carlos\Documents\Codex\2026-10-22\files-mentioned-by-the-user-helium\work\toolchains\dotnet\dotnet.exe'
+$dotnet = (Get-Command dotnet -ErrorAction Stop).Source
+
+& $tool -Action Build -OutputRoot $newBuild -DotnetExe $dotnet
 ```
 
 The script stops when dependency restore, compilation, ZIP validation, manifest pairing, or packaged DLL verification fails. It writes `build.json` (including source commit, dirty-worktree flag, and package hashes) and paired `.pext`/`.pthm` packages only to the build output. For offline work, pass `-NugetPackagesRoot <existing cache>` and `-NugetConfig <config with packageSources cleared>`; all required packages must already be cached. An installation requires both package paths:
