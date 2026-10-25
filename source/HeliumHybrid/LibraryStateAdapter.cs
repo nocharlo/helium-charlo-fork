@@ -28,18 +28,24 @@ namespace HeliumHybrid
         internal string Grouping => api.MainView.Grouping.ToString();
         internal string ResolveIcon(string icon) => api.Database.GetFullFilePath(icon);
 
-        internal NavigatorViewSnapshot DiagnosticViewState(int navigatorGrouping)
+        internal NavigatorViewSnapshot ViewState(int navigatorGrouping)
         {
-            var filter = api.MainView.GetCurrentFilterSettings()?.CompletionStatuses;
             return new NavigatorViewSnapshot {
                 SortOrder = SortOrder,
                 SortDirection = SortDirection,
                 Grouping = Grouping,
                 PresetId = api.MainView.GetActiveFilterPreset(),
-                CompletionStatusFilterActive = filter != null &&
-                    (filter.Ids?.Count > 0 || !string.IsNullOrWhiteSpace(filter.Text)),
                 NavigatorGrouping = navigatorGrouping
             };
+        }
+
+        internal NavigatorViewSnapshot DiagnosticViewState(int navigatorGrouping)
+        {
+            var state = ViewState(navigatorGrouping);
+            var filter = api.MainView.GetCurrentFilterSettings()?.CompletionStatuses;
+            state.CompletionStatusFilterActive = filter != null &&
+                (filter.Ids?.Count > 0 || !string.IsNullOrWhiteSpace(filter.Text));
+            return state;
         }
 
         internal IEnumerable<NavigatorSource> Sources(IEnumerable<Game> games, int grouping)

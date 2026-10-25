@@ -1,8 +1,8 @@
 # v0.2.6 Navigator Essentials: preset synchronization baseline
 
-This first step records the current v0.2.5 behavior and adds opt-in diagnostics. It does **not** change Navigator ordering, native commands, click handling, grouping preferences, or Playnite filters. The six preset observations below were reported by the maintainer; they have not yet been reproduced on this branch.
+The first local commit recorded the v0.2.5 behavior and added opt-in diagnostics. The ordering candidate described below now preserves native order and reacts to native view-state changes. Native commands, click handling, Navigator grouping preferences, and Playnite filters remain unchanged. The six preset observations were reported by the maintainer and still require runtime verification on this branch.
 
-## Source and SDK map
+## Baseline source and SDK map (first commit)
 
 | Concern | Current path | Consequence |
 | --- | --- | --- |
@@ -44,10 +44,31 @@ Keep diagnostic logs, screenshots, and test-library data outside the repository.
 - Extension build: .NET Framework 4.6.2 target compiled against the declared Playnite SDK with zero warnings and zero errors. The standalone test projects ran with a .NET 10 SDK target override available in the local toolchain.
 - Playnite UI, six preset scenarios, portable deployment, and diagnostic log behavior in a running Playnite process: **NOT RUN** in this step. No ordering-parity claim is made.
 
-## Next parity step
+## Ordering parity candidate
 
-1. Run the six cases in isolated portable Playnite with diagnostics enabled. Record the exact native sort/direction/group state and whether membership changes, without retaining personal titles or IDs in public evidence.
-2. For Completion Status, distinguish filtering failure from missing native grouping and from a preset configuration issue. Do not add a duplicate filter unless the native filtered set itself is insufficient.
-3. Add an explicit ordering input to the pure projection, backed by tests for native order, direction, ties, missing values, and Navigator-specific grouping. Keep existing alphabetical behavior as the fallback until the native contract is confirmed.
-4. Change the refresh trigger to react to the relevant native view-state transitions. Preserve Grid scroll guards, selection, click commands, and the current visual layout.
-5. Build and deploy paired packages to the portable sandbox; run automated tests and the six focused UI regressions. Stop on unresolved difference before touching the primary Playnite installation.
+The Playnite Desktop `MainViewAPI.FilteredGames` implementation enumerates the current collection view and removes duplicate game objects in encounter order. The collection view applies the native sort field, direction, and grouping before this API read ([MainViewAPI source](https://github.com/JosefNemec/Playnite/blob/master/source/Playnite.DesktopApp/Api/MainViewAPI.cs), [DesktopCollectionView source](https://github.com/JosefNemec/Playnite/blob/master/source/Playnite.DesktopApp/DesktopCollectionView.cs)). This supports using the API sequence rather than reimplementing Playnite comparators. The installed portable Playnite build still requires UI verification.
+
+- `NavigatorProjection.Build` now preserves the incoming game sequence. With a Navigator-specific group selected, it continues to sort group headings alphabetically and preserves the native game sequence within each group. Search keys, row counts, icons, and independent group membership rules remain unchanged.
+- `Navigator.Refresh` now compares both sorted IDs (membership) and incoming IDs (native order). It also watches native sort field, direction, grouping, and active preset identity. Any of these changes can trigger a rebuild even when membership is unchanged. The 1.5-second poll and full-rebuild behavior remain; this is not an incremental refresh rewrite.
+- The diagnostic log now includes `orderChanged` and `viewStateChanged` as rebuild reasons. It still excludes game and preset identifiers.
+- This change does not add native group headings to the Navigator. Its existing None/Series/Category/Platform grouping preference remains independent. Completion Status is still under investigation.
+
+## Validation of the ordering candidate
+
+- Pure refresh decision and diagnostic tests: 21 passed.
+- Projection tests: 16 passed, including native order, reversed direction, ties, and retained Navigator group behavior.
+- Existing logic tests: 13 passed. Existing settings persistence/recovery test: passed.
+- Extension build and Test Harness package build: passed with zero warnings and zero errors. The static package validator passed 65 XAML/XML files, two paired packages, DLL integrity, and stable IDs.
+- The development packages still carry the unchanged v0.2.5 manifests and are not a v0.2.6 release. This local candidate has theme SHA-256 `95F99C4D83CD4B2624728A7A50A99BB271748FB09592ABD539AAF8C371D187B6` and extension SHA-256 `973205483895F158AA227BF3ACD136D7F1F6304AC8BDA3B6D0CF7EB621766FBE`. The build manifest records a dirty source tree because the validation preceded this commit.
+- Portable Playnite preset checks: **PENDING** until the primary Playnite process is closed and the sandbox can be safely deployed. No visual parity claim is made.
+
+## Completion Status investigation
+
+The native SDK separates `FilterPresetSettings.CompletionStatuses` (membership filtering) from `GroupableField.CompletionStatus` (presentation grouping). Navigator reads the native `FilteredGames` set, so a filter that changes that set should affect its membership. Navigator has no Completion Status group headings. A preset could be using filtering, grouping, both, or neither; its saved configuration and runtime result have not been inspected. In the portable test, compare Grid and Navigator membership first, then compare group boundaries. Do not implement a duplicate status filter based on appearance alone.
+
+## Remaining refresh and UI work
+
+1. Confirm Recently Played, Most Played, and Rating order and ties in the portable Playnite; verify a sort or preset switch that keeps membership unchanged. Check Favorites, Installed, Navigator-specific groups, selection, and Grid/Details transitions for regressions.
+2. Determine whether Completion Status differs in membership, presentation, or preset configuration. Native Completion Status headings are not implemented in this candidate.
+3. The 1.5-second poll still reads the full filtered list and sorts an ID copy for membership comparison. A detected change recreates all projected rows and the WPF `ListCollectionView`; it does not move only affected rows. That can reset group expansion or scroll and repeat icon-path resolution. Measure this before any incremental refresh work.
+4. The SDK path used here has no filter-change event in this integration. Any event-driven replacement for polling needs a documented public SDK signal and Windows regression tests.

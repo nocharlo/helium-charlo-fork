@@ -27,11 +27,15 @@ namespace HeliumHybrid
             return !(current ?? new Guid[0]).SequenceEqual(previous ?? new Guid[0]);
         }
 
-        // This deliberately preserves the v0.2.5 trigger. Native sort/group state is observed
-        // separately and must not start rebuilding the list until the parity change is tested.
-        internal static bool ShouldRebuild(bool dirty, bool membershipChanged)
+        internal static bool OrderChanged(Guid[] current, Guid[] previous)
         {
-            return dirty || membershipChanged;
+            return !(current ?? new Guid[0]).SequenceEqual(previous ?? new Guid[0]);
+        }
+
+        internal static bool ShouldRebuild(bool dirty, bool membershipChanged, bool orderChanged,
+            bool viewStateChanged)
+        {
+            return dirty || membershipChanged || orderChanged || viewStateChanged;
         }
 
         internal static bool ViewStateChanged(NavigatorViewSnapshot current, NavigatorViewSnapshot previous)
