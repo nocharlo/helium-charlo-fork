@@ -19,9 +19,12 @@ This branch starts from the approved v0.2.4 commit `e94fc44`. The v0.2.5 work is
 
 The candidate was built as paired v0.2.5 packages in a separate output directory. Its Playnite runtime checks covered Series, Category and Platform groupings, local and global BioShock searches, sidebar/grid/details synchronization, Grid↔Details, and Platform preference after a full process restart. The screenshots and exact package hashes are held in the local task evidence folder, not in Git. A transient Computer Use capture error was recovered by reselecting the exact sandbox window; the app log contained no Navigator or other error during the candidate run.
 
+## Second extraction: presentation and icons
+
+`NavigatorPresentation.cs` now owns `GameRow` and the 512-entry `IconCache`. Their class bodies were compared with the prior commit and are identical; only their file location and required `using` directives changed. The Playnite build compiled offline with zero warnings/errors, the projection checks passed, and candidate package/XAML validation passed. Portable deployment and visual testing are deferred to the next related-extractions milestone.
 ## Safest continuation
 
-1. Move `GameRow` and `IconCache` into a presentation adapter, keeping lazy icon decoding and the 512-entry cache unchanged. Test path resolution and null/blank icons without opening games.
+1. Completed: presentation adapter move, with lazy icon decoding and cache unchanged.
 2. Add a read-only `LibraryStateAdapter` that centralizes `FilteredGames`, selected IDs, sort/group state and Playnite metadata access. Keep UI-thread access and existing 1.5-second filter polling; do not add SDK subscriptions that are not available.
 3. Isolate selection synchronization from click navigation. Preserve the current timer delays, drag thresholds, double-click launch and Grid-only click actions. Require a focused Windows milestone test before committing navigation behavior.
 4. Separate width, collapse and view-layout operations, preserving the theme's named controls and converter-owned templates.
