@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.6 — Navigator Essentials (in progress)
+
+- Preserves group expansion across preset changes and virtualization; explicit Navigator grouping takes precedence over supported native grouping.
+- The default mode follows native Completion Status, Series, Category and Platform grouping while retaining native game order.
+- Portable Playnite confirmed Completion Status group counts, first visible order for Most Played and Recently Played, Favorite and installation indicators, local search, selection, collapse, resize and saved grouping after restart.
+- Rating's native score grouping is not yet reproduced. Visual indicator updates were observed, but a no-rebuild runtime diagnostic trace and full regression coverage remain pending. Manifests and distributable packages stay at v0.2.5.
+
 ## v0.2.5 — Architecture Foundation, locally validated candidate
 
 - Extracted plain C# game ordering, group expansion, search matching and distinct counts into `NavigatorProjection`, with 12 directed checks.
