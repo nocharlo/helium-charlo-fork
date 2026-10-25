@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.5 — Architecture Foundation, locally validated candidate
+
+- Extracted plain C# game ordering, group expansion, search matching and distinct counts into `NavigatorProjection`, with 12 directed checks.
+- Moved the WPF row and bounded local icon cache into `NavigatorPresentation`; centralized read-only Playnite library and view-state access in `LibraryStateAdapter`. Removed the adapter's dependency on a helper in `Navigator.cs`.
+- Added an isolated portable Playnite test harness with offline build, paired packaging, identity checks, verified backup, deployment, rollback and evidence capture. The sandbox clears inherited development-extension paths and startup scripts.
+- Kept theme and extension IDs, settings format, click handling, native commands, layout behavior and approved v0.2.4 packages unchanged.
+- Validated the candidate in portable Playnite: start, selection/Grid/details synchronization, local and global search, Platform/Series/Category grouping, Grid/Details views, and grouping preference after a full restart. The final selection cleanup was retested separately. See [v0.2.5 validation](VALIDATION-v0.2.5.md) for build hashes and test scope.
+
+This is a local candidate. No push or release publication was performed. The two uncommon mouse-release issues documented for v0.2.4 remain outside this refactor.
+
 ## v0.2.4 — stability hotfix, accepted for normal use
 
 - Kept Navigator selection inside Full Details View without an automatic return to Grid, independent of sidebar click preference.
