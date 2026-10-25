@@ -38,6 +38,8 @@ namespace HeliumHybrid
         private readonly DispatcherTimer timer, searchTimer;
         private readonly DispatcherTimer coverClickTimer, sidebarClickTimer;
         private Guid pendingSidebarId;
+        private Guid navigatorSelectionId;
+        private DateTime navigatorSelectionAt;
         private bool panelRequested;
         private DateTime panelRequestedAt;
         private ListBox nativeGridList;
@@ -172,7 +174,11 @@ namespace HeliumHybrid
             sidebarClickTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(200, (int)GetDoubleClickTime()) + 60);
             sidebarClickTimer.Start();
         }
-        private void SelectGame(Guid id) => api.MainView.SelectGame(id);
+        private void SelectGame(Guid id)
+        {
+            navigatorSelectionId = id; navigatorSelectionAt = DateTime.UtcNow;
+            api.MainView.SelectGame(id);
+        }
         private void Navigate(Guid id, int action)
         {
             // Selection is already synchronized. Click actions only open views from Grid.
@@ -306,7 +312,13 @@ namespace HeliumHybrid
         private void SelectionChanged()
         {
             if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(SelectionChanged)); return; }
-            if (active) Safe(() => SyncSelection(true));
+            if (active) Safe(() => {
+                var selected = library.SelectedIds();
+                var fromNavigator = DateTime.UtcNow - navigatorSelectionAt < TimeSpan.FromMilliseconds(750) &&
+                    selected.Contains(navigatorSelectionId);
+                if (prefs.AutomaticallyRevealSelectedGame && !fromNavigator) RevealSelected(selected);
+                else SyncSelection(false);
+            });
         }
         public override void GameContextChanged(Game oldContext, Game newContext) { SelectionChanged(); }
         private void Refresh()
@@ -420,6 +432,44 @@ namespace HeliumHybrid
             count.Text = NavigatorProjection.DistinctGameCount(view.Cast<GameRow>().Select(r => r.Id)) + " games";
             status.Text = view.IsEmpty ? "No games found. Check the global filters too." : "";
             SyncSelection(false);
+        }
+        private void RevealSelected(HashSet<Guid> selected)
+        {
+            if (view == null || IsCollapsed() || Visibility != Visibility.Visible) return;
+            var matching = view.Cast<GameRow>().Where(item => selected.Contains(item.Id)).ToList();
+            var row = matching.FirstOrDefault(item => groupState.IsExpanded(EffectiveGrouping, item.Group)) ??
+                matching.FirstOrDefault();
+            if (row == null) return;
+            var mode = EffectiveGrouping;
+            if (mode != 0) {
+                groupState.SetExpanded(mode, row.Group, true);
+                var visibleGroup = FindGroupExpander(list, row.Group);
+                if (visibleGroup != null) visibleGroup.IsExpanded = true;
+            }
+            syncing = true;
+            try { list.SelectedItem = row; }
+            finally { syncing = false; }
+            list.ScrollIntoView(row);
+            var currentView = view;
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
+                if (!active || !ReferenceEquals(view, currentView) || !view.Contains(row)) return;
+                if (mode != 0) {
+                    var group = FindGroupExpander(list, row.Group);
+                    if (group != null) group.IsExpanded = true;
+                }
+                list.ScrollIntoView(row);
+            }));
+        }
+        private static NavigatorGroupExpander FindGroupExpander(DependencyObject root, string name)
+        {
+            if (root is NavigatorGroupExpander expander &&
+                string.Equals((expander.DataContext as CollectionViewGroup)?.Name?.ToString(),
+                    name, StringComparison.Ordinal)) return expander;
+            for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++) {
+                var match = FindGroupExpander(VisualTreeHelper.GetChild(root, i), name);
+                if (match != null) return match;
+            }
+            return null;
         }
         private void SyncSelection(bool scroll)
         {
