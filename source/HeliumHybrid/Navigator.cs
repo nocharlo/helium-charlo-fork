@@ -501,8 +501,4 @@ namespace HeliumHybrid
             }
         }
     }
-    internal static class EnumerableCompatibility
-    {
-        internal static HashSet<T> ToHashSetCompat<T>(this IEnumerable<T> items) { return new HashSet<T>(items); }
-    }
 }

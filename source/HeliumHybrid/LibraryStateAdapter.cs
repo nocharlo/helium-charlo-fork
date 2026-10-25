@@ -17,7 +17,11 @@ namespace HeliumHybrid
         internal IEnumerable<Game> FilteredGames => api.MainView.FilteredGames ?? new List<Game>();
         internal IEnumerable<Game> SelectedGames => api.MainView.SelectedGames;
         internal bool IsSelected(Guid id) => SelectedGames?.Any(game => game.Id == id) == true;
-        internal HashSet<Guid> SelectedIds() => SelectedGames?.Select(game => game.Id).ToHashSetCompat() ?? new HashSet<Guid>();
+        internal HashSet<Guid> SelectedIds()
+        {
+            var selected = SelectedGames;
+            return selected == null ? new HashSet<Guid>() : new HashSet<Guid>(selected.Select(game => game.Id));
+        }
         internal Guid[] SortedFilteredIds() => api.MainView.FilteredGames?.Select(game => game.Id).OrderBy(id => id).ToArray();
         internal string SortOrder => api.MainView.SortOrder.ToString();
         internal string SortDirection => api.MainView.SortOrderDirection.ToString();
