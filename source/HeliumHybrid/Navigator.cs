@@ -59,6 +59,8 @@ namespace HeliumHybrid
         private DesktopView lastDesktopView;
         private int dirty = 1;
         private Guid[] lastIds = new Guid[0];
+        private readonly object updateGate = new object();
+        private readonly HashSet<Guid> pendingGameIds = new HashSet<Guid>();
         private Guid[] lastOrderIds = new Guid[0];
         private NavigatorViewSnapshot lastViewState;
         private List<GameRow> rows = new List<GameRow>();
@@ -291,7 +293,10 @@ namespace HeliumHybrid
         }
         private void MetadataUpdated<T>(object sender, ItemUpdatedEventArgs<T> args) where T : DatabaseObject { Interlocked.Exchange(ref dirty, 1); }
         private void MetadataChanged<T>(object sender, ItemCollectionChangedEventArgs<T> args) where T : DatabaseObject { Interlocked.Exchange(ref dirty, 1); }
-        private void GamesUpdated(object sender, ItemUpdatedEventArgs<Game> args) { Interlocked.Exchange(ref dirty, 1); }
+        private void GamesUpdated(object sender, ItemUpdatedEventArgs<Game> args)
+        {
+            lock (updateGate) foreach (var update in args.UpdatedItems) pendingGameIds.Add(update.NewData.Id);
+        }
         private void GamesChanged(object sender, ItemCollectionChangedEventArgs<Game> args) { Interlocked.Exchange(ref dirty, 1); }
         private void SelectionChanged()
         {
@@ -304,15 +309,18 @@ namespace HeliumHybrid
             if (!active || IsCollapsed()) return;
             Safe(() => {
                 var refreshStart = diagnostics.Enabled ? Stopwatch.GetTimestamp() : 0;
-                var games = library.FilteredGames;
+                var games = library.FilteredGames.ToList();
                 // Filter membership, native sequence, and view state are separate change signals.
                 var orderIds = games.Select(g => g.Id).ToArray();
-                var ids = NavigatorRefreshDecision.SortedIds(orderIds);
+                var orderChanged = NavigatorRefreshDecision.OrderChanged(orderIds, lastOrderIds);
+                var ids = orderChanged ? NavigatorRefreshDecision.SortedIds(orderIds) : lastIds;
                 var changed = Interlocked.Exchange(ref dirty, 0) != 0;
                 var membershipChanged = NavigatorRefreshDecision.MembershipChanged(ids, lastIds);
-                var orderChanged = NavigatorRefreshDecision.OrderChanged(orderIds, lastOrderIds);
                 var viewState = library.ViewState(prefs.Grouping);
                 var viewStateChanged = NavigatorRefreshDecision.ViewStateChanged(viewState, lastViewState);
+                if (!changed && !membershipChanged && !orderChanged && !viewStateChanged)
+                    changed = UpdateGameRows(games);
+                else ClearPendingGameUpdates();
                 var rebuild = NavigatorRefreshDecision.ShouldRebuild(changed, membershipChanged,
                     orderChanged, viewStateChanged);
                 var diagnosticState = diagnostics.Enabled
@@ -330,7 +338,8 @@ namespace HeliumHybrid
                 var projectionStart = diagnostics.Enabled ? Stopwatch.GetTimestamp() : 0;
                 var projected = NavigatorProjection.Build(library.Sources(games, prefs.Grouping), prefs.Grouping, library.ResolveIcon);
                 rows = projected.Select(row => new GameRow {
-                    Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group, IconPath = row.IconPath
+                    Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group, IconPath = row.IconPath,
+                    IsInstalled = row.IsInstalled, Favorite = row.Favorite
                 }).ToList();
                 var projectionMs = diagnostics.Enabled ? NavigatorDiagnostics.MillisecondsSince(projectionStart) : 0;
                 var viewStart = diagnostics.Enabled ? Stopwatch.GetTimestamp() : 0;
@@ -346,6 +355,40 @@ namespace HeliumHybrid
                     diagnostics.Enabled ? NavigatorDiagnostics.MillisecondsSince(refreshStart) : 0,
                     projectionMs, diagnostics.Enabled ? NavigatorDiagnostics.MillisecondsSince(viewStart) : 0);
             });
+        }
+        private Guid[] TakePendingGameUpdates()
+        {
+            lock (updateGate) {
+                var ids = pendingGameIds.ToArray();
+                pendingGameIds.Clear();
+                return ids;
+            }
+        }
+        private void ClearPendingGameUpdates() { TakePendingGameUpdates(); }
+        private bool UpdateGameRows(IReadOnlyList<Game> games)
+        {
+            var pending = TakePendingGameUpdates();
+            if (pending.Length == 0) return false;
+            var byId = games.Where(game => pending.Contains(game.Id)).ToDictionary(game => game.Id);
+            foreach (var id in pending) {
+                var existing = rows.Where(row => row.Id == id).ToList();
+                if (existing.Count == 0 || !byId.TryGetValue(id, out var game)) continue;
+                var projected = NavigatorProjection.Build(library.Sources(new[] { game }, prefs.Grouping),
+                    prefs.Grouping, library.ResolveIcon);
+                var prior = existing.Select(row => new NavigatorProjectedRow {
+                    Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group,
+                    IconPath = row.IconPath, IsInstalled = row.IsInstalled, Favorite = row.Favorite
+                });
+                var kind = NavigatorRefreshDecision.ClassifyRows(prior, projected);
+                if (kind == NavigatorRowChange.Structural) return true;
+                if (kind == NavigatorRowChange.Visual) {
+                    foreach (var row in existing) {
+                        row.IsInstalled = game.IsInstalled;
+                        row.Favorite = game.Favorite;
+                    }
+                }
+            }
+            return false;
         }
         private void ApplySearch()
         {

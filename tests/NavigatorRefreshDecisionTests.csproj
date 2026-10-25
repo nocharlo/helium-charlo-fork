@@ -7,6 +7,8 @@
   <ItemGroup>
     <Compile Include="NavigatorRefreshDecisionTests.cs" />
     <Compile Include="../source/HeliumHybrid/NavigatorRefreshDecision.cs" Link="NavigatorRefreshDecision.cs" />
+    <Compile Include="../source/HeliumHybrid/NavigatorProjection.cs" Link="NavigatorProjection.cs" />
+    <Compile Include="../source/HeliumHybrid/Logic.cs" Link="Logic.cs" />
     <Compile Include="../source/HeliumHybrid/NavigatorDiagnostics.cs" Link="NavigatorDiagnostics.cs" />
   </ItemGroup>
 </Project>

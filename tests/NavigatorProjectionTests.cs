@@ -18,7 +18,7 @@ class NavigatorProjectionTests
         var gamma = Guid.Parse("00000000-0000-0000-0000-000000000003");
         var iconCalls = 0;
         var games = new[] {
-            new NavigatorSource { Id = beta, Name = "Item Z", SortingName = "Zeta", Icon = "icon-a", GroupNames = new[]{"Series B","Series B","Series A"} },
+            new NavigatorSource { Id = beta, Name = "Item Z", SortingName = "Zeta", Icon = "icon-a", IsInstalled = true, Favorite = true, GroupNames = new[]{"Series B","Series B","Series A"} },
             new NavigatorSource { Id = alpha, Name = "Café", SortingName = "Alpha", GroupNames = new[]{"Series A"} },
             new NavigatorSource { Id = gamma, Name = null, SortingName = null, Icon = " ", GroupNames = new string[0] }
         };
@@ -34,6 +34,8 @@ class NavigatorProjectionTests
         Check(tied.Select(row => row.Id).SequenceEqual(new[]{beta,alpha}),
             "Native tie order is preserved");
         Check(plain.All(row => row.Group == ""), "Ungrouped rows have no group");
+        Check(plain[0].IsInstalled && plain[0].Favorite && !plain[1].IsInstalled && !plain[1].Favorite,
+            "Installation and favorite state project without changing order");
         Check(plain[2].Name == "Untitled" && plain[2].Key == "", "Null title keeps prior display and search behavior");
         Check(plain[0].IconPath == "full/icon-a" && iconCalls == 1, "Resolve nonblank icon once per game");
         Check(NavigatorProjection.Matches(plain[1].Key, NavigatorProjection.SearchKey("cafe")), "Accent-insensitive search");

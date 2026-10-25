@@ -77,6 +77,28 @@ class NavigatorRefreshDecisionTests
         Check(NavigatorRefreshDecision.ViewStateChanged(same, baseline),
             "Independent Navigator grouping change is detected");
 
+        var oldRows = new[] { new NavigatorProjectedRow {
+            Id = first, Name = "Item", Key = "item", Group = "A", IconPath = "icon",
+            IsInstalled = false, Favorite = false
+        }, new NavigatorProjectedRow {
+            Id = first, Name = "Item", Key = "item", Group = "B", IconPath = "icon"
+        }};
+        var visualRows = oldRows.Select(row => new NavigatorProjectedRow {
+            Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group,
+            IconPath = row.IconPath, IsInstalled = true, Favorite = true
+        }).ToArray();
+        Check(NavigatorRefreshDecision.ClassifyRows(oldRows, oldRows) == NavigatorRowChange.None,
+            "Unrelated update skips rebuild");
+        Check(NavigatorRefreshDecision.ClassifyRows(oldRows, visualRows) == NavigatorRowChange.Visual,
+            "Indicator changes are visual across duplicate group rows");
+        visualRows[0].Name = "Renamed";
+        Check(NavigatorRefreshDecision.ClassifyRows(oldRows, visualRows) == NavigatorRowChange.Structural,
+            "Name changes need rebuild");
+        visualRows[0].Name = "Item"; visualRows[1].Group = "C";
+        Check(NavigatorRefreshDecision.ClassifyRows(oldRows, visualRows) == NavigatorRowChange.Structural,
+            "Group changes need rebuild");
+        Check(NavigatorRefreshDecision.ClassifyRows(oldRows, visualRows.Take(1)) == NavigatorRowChange.Structural,
+            "Group occurrence changes need rebuild");
         var messages = new List<string>();
         var disabled = new NavigatorDiagnostics(false, messages.Add);
         disabled.Record(baseline, false, false, false, false, false, 1, 0, 0);
