@@ -28,10 +28,8 @@ namespace HeliumHybrid
         internal static List<NavigatorProjectedRow> Build(IEnumerable<NavigatorSource> games, int grouping, Func<string, string> resolveIcon)
         {
             var rows = new List<NavigatorProjectedRow>();
-            var sorted = (games ?? Enumerable.Empty<NavigatorSource>())
-                .OrderBy(game => string.IsNullOrEmpty(game.SortingName) ? game.Name : game.SortingName,
-                    StringComparer.CurrentCultureIgnoreCase);
-            foreach (var game in sorted) {
+            // FilteredGames already follows Playnite's current collection view order.
+            foreach (var game in games ?? Enumerable.Empty<NavigatorSource>()) {
                 string iconPath = null;
                 if (!string.IsNullOrWhiteSpace(game.Icon)) iconPath = resolveIcon(game.Icon);
                 foreach (var group in grouping == 0 ? new[] { "" } : Logic.Groups(game.GroupNames))

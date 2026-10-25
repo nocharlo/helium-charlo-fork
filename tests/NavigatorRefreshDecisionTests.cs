@@ -24,12 +24,20 @@ class NavigatorRefreshDecisionTests
             "Native reordering alone does not change membership");
         Check(NavigatorRefreshDecision.MembershipChanged(current, new[] { first }),
             "Added member changes snapshot");
-        Check(!NavigatorRefreshDecision.ShouldRebuild(false, false),
-            "Unchanged membership without dirty flag skips rebuild");
-        Check(NavigatorRefreshDecision.ShouldRebuild(true, false),
+        Check(!NavigatorRefreshDecision.OrderChanged(new[] { first, second }, new[] { first, second }),
+            "Stable native order does not change");
+        Check(NavigatorRefreshDecision.OrderChanged(new[] { second, first }, new[] { first, second }),
+            "Same members in new native order are detected");
+        Check(!NavigatorRefreshDecision.ShouldRebuild(false, false, false, false),
+            "Stable state skips rebuild");
+        Check(NavigatorRefreshDecision.ShouldRebuild(true, false, false, false),
             "Dirty flag rebuilds");
-        Check(NavigatorRefreshDecision.ShouldRebuild(false, true),
+        Check(NavigatorRefreshDecision.ShouldRebuild(false, true, false, false),
             "Membership change rebuilds");
+        Check(NavigatorRefreshDecision.ShouldRebuild(false, false, true, false),
+            "Native order change rebuilds without membership change");
+        Check(NavigatorRefreshDecision.ShouldRebuild(false, false, false, true),
+            "Native view state change rebuilds without membership change");
 
         var baseline = new NavigatorViewSnapshot {
             SortOrder = "Name", SortDirection = "Ascending", Grouping = "None",
@@ -43,38 +51,41 @@ class NavigatorRefreshDecisionTests
             "Identical native state is stable");
         same.SortOrder = "PlayCount";
         Check(NavigatorRefreshDecision.ViewStateChanged(same, baseline),
-            "Native sort change is observable");
-        Check(!NavigatorRefreshDecision.ShouldRebuild(false, false),
-            "Native sort change alone does not yet rebuild");
+            "Most Played sort field change is detected");
         same.SortOrder = "Name";
         same.SortDirection = "Descending";
         Check(NavigatorRefreshDecision.ViewStateChanged(same, baseline),
-            "Native direction change is observable");
+            "Recently Played direction change is detected");
         same.SortDirection = "Ascending";
+        same.SortOrder = "UserScore";
+        Check(NavigatorRefreshDecision.ViewStateChanged(same, baseline),
+            "Rating sort field change is detected");
+        same.SortOrder = "Name";
         same.Grouping = "CompletionStatus";
         Check(NavigatorRefreshDecision.ViewStateChanged(same, baseline),
-            "Native grouping change is observable");
+            "Native grouping change is detected");
         same.Grouping = "None";
         same.CompletionStatusFilterActive = true;
         Check(NavigatorRefreshDecision.ViewStateChanged(same, baseline),
-            "Completion status filter state is observable");
+            "Completion status filter state is observable in diagnostics");
         same.CompletionStatusFilterActive = false;
         same.PresetId = second;
         Check(NavigatorRefreshDecision.ViewStateChanged(same, baseline),
-            "Preset switch is observable without logging its ID");
+            "Preset switch is detected with unchanged membership and order");
         same.PresetId = first;
         same.NavigatorGrouping = 1;
         Check(NavigatorRefreshDecision.ViewStateChanged(same, baseline),
-            "Navigator grouping preference is observable");
+            "Independent Navigator grouping change is detected");
 
         var messages = new List<string>();
         var disabled = new NavigatorDiagnostics(false, messages.Add);
-        disabled.Record(baseline, false, false, false, 1, 0, 0);
+        disabled.Record(baseline, false, false, false, false, false, 1, 0, 0);
         Check(messages.Count == 0, "Diagnostics default path emits nothing");
         var enabled = new NavigatorDiagnostics(true, messages.Add);
-        enabled.Record(baseline, true, true, true, 4, 2, 1);
-        Check(messages.Count == 2 && messages.Any(text => text.Contains("projectionMs=")),
-            "Opt-in diagnostics record state and rebuild timing");
+        enabled.Record(baseline, false, false, true, true, true, 4, 2, 1);
+        Check(messages.Count == 2 && messages.Any(text => text.Contains("orderChanged=True") &&
+            text.Contains("viewStateChanged=True") && text.Contains("projectionMs=")),
+            "Opt-in diagnostics record reasons and rebuild timing");
         Check(messages.All(text => !text.Contains(first.ToString())),
             "Diagnostics never print preset identifiers");
 

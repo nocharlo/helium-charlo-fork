@@ -9,6 +9,7 @@
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net462" Version="1.0.3" PrivateAssets="all" />
     <Reference Include="PresentationCore" /><Reference Include="PresentationFramework" />
     <Reference Include="WindowsBase" /><Reference Include="System.Xaml" />
+    <Compile Remove="obj/**/*.cs" />
     <EmbeddedResource Include="Navigator.xaml" />
   </ItemGroup>
 </Project>

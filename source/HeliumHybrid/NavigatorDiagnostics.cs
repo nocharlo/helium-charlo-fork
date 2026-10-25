@@ -45,7 +45,7 @@ namespace HeliumHybrid
         }
 
         internal void Record(NavigatorViewSnapshot state, bool dirty, bool membershipChanged,
-            bool rebuilt, double totalMs, double projectionMs, double viewMs)
+            bool orderChanged, bool viewStateChanged, bool rebuilt, double totalMs, double projectionMs, double viewMs)
         {
             if (!enabled) return;
             refreshes++;
@@ -64,6 +64,7 @@ namespace HeliumHybrid
 
             if (rebuilt) {
                 Emit("rebuild dirty=" + dirty + " membershipChanged=" + membershipChanged +
+                    " orderChanged=" + orderChanged + " viewStateChanged=" + viewStateChanged +
                     " totalMs=" + Format(totalMs) + " projectionMs=" + Format(projectionMs) +
                     " viewMs=" + Format(viewMs));
             }
