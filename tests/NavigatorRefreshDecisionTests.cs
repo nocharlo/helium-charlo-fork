@@ -99,6 +99,27 @@ class NavigatorRefreshDecisionTests
             "Group changes need rebuild");
         Check(NavigatorRefreshDecision.ClassifyRows(oldRows, visualRows.Take(1)) == NavigatorRowChange.Structural,
             "Group occurrence changes need rebuild");
+        Check(NavigatorRefreshDecision.EffectiveGrouping(0, "CompletionStatus") == 4,
+            "Default follows native completion grouping");
+        Check(NavigatorRefreshDecision.EffectiveGrouping(0, "Series") == 5 &&
+            NavigatorRefreshDecision.EffectiveGrouping(0, "Category") == 6 &&
+            NavigatorRefreshDecision.EffectiveGrouping(0, "Platform") == 7,
+            "Default follows supported native groups");
+        Check(NavigatorRefreshDecision.EffectiveGrouping(2, "CompletionStatus") == 2,
+            "Explicit Navigator grouping takes precedence");
+        Check(NavigatorRefreshDecision.EffectiveGrouping(0, "Name") == 0,
+            "Unsupported native group remains flat");
+        var groupState = new NavigatorGroupState();
+        Check(groupState.IsExpanded(1, "Shared"), "New groups expand by default");
+        groupState.SetExpanded(1, "Shared", false);
+        Check(!groupState.IsExpanded(1, "Shared"), "Collapsed group survives view replacement");
+        Check(groupState.IsExpanded(2, "Shared"), "Same group name in another mode is independent");
+        groupState.SetExpanded(2, "Shared", true);
+        Check(!groupState.IsExpanded(1, "Shared"), "Returning to prior mode restores its state");
+        groupState.SetExpanded(1, "Offscreen", false);
+        Check(!groupState.IsExpanded(1, "Offscreen"), "Offscreen group state does not need a WPF container");
+        groupState.SetExpanded(1, "Shared", true);
+        Check(groupState.IsExpanded(1, "Shared"), "Expanded group state survives view replacement");
         var messages = new List<string>();
         var disabled = new NavigatorDiagnostics(false, messages.Add);
         disabled.Record(baseline, false, false, false, false, false, 1, 0, 0);
@@ -108,6 +129,9 @@ class NavigatorRefreshDecisionTests
         Check(messages.Count == 2 && messages.Any(text => text.Contains("orderChanged=True") &&
             text.Contains("viewStateChanged=True") && text.Contains("projectionMs=")),
             "Opt-in diagnostics record reasons and rebuild timing");
+        enabled.VisualUpdate(2);
+        Check(messages.Any(text => text.Contains("visual-update occurrences=2")),
+            "Opt-in diagnostics distinguish visual row updates from rebuilds");
         Check(messages.All(text => !text.Contains(first.ToString())),
             "Diagnostics never print preset identifiers");
 

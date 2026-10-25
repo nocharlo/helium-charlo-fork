@@ -66,6 +66,8 @@ namespace HeliumHybrid
         private List<GameRow> rows = new List<GameRow>();
         private ListCollectionView view;
         private int rebuildGeneration;
+        private int EffectiveGrouping => NavigatorRefreshDecision.EffectiveGrouping(prefs.Grouping, library.Grouping);
+        private readonly NavigatorGroupState groupState = new NavigatorGroupState();
         public Navigator(IPlayniteAPI api, HybridPlugin plugin)
         {
             this.api = api; this.plugin = plugin; library = new LibraryStateAdapter(api);
@@ -77,11 +79,13 @@ namespace HeliumHybrid
                 root = (Grid)XamlReader.Load(stream);
             Content = root;
             list = (ListBox)root.FindName("Games"); search = (TextBox)root.FindName("Search");
+            list.Tag = groupState;
             grouping = (ComboBox)root.FindName("Grouping"); count = (TextBlock)root.FindName("Count");
             status = (TextBlock)root.FindName("Status"); toggle = (Button)root.FindName("CollapseButton");
             grip = (Thumb)root.FindName("ResizeGrip"); tools = (FrameworkElement)root.FindName("Tools");
             backButton = (Button)root.FindName("BackButton");
             grouping.SelectedIndex = Math.Max(0, Math.Min(3, prefs.Grouping));
+            groupState.Mode = EffectiveGrouping;
             timer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(1500) };
             timer.Tick += (s, e) => { RecomputeLayout(); Refresh(); };
             searchTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(180) };
@@ -100,7 +104,7 @@ namespace HeliumHybrid
                     Safe(() => Navigate(pendingSidebarId, prefs.SidebarClickAction));
             };
             search.TextChanged += (s, e) => { searchTimer.Stop(); searchTimer.Start(); };
-            grouping.SelectionChanged += (s, e) => { prefs.Grouping = grouping.SelectedIndex; Interlocked.Exchange(ref dirty, 1); Refresh(); Save(); };
+            grouping.SelectionChanged += (s, e) => { prefs.Grouping = grouping.SelectedIndex; groupState.Mode = EffectiveGrouping; Interlocked.Exchange(ref dirty, 1); Refresh(); Save(); };
             backButton.Click += (sender, args) => Safe(ReturnToGrid);
             toggle.Click += (sender, args) => {
                 prefs.Collapsed = !prefs.Collapsed;
@@ -338,9 +342,10 @@ namespace HeliumHybrid
                 lastViewState = viewState;
                 var selectedRow = list.SelectedItem as GameRow;
                 var scrollOffset = FindScroll(list)?.VerticalOffset ?? 0;
-                var expandedGroups = CaptureExpandedGroups(list);
+                var effectiveGrouping = EffectiveGrouping;
+                groupState.Mode = effectiveGrouping;
                 var projectionStart = diagnostics.Enabled ? Stopwatch.GetTimestamp() : 0;
-                var projected = NavigatorProjection.Build(library.Sources(games, prefs.Grouping), prefs.Grouping, library.ResolveIcon);
+                var projected = NavigatorProjection.Build(library.Sources(games, effectiveGrouping), effectiveGrouping, library.ResolveIcon);
                 rows = projected.Select(row => new GameRow {
                     Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group, IconPath = row.IconPath,
                     IsInstalled = row.IsInstalled, Favorite = row.Favorite
@@ -350,7 +355,7 @@ namespace HeliumHybrid
                 syncing = true;
                 try {
                     view = new ListCollectionView(rows);
-                    if (prefs.Grouping != 0) view.GroupDescriptions.Add(new PropertyGroupDescription("Group"));
+                    if (effectiveGrouping != 0) view.GroupDescriptions.Add(new PropertyGroupDescription("Group"));
                     list.ItemsSource = view; ApplySearch();
                     if (selectedRow != null) {
                         var occurrence = rows.FirstOrDefault(row => row.Id == selectedRow.Id && row.Group == selectedRow.Group && view.Contains(row));
@@ -362,7 +367,6 @@ namespace HeliumHybrid
                 var currentView = view;
                 Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
                     if (!active || generation != rebuildGeneration || !ReferenceEquals(view, currentView)) return;
-                    RestoreExpandedGroups(list, expandedGroups);
                     FindScroll(list)?.ScrollToVerticalOffset(scrollOffset);
                 }));
                 diagnostics.Record(diagnosticState, changed, membershipChanged, orderChanged,
@@ -388,8 +392,8 @@ namespace HeliumHybrid
             foreach (var id in pending) {
                 var existing = rows.Where(row => row.Id == id).ToList();
                 if (existing.Count == 0 || !byId.TryGetValue(id, out var game)) continue;
-                var projected = NavigatorProjection.Build(library.Sources(new[] { game }, prefs.Grouping),
-                    prefs.Grouping, library.ResolveIcon);
+                var projected = NavigatorProjection.Build(library.Sources(new[] { game }, EffectiveGrouping),
+                    EffectiveGrouping, library.ResolveIcon);
                 var prior = existing.Select(row => new NavigatorProjectedRow {
                     Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group,
                     IconPath = row.IconPath, IsInstalled = row.IsInstalled, Favorite = row.Favorite
@@ -397,6 +401,7 @@ namespace HeliumHybrid
                 var kind = NavigatorRefreshDecision.ClassifyRows(prior, projected);
                 if (kind == NavigatorRowChange.Structural) return true;
                 if (kind == NavigatorRowChange.Visual) {
+                    diagnostics.VisualUpdate(existing.Count);
                     foreach (var row in existing) {
                         row.IsInstalled = game.IsInstalled;
                         row.Favorite = game.Favorite;
@@ -404,31 +409,6 @@ namespace HeliumHybrid
                 }
             }
             return false;
-        }
-        private static Dictionary<string, bool> CaptureExpandedGroups(DependencyObject root)
-        {
-            var result = new Dictionary<string, bool>(StringComparer.Ordinal);
-            VisitExpanders(root, expander => {
-                if (expander.DataContext is CollectionViewGroup group)
-                    result[group.Name?.ToString() ?? string.Empty] = expander.IsExpanded;
-            });
-            return result;
-        }
-        private static void RestoreExpandedGroups(DependencyObject root, Dictionary<string, bool> states)
-        {
-            if (states.Count == 0) return;
-            VisitExpanders(root, expander => {
-                if (expander.DataContext is CollectionViewGroup group &&
-                    states.TryGetValue(group.Name?.ToString() ?? string.Empty, out var expanded))
-                    expander.IsExpanded = expanded;
-            });
-        }
-        private static void VisitExpanders(DependencyObject node, Action<Expander> visit)
-        {
-            if (node == null) return;
-            if (node is Expander expander) visit(expander);
-            for (var i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++)
-                VisitExpanders(VisualTreeHelper.GetChild(node, i), visit);
         }
         private void ApplySearch()
         {

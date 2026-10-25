@@ -35,6 +35,18 @@ namespace HeliumHybrid
             }
             return visual ? NavigatorRowChange.Visual : NavigatorRowChange.None;
         }
+        // Explicit Navigator grouping wins. The SDK exposes group fields but not native group containers.
+        internal static int EffectiveGrouping(int navigatorGrouping, string nativeGrouping)
+        {
+            if (navigatorGrouping != 0) return navigatorGrouping;
+            switch (nativeGrouping) {
+                case "CompletionStatus": return 4;
+                case "Series": return 5;
+                case "Category": return 6;
+                case "Platform": return 7;
+                default: return 0;
+            }
+        }
         internal static Guid[] SortedIds(IEnumerable<Guid> ids)
         {
             return (ids ?? Enumerable.Empty<Guid>()).OrderBy(id => id).ToArray();

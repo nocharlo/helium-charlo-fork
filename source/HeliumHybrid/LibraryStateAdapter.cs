@@ -60,9 +60,10 @@ namespace HeliumHybrid
         private static IEnumerable<string> GroupNames(Game game, int grouping)
         {
             switch (grouping) {
-                case 1: return game.Series?.Select(value => value.Name);
-                case 2: return game.Categories?.Select(value => value.Name);
-                case 3: return game.Platforms?.Select(value => value.Name);
+                case 1: case 5: return game.Series?.Select(value => value.Name);
+                case 2: case 6: return game.Categories?.Select(value => value.Name);
+                case 3: case 7: return game.Platforms?.Select(value => value.Name);
+                case 4: return new[] { game.CompletionStatus?.Name ?? "None" };
                 default: return null;
             }
         }
