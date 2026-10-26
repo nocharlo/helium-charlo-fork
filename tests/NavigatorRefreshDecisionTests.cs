@@ -99,6 +99,10 @@ class NavigatorRefreshDecisionTests
             "Group changes need rebuild");
         Check(NavigatorRefreshDecision.ClassifyRows(oldRows, visualRows.Take(1)) == NavigatorRowChange.Structural,
             "Group occurrence changes need rebuild");
+        var activityBefore = new[] { new NavigatorProjectedRow { Id = first, Name = "Item", Group = "Last 7 Days", ActivityTicks = 10, GroupOrder = long.MaxValue } };
+        var activityAfter = new[] { new NavigatorProjectedRow { Id = first, Name = "Item", Group = "Last 7 Days", ActivityTicks = 11, GroupOrder = long.MaxValue } };
+        Check(NavigatorRefreshDecision.ClassifyRows(activityBefore, activityAfter) == NavigatorRowChange.Structural,
+            "Updated activity within the same group rebuilds chronological order");
         Check(NavigatorRefreshDecision.EffectiveGrouping(0, "CompletionStatus") == 4,
             "Default follows native completion grouping");
         Check(NavigatorRefreshDecision.EffectiveGrouping(0, "Series") == 5 &&
@@ -110,6 +114,9 @@ class NavigatorRefreshDecisionTests
         Check(NavigatorRefreshDecision.EffectiveGrouping(1, "Category") == 1 &&
             NavigatorRefreshDecision.EffectiveGrouping(0, "Category") == 6,
             "Custom rating categories follow native grouping only in default mode");
+        Check(NavigatorRefreshDecision.EffectiveGrouping(4, "Category") == 8 &&
+            NavigatorRefreshDecision.EffectiveGrouping(3, "Category") == 3,
+            "Recent Activity mode is independent and old grouping indexes remain stable");
         Check(NavigatorRefreshDecision.EffectiveGrouping(0, "Name") == 0,
             "Unsupported native group remains flat");
         var groupState = new NavigatorGroupState();
@@ -123,6 +130,9 @@ class NavigatorRefreshDecisionTests
         Check(!groupState.IsExpanded(1, "Offscreen"), "Offscreen group state does not need a WPF container");
         groupState.SetExpanded(1, "Shared", true);
         Check(groupState.IsExpanded(1, "Shared"), "Expanded group state survives view replacement");
+        groupState.SetExpanded(8, "Last 7 Days", false);
+        Check(!groupState.IsExpanded(8, "Last 7 Days") && groupState.IsExpanded(8, "Earlier This Month"),
+            "Recent Activity preserves one collapsed group without closing others");
         var messages = new List<string>();
         var disabled = new NavigatorDiagnostics(false, messages.Add);
         disabled.Record(baseline, false, false, false, false, false, 1, 0, 0);

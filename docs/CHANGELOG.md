@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.0 — Recent Activity (Phase One, unreleased)
+
+- Added Navigator-specific chronological grouping from Playnite LastActivity: Last 7 Days, Earlier This Month, individual previous months, and No Recorded Activity.
+- Activity groups follow local calendar boundaries, retain filtered membership, and sort games newest first without changing native presets.
+- Automated tests and an isolated build pass. Portable visual validation remains pending because the Computer Use graphics capture failed.
+
 ## v0.2.6 — Navigator Essentials (local release candidate)
 
 - Follows native filtered game order and supported native grouping, including custom Rating categories; explicit Navigator grouping remains independent.

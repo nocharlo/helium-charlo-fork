@@ -30,7 +30,8 @@ namespace HeliumHybrid
                 var oldRow = oldRows[i]; var newRow = newRows[i];
                 if (oldRow.Id != newRow.Id || oldRow.Name != newRow.Name ||
                     oldRow.Key != newRow.Key || oldRow.Group != newRow.Group ||
-                    oldRow.IconPath != newRow.IconPath) return NavigatorRowChange.Structural;
+                    oldRow.IconPath != newRow.IconPath ||
+                    oldRow.ActivityTicks != newRow.ActivityTicks || oldRow.GroupOrder != newRow.GroupOrder) return NavigatorRowChange.Structural;
                 visual |= oldRow.IsInstalled != newRow.IsInstalled || oldRow.Favorite != newRow.Favorite;
             }
             return visual ? NavigatorRowChange.Visual : NavigatorRowChange.None;
@@ -38,6 +39,7 @@ namespace HeliumHybrid
         // Explicit Navigator grouping wins. The SDK exposes group fields but not native group containers.
         internal static int EffectiveGrouping(int navigatorGrouping, string nativeGrouping)
         {
+            if (navigatorGrouping == 4) return 8;
             if (navigatorGrouping != 0) return navigatorGrouping;
             switch (nativeGrouping) {
                 case "CompletionStatus": return 4;
