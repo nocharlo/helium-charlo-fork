@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.2.6 — Navigator Essentials (local release candidate)
+## v0.2.6 — Navigator Essentials 
 
 - Follows native filtered game order and supported native grouping, including custom Rating categories; explicit Navigator grouping remains independent.
 - Shows favorite and installation indicators and updates existing rows for visual-only game changes.
