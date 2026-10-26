@@ -14,6 +14,7 @@ namespace HeliumHybrid
         internal bool IsInstalled { get; set; }
         internal bool Favorite { get; set; }
         internal IEnumerable<string> GroupNames { get; set; }
+        internal DateTime? LastActivity { get; set; }
     }
 
     internal sealed class NavigatorProjectedRow
@@ -22,6 +23,8 @@ namespace HeliumHybrid
         internal string Name { get; set; }
         internal string Group { get; set; }
         internal string Key { get; set; }
+        internal long ActivityTicks { get; set; }
+        internal long GroupOrder { get; set; }
         internal string IconPath { get; set; }
         internal bool IsInstalled { get; set; }
         internal bool Favorite { get; set; }
@@ -29,8 +32,9 @@ namespace HeliumHybrid
 
     internal static class NavigatorProjection
     {
-        internal static List<NavigatorProjectedRow> Build(IEnumerable<NavigatorSource> games, int grouping, Func<string, string> resolveIcon)
+        internal static List<NavigatorProjectedRow> Build(IEnumerable<NavigatorSource> games, int grouping, Func<string, string> resolveIcon, DateTime? now = null)
         {
+            if (grouping == 8) return BuildRecentActivity(games, resolveIcon, now ?? DateTime.Now);
             var rows = new List<NavigatorProjectedRow>();
             // FilteredGames already follows Playnite's current collection view order.
             foreach (var game in games ?? Enumerable.Empty<NavigatorSource>()) {
@@ -47,6 +51,41 @@ namespace HeliumHybrid
             return rows;
         }
 
+        private static List<NavigatorProjectedRow> BuildRecentActivity(IEnumerable<NavigatorSource> games,
+            Func<string, string> resolveIcon, DateTime now)
+        {
+            var rows = new List<NavigatorProjectedRow>();
+            var sevenDayBoundary = now.AddDays(-7);
+            foreach (var game in games ?? Enumerable.Empty<NavigatorSource>()) {
+                var activity = NormalizeActivity(game.LastActivity, now);
+                string label;
+                long order;
+                if (!activity.HasValue) { label = "No Recorded Activity"; order = 0; }
+                else if (activity.Value >= sevenDayBoundary) { label = "Last 7 Days"; order = long.MaxValue; }
+                else if (activity.Value.Year == now.Year && activity.Value.Month == now.Month) {
+                    label = "Earlier This Month"; order = long.MaxValue - 1;
+                } else {
+                    label = activity.Value.ToString("MMMM yyyy", System.Globalization.CultureInfo.CurrentCulture);
+                    order = activity.Value.Year * 12L + activity.Value.Month;
+                }
+                rows.Add(new NavigatorProjectedRow {
+                    Id = game.Id, Name = game.Name ?? "Untitled", Key = Logic.SearchKey(game.Name),
+                    Group = label, GroupOrder = order, ActivityTicks = activity?.Ticks ?? 0,
+                    IconPath = string.IsNullOrWhiteSpace(game.Icon) ? null : resolveIcon(game.Icon),
+                    IsInstalled = game.IsInstalled, Favorite = game.Favorite
+                });
+            }
+            return rows.OrderByDescending(row => row.GroupOrder)
+                .ThenByDescending(row => row.ActivityTicks).ToList();
+        }
+        private static DateTime? NormalizeActivity(DateTime? recorded, DateTime now)
+        {
+            if (!recorded.HasValue) return null;
+            try {
+                var value = recorded.Value.Kind == DateTimeKind.Utc ? recorded.Value.ToLocalTime() : recorded.Value;
+                return value.Year < 1900 || value > now ? (DateTime?)null : value;
+            } catch (ArgumentOutOfRangeException) { return null; }
+        }
         internal static string SearchKey(string text) => Logic.SearchKey(text);
         internal static bool Matches(string rowKey, string searchKey) => rowKey.Contains(searchKey);
         internal static int DistinctGameCount(IEnumerable<Guid> ids) => ids.Distinct().Count();
