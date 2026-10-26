@@ -1,12 +1,16 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Xml.Serialization;
 using HeliumHybrid;
 
 public sealed class TestPreferences
 {
     public int SidebarClickAction { get; set; } = 1;
     public int GridCoverClickAction { get; set; } = 0;
+    public int Grouping { get; set; }
+    public int RecentActivityGroupingStyle { get; set; }
+    [XmlIgnore] public bool RecentActivityGroupingStyleSpecified { get; set; }
 }
 
 internal static class SettingsFileTests
@@ -43,6 +47,21 @@ internal static class SettingsFileTests
             Check(SettingsFile.Load<TestPreferences>(path, ex => throw ex, out canSave).SidebarClickAction == 1,
                 "New file loads after recovery");
             Check(File.ReadAllBytes(backup).SequenceEqual(corrupt), "Recovery does not overwrite corrupt backup");
+            var legacyPath = Path.Combine(directory, "legacy.xml");
+            File.WriteAllText(legacyPath, "<TestPreferences><Grouping>4</Grouping></TestPreferences>");
+            var legacy = SettingsFile.Load<TestPreferences>(legacyPath, ex => throw ex, out canSave);
+            Check(!legacy.RecentActivityGroupingStyleSpecified &&
+                Logic.RecentActivityStyle(legacy.Grouping, legacy.RecentActivityGroupingStyle,
+                    legacy.RecentActivityGroupingStyleSpecified) == 1,
+                "Legacy Recent Activity setting migrates to Detailed");
+            legacy.RecentActivityGroupingStyle = 1;
+            legacy.RecentActivityGroupingStyleSpecified = true;
+            SettingsFile.Save(legacyPath, legacy);
+            var reloaded = SettingsFile.Load<TestPreferences>(legacyPath, ex => throw ex, out canSave);
+            Check(reloaded.RecentActivityGroupingStyleSpecified && reloaded.RecentActivityGroupingStyle == 1,
+                "Migrated grouping style persists in XML");
+            Check(Logic.RecentActivityStyle(0, new TestPreferences().RecentActivityGroupingStyle, false) == 0,
+                "New settings default to Hybrid");
             Console.WriteLine("PASS: settings missing, persisted, corrupt backup, recovery and restart reload.");
         } finally { Directory.Delete(directory, true); }
     }

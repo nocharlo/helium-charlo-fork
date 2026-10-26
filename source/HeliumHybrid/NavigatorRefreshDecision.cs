@@ -37,9 +37,9 @@ namespace HeliumHybrid
             return visual ? NavigatorRowChange.Visual : NavigatorRowChange.None;
         }
         // Explicit Navigator grouping wins. The SDK exposes group fields but not native group containers.
-        internal static int EffectiveGrouping(int navigatorGrouping, string nativeGrouping)
+        internal static int EffectiveGrouping(int navigatorGrouping, string nativeGrouping, int recentActivityGroupingStyle = 0)
         {
-            if (navigatorGrouping == 4) return 8;
+            if (navigatorGrouping == 4) return recentActivityGroupingStyle == 1 ? 9 : 8;
             if (navigatorGrouping != 0) return navigatorGrouping;
             switch (nativeGrouping) {
                 case "CompletionStatus": return 4;

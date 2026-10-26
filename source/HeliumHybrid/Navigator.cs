@@ -68,7 +68,7 @@ namespace HeliumHybrid
         private List<GameRow> rows = new List<GameRow>();
         private ListCollectionView view;
         private int rebuildGeneration;
-        private int EffectiveGrouping => NavigatorRefreshDecision.EffectiveGrouping(prefs.Grouping, library.Grouping);
+        private int EffectiveGrouping => NavigatorRefreshDecision.EffectiveGrouping(prefs.Grouping, library.Grouping, prefs.RecentActivityGroupingStyle);
         private readonly NavigatorGroupState groupState = new NavigatorGroupState();
         public Navigator(IPlayniteAPI api, HybridPlugin plugin)
         {
@@ -301,6 +301,11 @@ namespace HeliumHybrid
             if (!active) return;
             prefs.Width = Logic.ClampWidth(prefs.Width);
             ApplySize(); RecomputeLayout();
+            if (groupState.Mode != EffectiveGrouping) {
+                groupState.Mode = EffectiveGrouping;
+                Interlocked.Exchange(ref dirty, 1);
+                Refresh();
+            }
         }
         private void MetadataUpdated<T>(object sender, ItemUpdatedEventArgs<T> args) where T : DatabaseObject { Interlocked.Exchange(ref dirty, 1); }
         private void MetadataChanged<T>(object sender, ItemCollectionChangedEventArgs<T> args) where T : DatabaseObject { Interlocked.Exchange(ref dirty, 1); }
