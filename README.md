@@ -10,7 +10,7 @@ It brings a compact, searchable game list alongside Playnite's native Grid and D
 
 [**Download v0.2.5**](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.2.5) · [Changelog](docs/CHANGELOG.md) · [Report an issue](https://github.com/nocharlo/helium-charlo-fork/issues)
 
-**Local v0.2.6 candidate:** Navigator Essentials follows native ordering and supported groups, adds favorite and installation indicators, and reduces unnecessary refreshes. It is not published; see the [changelog](docs/CHANGELOG.md) for validation limits.
+**Upcoming local v0.2.7 candidate:** Recent Activity groups the Navigator by play history. Hybrid summarizes previous years; Detailed keeps monthly groups. Neither v0.2.6 nor v0.2.7 has been published.
 
 ---
 
@@ -37,10 +37,10 @@ I'm sharing it here in case anyone else has been looking for something similar, 
 - A compact, scrollable game list alongside the main library.
 - Search within the Navigator without changing the main library's search results.
 - Support for Playnite's active global filters.
-- Expandable game groupings, including platforms, series, and categories.
+- Expandable game groupings, including platforms, series, categories, and Recent Activity.
 - Game icons and synchronized selection.
 - Game counts, adjustable width, and a collapsible sidebar.
-- Persistent Navigator preferences.
+- Persistent Navigator preferences, including Hybrid or Detailed Recent Activity grouping.
 
 The Navigator reads from Playnite's existing library. It doesn't maintain a separate game database or modify your game metadata.
 
