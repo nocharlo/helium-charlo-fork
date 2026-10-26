@@ -92,6 +92,31 @@ class NavigatorProjectionTests
         Check(NavigatorProjection.Build(recent.Take(2), 8, icon => icon, now).Count == 2 &&
             NavigatorProjection.Matches(activity[0].Key, NavigatorProjection.SearchKey("newer")),
             "Activity projection retains native filter subset and local search keys");
+        var autumn = new DateTime(2026, 10, 20, 12, 0, 0);
+        var archive = new[] {
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "year 2024", LastActivity = new DateTime(2024, 11, 1) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "older 2025", LastActivity = new DateTime(2025, 1, 10) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "September", LastActivity = new DateTime(2026, 9, 30) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "newer 2025", LastActivity = new DateTime(2025, 12, 31) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "August", LastActivity = new DateTime(2026, 8, 3) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "this month", LastActivity = new DateTime(2026, 10, 1) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "this week", LastActivity = autumn.AddDays(-1) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "no activity" }
+        };
+        var hybrid = NavigatorProjection.Build(archive, 8, icon => icon, autumn);
+        Check(hybrid.Select(row => row.Group).SequenceEqual(new[] {
+            "Last 7 Days", "Earlier This Month", new DateTime(2026, 9, 1).ToString("MMMM yyyy"),
+            new DateTime(2026, 8, 1).ToString("MMMM yyyy"), "2025", "2025", "2024", "No Recorded Activity"
+        }), "Hybrid groups current-year months and previous years chronologically");
+        Check(hybrid[4].Name == "newer 2025" && hybrid[5].Name == "older 2025",
+            "Hybrid orders games newest first within an annual group");
+        var detailed = NavigatorProjection.Build(archive, 9, icon => icon, autumn);
+        Check(detailed.Count == archive.Length && detailed[4].Group != detailed[5].Group &&
+            detailed[4].Name == "newer 2025" && detailed[5].Name == "older 2025" &&
+            detailed[6].Group == new DateTime(2024, 11, 1).ToString("MMMM yyyy"),
+            "Detailed retains individual month-year groups and prior ordering");
+        Check(hybrid.Select(row => row.Id).SequenceEqual(detailed.Select(row => row.Id)),
+            "Style switch changes headings without changing chronological game order");
         Console.WriteLine("PASS: " + checks + " NavigatorProjection checks.");
     }
 }

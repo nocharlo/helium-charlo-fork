@@ -117,6 +117,10 @@ class NavigatorRefreshDecisionTests
         Check(NavigatorRefreshDecision.EffectiveGrouping(4, "Category") == 8 &&
             NavigatorRefreshDecision.EffectiveGrouping(3, "Category") == 3,
             "Recent Activity mode is independent and old grouping indexes remain stable");
+        Check(NavigatorRefreshDecision.EffectiveGrouping(4, "Category", 0) == 8 &&
+            NavigatorRefreshDecision.EffectiveGrouping(4, "Category", 1) == 9 &&
+            NavigatorRefreshDecision.EffectiveGrouping(2, "Category", 1) == 2,
+            "Activity style changes only Recent Activity effective mode");
         Check(NavigatorRefreshDecision.EffectiveGrouping(0, "Name") == 0,
             "Unsupported native group remains flat");
         var groupState = new NavigatorGroupState();
@@ -133,6 +137,9 @@ class NavigatorRefreshDecisionTests
         groupState.SetExpanded(8, "Last 7 Days", false);
         Check(!groupState.IsExpanded(8, "Last 7 Days") && groupState.IsExpanded(8, "Earlier This Month"),
             "Recent Activity preserves one collapsed group without closing others");
+        groupState.SetExpanded(9, "Last 7 Days", true);
+        Check(!groupState.IsExpanded(8, "Last 7 Days") && groupState.IsExpanded(9, "Last 7 Days"),
+            "Hybrid and Detailed expansion states are independent");
         var messages = new List<string>();
         var disabled = new NavigatorDiagnostics(false, messages.Add);
         disabled.Record(baseline, false, false, false, false, false, 1, 0, 0);

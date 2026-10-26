@@ -34,7 +34,7 @@ namespace HeliumHybrid
     {
         internal static List<NavigatorProjectedRow> Build(IEnumerable<NavigatorSource> games, int grouping, Func<string, string> resolveIcon, DateTime? now = null)
         {
-            if (grouping == 8) return BuildRecentActivity(games, resolveIcon, now ?? DateTime.Now);
+            if (grouping == 8 || grouping == 9) return BuildRecentActivity(games, resolveIcon, now ?? DateTime.Now, grouping == 9);
             var rows = new List<NavigatorProjectedRow>();
             // FilteredGames already follows Playnite's current collection view order.
             foreach (var game in games ?? Enumerable.Empty<NavigatorSource>()) {
@@ -52,7 +52,7 @@ namespace HeliumHybrid
         }
 
         private static List<NavigatorProjectedRow> BuildRecentActivity(IEnumerable<NavigatorSource> games,
-            Func<string, string> resolveIcon, DateTime now)
+            Func<string, string> resolveIcon, DateTime now, bool detailed)
         {
             var rows = new List<NavigatorProjectedRow>();
             var sevenDayBoundary = now.AddDays(-7);
@@ -64,6 +64,9 @@ namespace HeliumHybrid
                 else if (activity.Value >= sevenDayBoundary) { label = "Last 7 Days"; order = long.MaxValue; }
                 else if (activity.Value.Year == now.Year && activity.Value.Month == now.Month) {
                     label = "Earlier This Month"; order = long.MaxValue - 1;
+                } else if (!detailed && activity.Value.Year < now.Year) {
+                    label = activity.Value.Year.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    order = activity.Value.Year * 12L;
                 } else {
                     label = activity.Value.ToString("MMMM yyyy", System.Globalization.CultureInfo.CurrentCulture);
                     order = activity.Value.Year * 12L + activity.Value.Month;

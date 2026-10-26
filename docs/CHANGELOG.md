@@ -4,6 +4,7 @@
 
 - Added Navigator-specific chronological grouping from Playnite LastActivity: Last 7 Days, Earlier This Month, individual previous months, and No Recorded Activity.
 - Activity groups follow local calendar boundaries, retain filtered membership, and sort games newest first without changing native presets.
+- Recent Activity offers Hybrid year-level archives by default for new settings and Detailed month-level archives for existing users; each style keeps separate group expansion state.
 - Automated tests and an isolated build pass. Portable visual validation remains pending because the Computer Use graphics capture failed.
 
 ## v0.2.6 — Navigator Essentials (local release candidate)
