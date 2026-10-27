@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression checks for private build-path detection."""
+"""Regression coverage for distributable DLL and archive privacy checks."""
 import sys
 import tempfile
 import unittest
@@ -11,32 +11,107 @@ from check_artifact_opsec import findings, scan
 
 
 class ArtifactOpsecTests(unittest.TestCase):
-    def test_rejects_embedded_windows_pdb(self):
-        payload = b"RSDS" + bytes(20) + b"C:\\Users\\Example\\project\\bin\\HeliumCharlo.pdb\0"
-        self.assertIn("embedded user-profile path", findings(payload, "HeliumCharlo.dll"))
+    def test_windows_user_path_ascii(self):
+        result = findings(b"C:\\Users\\ActualUser\\build\\Helium.pdb", "HeliumCharlo.dll")
+        self.assertIn("embedded absolute filesystem path", result)
+
+    def test_absolute_drive_outside_codeview(self):
+        result = findings(b"other\x00D:\\build\\ci\\bin\\file.pdb\x00", "HeliumCharlo.dll")
+        self.assertIn("embedded absolute filesystem path", result)
+
+    def test_drive_with_forward_slashes(self):
+        self.assertIn("embedded absolute filesystem path",
+                      findings(b"E:/workspace/Helium/src", "HeliumCharlo.dll"))
+
+    def test_utf16_two_alignments(self):
+        payload = "D:\\workspace\\source".encode("utf-16-le")
+        for content in (payload, b"\x00" + payload):
+            self.assertIn("embedded absolute filesystem path",
+                          findings(content, "HeliumCharlo.dll"))
+
+    def test_unc_path_in_binary(self):
+        self.assertIn("embedded absolute filesystem path",
+                      findings(b"\\\\server\\private-share\\build\\release", "HeliumCharlo.dll"))
+
+    def test_codeview_drive(self):
+        payload = b"RSDS" + bytes(20) + b"C:\\Users\\Example\\project\\file.pdb\0"
         self.assertIn("absolute CodeView PDB path", findings(payload, "HeliumCharlo.dll"))
 
-    def test_rejects_utf16_profile_path(self):
-        payload = "C:\\Users\\Example\\build".encode("utf-16-le")
-        self.assertIn("embedded user-profile path", findings(payload, "HeliumCharlo.dll"))
+    def test_codeview_unc(self):
+        payload = b"RSDS" + bytes(20) + b"\\\\server\\share\\project\\file.pdb\0"
+        self.assertIn("absolute CodeView PDB path", findings(payload, "HeliumCharlo.dll"))
 
-    def test_rejects_linux_and_macos_profile_paths(self):
-        for path in (b"/home/example/build/", b"/Users/example/project/"):
-            self.assertIn("embedded user-profile path", findings(path, "HeliumCharlo.dll"))
+    def test_codeview_relative_pdb_name(self):
+        payload = b"RSDS" + bytes(20) + b"HeliumCharlo.pdb\0"
+        self.assertNotIn("absolute CodeView PDB path", findings(payload, "HeliumCharlo.dll"))
 
-    def test_clean_payload_is_accepted(self):
-        self.assertEqual([], findings(b"HeliumCharlo release binary", "HeliumCharlo.dll"))
+    def test_posix_profiles(self):
+        for path in (b"/home/developer/project/", b"/Users/developer/project/"):
+            self.assertIn("embedded absolute filesystem path",
+                          findings(path, "HeliumCharlo.dll"))
 
-    def test_pdb_file_not_allowed(self):
-        self.assertIn("debug symbols included in release", findings(b"", "HeliumCharlo.pdb"))
+    def test_clean_binary(self):
+        self.assertEqual([], findings(b"Helium release compiled", "HeliumCharlo.dll"))
 
-    def test_zip_archive_scanning(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            archive = Path(tmp) / "test.pext"
-            with zipfile.ZipFile(archive, "w") as zf:
+    def test_web_urls_are_not_unc(self):
+        self.assertEqual([], findings(
+            b"Source: https://github.com/nocharlo/helium-charlo-fork", "README.md"
+        ))
+
+    def test_text_placeholder_does_not_block(self):
+        # Documentation or template strings with obviously fake example names
+        # are not private paths. The same content in a DLL still fails.
+        text = b"Example: C:\\Users\\Example\\project\\file.pdb"
+        self.assertEqual([], findings(text, "README.txt"))
+        self.assertIn("embedded absolute filesystem path", findings(text, "HeliumCharlo.dll"))
+
+    def test_symbols_file_is_rejected(self):
+        self.assertIn("debug symbol file in release", findings(b"", "HeliumCharlo.pdb"))
+
+    def test_archive_member_name_absolute(self):
+        with tempfile.TemporaryDirectory() as temp:
+            package = Path(temp) / "test.pext"
+            with zipfile.ZipFile(package, "w") as zf:
+                zf.writestr("C:/Users/developer/private.txt", "nothing")
+            self.assertTrue(any("member name" in issue for issue in scan(package)))
+
+    def test_archive_member_name_embedded(self):
+        with tempfile.TemporaryDirectory() as temp:
+            package = Path(temp) / "test.pext"
+            with zipfile.ZipFile(package, "w") as zf:
+                zf.writestr("documentation/D:\\build\\private.txt", "nothing")
+            self.assertTrue(any("member name" in issue for issue in scan(package)))
+
+    def test_archive_member_dotdot(self):
+        with tempfile.TemporaryDirectory() as temp:
+            package = Path(temp) / "test.pext"
+            with zipfile.ZipFile(package, "w") as zf:
+                zf.writestr("../secrets.txt", "nothing")
+            self.assertTrue(any("member name" in issue for issue in scan(package)))
+
+    def test_archive_payload_and_no_echo(self):
+        with tempfile.TemporaryDirectory() as temp:
+            package = Path(temp) / "test.pext"
+            with zipfile.ZipFile(package, "w") as zf:
                 zf.writestr("extension.yaml", "Version: 0.2.7")
-                zf.writestr("HeliumCharlo.dll", b"C:\\Users\\Example\\debug")
-            self.assertTrue(any("HeliumCharlo.dll" in issue for issue in scan(archive)))
+                zf.writestr("HeliumCharlo.dll", b"D:\\personal\\dir\\app.pdb")
+            errors = scan(package)
+            self.assertTrue(errors)
+            self.assertTrue(all("personal" not in e for e in errors))
+
+    def test_corrupt_archive_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            package = Path(temp) / "broken.pext"
+            package.write_bytes(b"not a zip")
+            self.assertTrue(scan(package))
+
+    def test_clean_package_passes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            package = Path(temp) / "test.pext"
+            with zipfile.ZipFile(package, "w") as zf:
+                zf.writestr("extension.yaml", "Version: 0.2.7")
+                zf.writestr("HeliumCharlo.dll", b"MZcleanbinary")
+            self.assertEqual([], scan(package))
 
 
 if __name__ == "__main__":
