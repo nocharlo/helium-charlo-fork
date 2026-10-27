@@ -1,0 +1,74 @@
+name: Historical release repair candidates
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/historical-release-repair.yml"
+      - "scripts/check_artifact_opsec.py"
+      - "scripts/rebuild_historical_release.py"
+      - "tests/ArtifactOpsecTests.py"
+      - "tests/ReleaseProvenanceTests.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - tag: v0.2.5
+            version: 0.2.5
+            commit: 6e700b7e358a09bab163ae05471ff561e9df49fc
+          - tag: v.0.2.6
+            version: 0.2.6
+            commit: ae6ba0bb721745431eb65f23d8d2f3a1de41488d
+          - tag: v0.2.7
+            version: 0.2.7
+            commit: e0eaf101a6f591110693bcc6ccbd6dbef3f15164
+    steps:
+      - name: Check out trusted release verification scripts
+        uses: actions/checkout@v4
+      - name: Check out exact original release source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.commit }}
+          path: historical
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify OPSEC and provenance regression checks
+        shell: pwsh
+        run: |
+          python tests/ArtifactOpsecTests.py
+          if ($LASTEXITCODE -ne 0) { throw 'Artifact OPSEC tests failed' }
+          python tests/ReleaseProvenanceTests.py
+          if ($LASTEXITCODE -ne 0) { throw 'Release evidence tests failed' }
+      - name: Rebuild from pinned source and verify exact package digest
+        shell: pwsh
+        env:
+          TAG: ${{ matrix.tag }}
+          COMMIT: ${{ matrix.commit }}
+          VERSION: ${{ matrix.version }}
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP ('repaired-' + $env:VERSION)
+          python scripts/rebuild_historical_release.py build --source historical --output $out --tag $env:TAG --commit $env:COMMIT
+          if ($LASTEXITCODE -ne 0) { throw 'Historical package build failed' }
+          python scripts/rebuild_historical_release.py verify --evidence (Join-Path $out 'release-evidence.json') --artifact (Join-Path $out ('Helium-Navigator-v' + $env:VERSION + '.pext')) --tag $env:TAG --commit $env:COMMIT
+          if ($LASTEXITCODE -ne 0) { throw 'Exact artifact digest check failed' }
+      - name: Archive candidate and commit-linked evidence; do not publish
+        uses: actions/upload-artifact@v4
+        with:
+          name: helium-fixed-${{ matrix.version }}
+          path: |
+            ${{ runner.temp }}/repaired-${{ matrix.version }}/*.pext
+            ${{ runner.temp }}/repaired-${{ matrix.version }}/release-evidence.json
+          if-no-files-found: error
+          retention-days: 30
