@@ -13,7 +13,7 @@ on:
           - v.0.2.6
           - v0.2.7
       verified_run_id:
-        description: Successful main-branch historical rebuild workflow run ID
+        description: Successful main-branch historical repair build run ID
         required: true
         type: string
       approved_sha256:
@@ -57,8 +57,8 @@ jobs:
           if ($env:APPROVED_SHA -notmatch '^[a-fA-F0-9]{64}$') { throw 'Invalid approved SHA-256' }
           $run = (gh api ('repos/' + $env:GITHUB_REPOSITORY + '/actions/runs/' + $env:RUN_ID) | ConvertFrom-Json)
           if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect source workflow run' }
-          if ($run.conclusion -ne 'success' -or $run.event -ne 'workflow_dispatch' -or $run.head_branch -ne 'main' -or $run.name -ne 'Historical release repair candidates') {
-            throw 'Only successful manual main-branch rebuild runs are eligible'
+          if ($run.conclusion -ne 'success' -or $run.event -notin @('push', 'workflow_dispatch') -or $run.head_branch -ne 'main' -or $run.name -ne 'Historical release repair candidates') {
+            throw 'Only successful protected main-branch rebuild runs are eligible'
           }
           if ($run.head_sha -ne $env:GITHUB_SHA) {
             throw 'Build verifier commit is different; rerun historical rebuild from current main'
