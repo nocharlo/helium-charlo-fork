@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 namespace HeliumHybrid
@@ -68,7 +69,7 @@ namespace HeliumHybrid
                     label = activity.Value.Year.ToString(System.Globalization.CultureInfo.InvariantCulture);
                     order = activity.Value.Year * 12L;
                 } else {
-                    label = activity.Value.ToString("MMMM yyyy", System.Globalization.CultureInfo.CurrentCulture);
+                    label = activity.Value.ToString("MMMM yyyy", CultureInfo.GetCultureInfo("en-US"));
                     order = activity.Value.Year * 12L + activity.Value.Month;
                 }
                 rows.Add(new NavigatorProjectedRow {

@@ -1,5 +1,7 @@
 using System;
+using System.Globalization;
 using System.Linq;
+using System.Threading;
 using HeliumHybrid;
 
 class NavigatorProjectionTests
@@ -105,16 +107,35 @@ class NavigatorProjectionTests
         };
         var hybrid = NavigatorProjection.Build(archive, 8, icon => icon, autumn);
         Check(hybrid.Select(row => row.Group).SequenceEqual(new[] {
-            "Last 7 Days", "Earlier This Month", new DateTime(2026, 9, 1).ToString("MMMM yyyy"),
-            new DateTime(2026, 8, 1).ToString("MMMM yyyy"), "2025", "2025", "2024", "No Recorded Activity"
+            "Last 7 Days", "Earlier This Month", "September 2026",
+            "August 2026", "2025", "2025", "2024", "No Recorded Activity"
         }), "Hybrid groups current-year months and previous years chronologically");
         Check(hybrid[4].Name == "newer 2025" && hybrid[5].Name == "older 2025",
             "Hybrid orders games newest first within an annual group");
         var detailed = NavigatorProjection.Build(archive, 9, icon => icon, autumn);
         Check(detailed.Count == archive.Length && detailed[4].Group != detailed[5].Group &&
             detailed[4].Name == "newer 2025" && detailed[5].Name == "older 2025" &&
-            detailed[6].Group == new DateTime(2024, 11, 1).ToString("MMMM yyyy"),
+            detailed[6].Group == "November 2024",
             "Detailed retains individual month-year groups and prior ordering");
+        var previousCulture = Thread.CurrentThread.CurrentCulture;
+        try {
+            foreach (var culture in new[] { "pt-BR", "en-US" }) {
+                Thread.CurrentThread.CurrentCulture = CultureInfo.GetCultureInfo(culture);
+                var localizedHybrid = NavigatorProjection.Build(archive, 8, icon => icon, autumn);
+                var localizedDetailed = NavigatorProjection.Build(archive, 9, icon => icon, autumn);
+                Check(localizedHybrid.Select(row => row.Group).SequenceEqual(new[] {
+                    "Last 7 Days", "Earlier This Month", "September 2026", "August 2026",
+                    "2025", "2025", "2024", "No Recorded Activity"
+                }), "Hybrid English labels under " + culture);
+                Check(localizedDetailed.Select(row => row.Group).SequenceEqual(new[] {
+                    "Last 7 Days", "Earlier This Month", "September 2026", "August 2026",
+                    "December 2025", "January 2025", "November 2024", "No Recorded Activity"
+                }), "Detailed English labels across years under " + culture);
+                Check(localizedHybrid.Select(row => row.Id).SequenceEqual(hybrid.Select(row => row.Id)) &&
+                    localizedDetailed.Select(row => row.Id).SequenceEqual(detailed.Select(row => row.Id)),
+                    "Culture does not change chronological order under " + culture);
+            }
+        } finally { Thread.CurrentThread.CurrentCulture = previousCulture; }
         Check(hybrid.Select(row => row.Id).SequenceEqual(detailed.Select(row => row.Id)),
             "Style switch changes headings without changing chronological game order");
         Console.WriteLine("PASS: " + checks + " NavigatorProjection checks.");
