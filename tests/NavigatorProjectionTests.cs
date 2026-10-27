@@ -1,5 +1,7 @@
 using System;
+using System.Globalization;
 using System.Linq;
+using System.Threading;
 using HeliumHybrid;
 
 class NavigatorProjectionTests
@@ -57,6 +59,85 @@ class NavigatorProjectionTests
             "Native Category grouping preserves custom star categories including unrated");
         Check(NavigatorProjection.DistinctGameCount(grouped.Select(row => row.Id)) == 3, "Displayed count deduplicates games");
         Check(NavigatorProjection.Build(null, 0, icon => icon).Count == 0, "Missing collection projects to empty list");
+        var now = new DateTime(2026, 3, 20, 12, 0, 0);
+        var recent = new[] {
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "older recent", LastActivity = now.AddDays(-2) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "newer recent", LastActivity = now.AddHours(-1) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "seven-day boundary", LastActivity = now.AddDays(-7) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "earlier month", LastActivity = now.AddDays(-8) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "older February", LastActivity = new DateTime(2026, 2, 1) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "newer February", LastActivity = new DateTime(2026, 2, 28) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "January", LastActivity = new DateTime(2026, 1, 31) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "missing" },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "future", LastActivity = now.AddMinutes(1) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "invalid", LastActivity = DateTime.MinValue }
+        };
+        var activity = NavigatorProjection.Build(recent, 8, icon => icon, now);
+        Check(activity.Count == recent.Length, "Each game has exactly one activity occurrence");
+        Check(activity.Take(3).All(row => row.Group == "Last 7 Days") &&
+            activity.Take(3).Select(row => row.Name).SequenceEqual(new[] { "newer recent", "older recent", "seven-day boundary" }),
+            "Rolling window is inclusive and newest first");
+        Check(activity[3].Group == "Earlier This Month", "Earlier current-month activity follows seven-day group");
+        Check(activity[4].Name == "newer February" && activity[5].Name == "older February" &&
+            activity[4].Group == activity[5].Group && activity[6].Name == "January",
+            "Previous months are newest first, with newest games first inside each month");
+        Check(activity.Skip(7).All(row => row.Group == "No Recorded Activity"),
+            "Missing, future and invalid timestamps have no recorded activity");
+        var crossingMonth = NavigatorProjection.Build(new[] {
+            new NavigatorSource { Id = alpha, Name = "previous month", LastActivity = new DateTime(2026, 2, 28) }
+        }, 8, icon => icon, new DateTime(2026, 3, 2));
+        Check(crossingMonth.Single().Group == "Last 7 Days", "Rolling window takes precedence over month boundary");
+        var crossingYear = NavigatorProjection.Build(new[] {
+            new NavigatorSource { Id = alpha, Name = "previous year", LastActivity = new DateTime(2025, 12, 31) }
+        }, 8, icon => icon, new DateTime(2026, 1, 3));
+        Check(crossingYear.Single().Group == "Last 7 Days", "Rolling window crosses year boundary");
+        Check(NavigatorProjection.Build(recent.Take(2), 8, icon => icon, now).Count == 2 &&
+            NavigatorProjection.Matches(activity[0].Key, NavigatorProjection.SearchKey("newer")),
+            "Activity projection retains native filter subset and local search keys");
+        var autumn = new DateTime(2026, 10, 20, 12, 0, 0);
+        var archive = new[] {
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "year 2024", LastActivity = new DateTime(2024, 11, 1) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "older 2025", LastActivity = new DateTime(2025, 1, 10) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "September", LastActivity = new DateTime(2026, 9, 30) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "newer 2025", LastActivity = new DateTime(2025, 12, 31) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "August", LastActivity = new DateTime(2026, 8, 3) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "this month", LastActivity = new DateTime(2026, 10, 1) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "this week", LastActivity = autumn.AddDays(-1) },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "no activity" }
+        };
+        var hybrid = NavigatorProjection.Build(archive, 8, icon => icon, autumn);
+        Check(hybrid.Select(row => row.Group).SequenceEqual(new[] {
+            "Last 7 Days", "Earlier This Month", "September 2026",
+            "August 2026", "2025", "2025", "2024", "No Recorded Activity"
+        }), "Hybrid groups current-year months and previous years chronologically");
+        Check(hybrid[4].Name == "newer 2025" && hybrid[5].Name == "older 2025",
+            "Hybrid orders games newest first within an annual group");
+        var detailed = NavigatorProjection.Build(archive, 9, icon => icon, autumn);
+        Check(detailed.Count == archive.Length && detailed[4].Group != detailed[5].Group &&
+            detailed[4].Name == "newer 2025" && detailed[5].Name == "older 2025" &&
+            detailed[6].Group == "November 2024",
+            "Detailed retains individual month-year groups and prior ordering");
+        var previousCulture = Thread.CurrentThread.CurrentCulture;
+        try {
+            foreach (var culture in new[] { "pt-BR", "en-US" }) {
+                Thread.CurrentThread.CurrentCulture = CultureInfo.GetCultureInfo(culture);
+                var localizedHybrid = NavigatorProjection.Build(archive, 8, icon => icon, autumn);
+                var localizedDetailed = NavigatorProjection.Build(archive, 9, icon => icon, autumn);
+                Check(localizedHybrid.Select(row => row.Group).SequenceEqual(new[] {
+                    "Last 7 Days", "Earlier This Month", "September 2026", "August 2026",
+                    "2025", "2025", "2024", "No Recorded Activity"
+                }), "Hybrid English labels under " + culture);
+                Check(localizedDetailed.Select(row => row.Group).SequenceEqual(new[] {
+                    "Last 7 Days", "Earlier This Month", "September 2026", "August 2026",
+                    "December 2025", "January 2025", "November 2024", "No Recorded Activity"
+                }), "Detailed English labels across years under " + culture);
+                Check(localizedHybrid.Select(row => row.Id).SequenceEqual(hybrid.Select(row => row.Id)) &&
+                    localizedDetailed.Select(row => row.Id).SequenceEqual(detailed.Select(row => row.Id)),
+                    "Culture does not change chronological order under " + culture);
+            }
+        } finally { Thread.CurrentThread.CurrentCulture = previousCulture; }
+        Check(hybrid.Select(row => row.Id).SequenceEqual(detailed.Select(row => row.Id)),
+            "Style switch changes headings without changing chronological game order");
         Console.WriteLine("PASS: " + checks + " NavigatorProjection checks.");
     }
 }

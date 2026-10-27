@@ -68,7 +68,7 @@ namespace HeliumHybrid
         private List<GameRow> rows = new List<GameRow>();
         private ListCollectionView view;
         private int rebuildGeneration;
-        private int EffectiveGrouping => NavigatorRefreshDecision.EffectiveGrouping(prefs.Grouping, library.Grouping);
+        private int EffectiveGrouping => NavigatorRefreshDecision.EffectiveGrouping(prefs.Grouping, library.Grouping, prefs.RecentActivityGroupingStyle);
         private readonly NavigatorGroupState groupState = new NavigatorGroupState();
         public Navigator(IPlayniteAPI api, HybridPlugin plugin)
         {
@@ -86,7 +86,7 @@ namespace HeliumHybrid
             status = (TextBlock)root.FindName("Status"); toggle = (Button)root.FindName("CollapseButton");
             grip = (Thumb)root.FindName("ResizeGrip"); tools = (FrameworkElement)root.FindName("Tools");
             backButton = (Button)root.FindName("BackButton");
-            grouping.SelectedIndex = Math.Max(0, Math.Min(3, prefs.Grouping));
+            grouping.SelectedIndex = Math.Max(0, Math.Min(4, prefs.Grouping));
             groupState.Mode = EffectiveGrouping;
             timer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(1500) };
             timer.Tick += (s, e) => { RecomputeLayout(); Refresh(); };
@@ -301,6 +301,11 @@ namespace HeliumHybrid
             if (!active) return;
             prefs.Width = Logic.ClampWidth(prefs.Width);
             ApplySize(); RecomputeLayout();
+            if (groupState.Mode != EffectiveGrouping) {
+                groupState.Mode = EffectiveGrouping;
+                Interlocked.Exchange(ref dirty, 1);
+                Refresh();
+            }
         }
         private void MetadataUpdated<T>(object sender, ItemUpdatedEventArgs<T> args) where T : DatabaseObject { Interlocked.Exchange(ref dirty, 1); }
         private void MetadataChanged<T>(object sender, ItemCollectionChangedEventArgs<T> args) where T : DatabaseObject { Interlocked.Exchange(ref dirty, 1); }
@@ -359,7 +364,7 @@ namespace HeliumHybrid
                 var projectionStart = diagnostics.Enabled ? Stopwatch.GetTimestamp() : 0;
                 var projected = NavigatorProjection.Build(library.Sources(games, effectiveGrouping), effectiveGrouping, library.ResolveIcon);
                 rows = projected.Select(row => new GameRow {
-                    Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group, IconPath = row.IconPath,
+                    Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group, IconPath = row.IconPath, ActivityTicks = row.ActivityTicks, GroupOrder = row.GroupOrder,
                     IsInstalled = row.IsInstalled, Favorite = row.Favorite
                 }).ToList();
                 var projectionMs = diagnostics.Enabled ? NavigatorDiagnostics.MillisecondsSince(projectionStart) : 0;
@@ -408,7 +413,8 @@ namespace HeliumHybrid
                     EffectiveGrouping, library.ResolveIcon);
                 var prior = existing.Select(row => new NavigatorProjectedRow {
                     Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group,
-                    IconPath = row.IconPath, IsInstalled = row.IsInstalled, Favorite = row.Favorite
+                    IconPath = row.IconPath, IsInstalled = row.IsInstalled, Favorite = row.Favorite,
+                    ActivityTicks = row.ActivityTicks, GroupOrder = row.GroupOrder
                 });
                 var kind = NavigatorRefreshDecision.ClassifyRows(prior, projected);
                 if (kind == NavigatorRowChange.Structural) return true;

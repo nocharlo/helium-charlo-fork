@@ -26,6 +26,11 @@ class LogicTests
         Check(rows.Length == 100000, "50,000 games / 100,000 memberships");
         Check(rows.Select(r=>r.Id).Distinct().Count() == 50000, "No games lost");
         Check(rows.Where(r => r.Key.Contains(Logic.SearchKey("Game 12345"))).Select(r=>r.Id).Distinct().Single() == 12345, "Grouped game search");
+        Check(Logic.RecentActivityStyle(0, 0, false) == 0 &&
+            Logic.RecentActivityStyle(4, 0, false) == 1 &&
+            Logic.RecentActivityStyle(4, 1, true) == 1 &&
+            Logic.RecentActivityStyle(4, 7, true) == 0,
+            "Activity style defaults to Hybrid but migrates existing activity users to Detailed");
         Console.WriteLine("PASS: " + assertions + " checks; 50,000-game scenario: " + watch.ElapsedMilliseconds + " ms.");
     }
 }

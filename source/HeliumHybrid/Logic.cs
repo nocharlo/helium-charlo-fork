@@ -20,6 +20,11 @@ namespace HeliumHybrid
                 .Distinct(StringComparer.CurrentCultureIgnoreCase).OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase).ToArray();
             return values.Length == 0 ? new[] { "No group" } : values;
         }
+        public static int RecentActivityStyle(int grouping, int storedStyle, bool specified)
+        {
+            if (!specified && grouping == 4) return 1; // Preserve Detailed for existing Recent Activity users.
+            return storedStyle == 1 ? 1 : 0;
+        }
         public static double ClampWidth(double width) { return double.IsNaN(width) || double.IsInfinity(width) ? 230 : Math.Max(180, Math.Min(380, width)); }
         // The available library width is measured in WPF device-independent pixels.
         public static bool Compact(int mode, bool wasCompact, double width)

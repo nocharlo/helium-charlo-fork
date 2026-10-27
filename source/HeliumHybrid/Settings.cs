@@ -15,6 +15,8 @@ namespace HeliumHybrid
         public double Width { get; set; } = 230;
         public bool Collapsed { get; set; }
         public int Grouping { get; set; }
+        public int RecentActivityGroupingStyle { get; set; } // 0: Hybrid, 1: Detailed.
+        [XmlIgnore] public bool RecentActivityGroupingStyleSpecified { get; set; }
         // 0: Automatic, 1: Always hidden, 2: Always visible.
         public int LayoutMode { get; set; }
         // Older XML fields are read for migration but omitted when saving the new format.
@@ -29,6 +31,9 @@ namespace HeliumHybrid
         {
             if (SidebarClickAction < 0 || SidebarClickAction > 1) SidebarClickAction = SteamMode ? 0 : 1;
             if (GridCoverClickAction < 0 || GridCoverClickAction > 1) GridCoverClickAction = OpenFromGridCover ? 0 : 1;
+            RecentActivityGroupingStyle = Logic.RecentActivityStyle(Grouping, RecentActivityGroupingStyle,
+                RecentActivityGroupingStyleSpecified);
+            RecentActivityGroupingStyleSpecified = true;
         }
         public bool PreserveGridScroll { get; set; } = true;
         public bool AutomaticallyRevealSelectedGame { get; set; } = true;
@@ -63,13 +68,17 @@ namespace HeliumHybrid
         private Preferences Copy() => new Preferences { Width = Width, Collapsed = Collapsed, Grouping = Grouping,
             LayoutMode = LayoutMode, SteamMode = SteamMode, OpenFromGridCover = OpenFromGridCover,
             SidebarClickAction = SidebarClickAction, GridCoverClickAction = GridCoverClickAction,
-            PreserveGridScroll = PreserveGridScroll, AutomaticallyRevealSelectedGame = AutomaticallyRevealSelectedGame };
+            PreserveGridScroll = PreserveGridScroll, AutomaticallyRevealSelectedGame = AutomaticallyRevealSelectedGame,
+            RecentActivityGroupingStyle = RecentActivityGroupingStyle,
+            RecentActivityGroupingStyleSpecified = RecentActivityGroupingStyleSpecified };
         private void Assign(Preferences value)
         {
             Width = value.Width; Collapsed = value.Collapsed; Grouping = value.Grouping;
             LayoutMode = value.LayoutMode; SteamMode = value.SteamMode;
             OpenFromGridCover = value.OpenFromGridCover; PreserveGridScroll = value.PreserveGridScroll;
             AutomaticallyRevealSelectedGame = value.AutomaticallyRevealSelectedGame;
+            RecentActivityGroupingStyle = value.RecentActivityGroupingStyle;
+            RecentActivityGroupingStyleSpecified = value.RecentActivityGroupingStyleSpecified;
             SidebarClickAction = value.SidebarClickAction; GridCoverClickAction = value.GridCoverClickAction;
         }
     }
@@ -84,6 +93,12 @@ namespace HeliumHybrid
             panel.Children.Add(NavigationChoice("Grid cover click", "GridCoverClickAction"));
             panel.Children.Add(BoundCheck("Restore grid scroll position when returning", "PreserveGridScroll"));
             panel.Children.Add(BoundCheck("Automatically reveal selected game", "AutomaticallyRevealSelectedGame"));
+            var activityStyle = new ComboBox { MaxWidth = 260, HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0,4,0,8) };
+            activityStyle.Items.Add("Hybrid"); activityStyle.Items.Add("Detailed");
+            activityStyle.SetBinding(ComboBox.SelectedIndexProperty, new Binding("RecentActivityGroupingStyle") { Mode = BindingMode.TwoWay });
+            panel.Children.Add(new TextBlock { Text = "Recent Activity grouping style" });
+            panel.Children.Add(activityStyle);
             panel.Children.Add(new TextBlock { Text = "Grid details panel", FontWeight = FontWeights.Bold, Margin = new Thickness(0,16,0,7) });
             var mode = new ComboBox { Margin = new Thickness(0,0,0,8), MaxWidth = 260, HorizontalAlignment = HorizontalAlignment.Left };
             mode.Items.Add("Automatic"); mode.Items.Add("Always hidden"); mode.Items.Add("Always visible");
