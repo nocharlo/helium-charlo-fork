@@ -6,9 +6,9 @@ Helium (charlo fork) is a modified [Helium](https://github.com/darklinkpower/Hel
 
 It brings Steam-style sidebar navigation to Playnite, combining a searchable game list with the Grid and Details views.
 
-**Latest release: v0.2.6 — Navigator Essentials**
+**Latest release: v0.2.7 — Recent Activity**
 
-[**Download**](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v.0.2.6) · [Changelog](docs/CHANGELOG.md) · [Report an Issue](https://github.com/nocharlo/helium-charlo-fork/issues)
+[**Download**](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.2.7) · [Changelog](docs/CHANGELOG.md) · [Report an Issue](https://github.com/nocharlo/helium-charlo-fork/issues)
 
 ---
 
@@ -33,7 +33,7 @@ This project is the result of that experiment. I'm sharing it in case anyone els
 - **Smart selection:** Automatically reveal selected games inside collapsed Navigator groups.
 - **Library indicators:** Favorite stars and distinct styling for installed and uninstalled games.
 - **Improved stability:** Better preservation of scroll position, group expansion, and selection during library updates.
-- **Upcoming v0.2.7:** Recent Activity groups games by last played date, with Hybrid and Detailed views.
+- **Recent Activity:** Browse games by last played date, with Hybrid and Detailed grouping modes and independent group expansion states.
 
 The Navigator uses Playnite's existing library data. It doesn't maintain a separate database or modify your game metadata.
 
@@ -43,10 +43,10 @@ The Navigator uses Playnite's existing library data. It doesn't maintain a separ
 
 Download both components:
 
-- [**Helium Theme (.pthm)**](https://github.com/nocharlo/helium-charlo-fork/releases/download/v.0.2.6/Helium-charlo-fork-v0.2.6.pthm)
-- [**Helium Navigator (.pext)**](https://github.com/nocharlo/helium-charlo-fork/releases/download/v.0.2.6/Helium-Navigator-v0.2.6.pext)
+- [**Helium Theme (.pthm)**](https://github.com/nocharlo/helium-charlo-fork/releases/download/v0.2.7/Helium-charlo-fork-v0.2.7.pthm)
+- [**Helium Navigator (.pext)**](https://github.com/nocharlo/helium-charlo-fork/releases/download/v0.2.7/Helium-Navigator-v0.2.7.pext)
 
-Install both packages, restart Playnite, and select **Helium (charlo fork) v0.2.6** in Desktop theme settings.
+Install both packages, restart Playnite, and select **Helium (charlo fork) v0.2.7** in Desktop theme settings.
 
 **Always use matching theme and extension versions.** Back up your existing configuration before updating.
 
@@ -79,12 +79,12 @@ I don't consider this a substitute for programming expertise. It's an experiment
 
 ## Roadmap
 
-- **v0.2.7 — Recent Activity:** Upcoming Navigator grouping with Hybrid and Detailed modes.
-- **Future 0.2.x:** Steam-style Navigator refinements.
-- **v0.3.0:** Broader library layout redesign.
-- **Continue Playing:** Archived experiment; not part of the planned releases.
+- **Future 0.2.x:** Incremental Steam-style Navigator refinements, starting with layout and controls where Playnite's SDK permits.
+- **v0.3.0:** A broader Steam-inspired library layout redesign, subject to technical feasibility.
+- **Continue Playing:** An archived experiment, not an upcoming release feature.
 
-These are plans, not promised release dates.
+These are ideas, not promises or release dates.
+
 ## Known Limitations
 
 - Some unusual mouse interactions remain insufficiently tested.
