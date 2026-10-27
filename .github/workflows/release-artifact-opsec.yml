@@ -1,0 +1,39 @@
+name: Release artifact OPSEC
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/release-artifact-opsec.yml"
+      - "scripts/Helium-TestHarness.ps1"
+      - "scripts/check_artifact_opsec.py"
+      - "tests/ArtifactOpsecTests.py"
+      - "source/HeliumHybrid/**"
+      - "theme/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify binary leak detector
+        run: python tests/ArtifactOpsecTests.py
+      - name: Build and inspect packages
+        shell: pwsh
+        run: |
+          ./scripts/Helium-TestHarness.ps1 -Action Build -OutputRoot (Join-Path $env:RUNNER_TEMP 'helium-release-check')
+      - name: Save checked packages for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: helium-opsec-checked-${{ github.sha }}
+          path: ${{ runner.temp }}/helium-release-check/packages/*
+          if-no-files-found: error
