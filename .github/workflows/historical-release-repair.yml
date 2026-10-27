@@ -8,6 +8,14 @@ on:
       - "scripts/rebuild_historical_release.py"
       - "tests/ArtifactOpsecTests.py"
       - "tests/ReleaseProvenanceTests.py"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/historical-release-repair.yml"
+      - "scripts/check_artifact_opsec.py"
+      - "scripts/rebuild_historical_release.py"
+      - "tests/ArtifactOpsecTests.py"
+      - "tests/ReleaseProvenanceTests.py"
   workflow_dispatch:
 
 permissions:
