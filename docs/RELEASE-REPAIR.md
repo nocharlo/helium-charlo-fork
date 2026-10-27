@@ -14,13 +14,13 @@ The `.pthm` theme assets remain untouched.
 
 ## Procedure
 
-1. Run **Historical release repair candidates** manually on the default branch
-   after merging its tested workflow, or use its PR-run candidate artifacts
-   **only for preliminary review**. The matrix checks out the exact original
-   release commits; it does not modify the release tags or package the latest
-   Navigator under an old version.
+1. After the verified repair PR merges, the **Historical release repair candidates**
+   workflow runs automatically on `main` and builds all three packages. A
+   manual run is also supported. PR-run artifacts are for preliminary review
+   **only**. The matrix checks out the exact original release commits; it does
+   not modify release tags or package the latest Navigator under an old version.
 2. Download `helium-fixed-0.2.5`, `helium-fixed-0.2.6`, and
-   `helium-fixed-0.2.7` from the successful **main-branch manual run**.
+   `helium-fixed-0.2.7` from the successful **main-branch build run**.
    Each contains a `.pext` and `release-evidence.json` with the pinned source
    commit and candidate SHA-256. Review the CI log and evidence.
 3. Test the **exact SHA-256** of each candidate in the isolated portable
@@ -29,7 +29,7 @@ The `.pthm` theme assets remain untouched.
    with its theme. Do not claim these tests happened until actually observed.
 4. For each successfully tested version, open **Publish inspected historical
    release asset** on the default branch, enter the corresponding *successful
-   manual main-branch rebuild run ID*, exact release tag, and the SHA-256 of
+   main-branch rebuild run ID*, exact release tag, and the SHA-256 of
    the file tested. Confirm runtime testing. This workflow downloads the
    archived CI package, verifies the hash against its provenance evidence and
    the exact tag commit, and replaces **only the corresponding `.pext`**
