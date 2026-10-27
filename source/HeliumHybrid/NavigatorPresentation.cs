@@ -14,6 +14,8 @@ namespace HeliumHybrid
         public string Group { get; set; }
         public string Key { get; set; }
         public string IconPath { get; set; }
+        public long ActivityTicks { get; set; }
+        public long GroupOrder { get; set; }
         private bool isInstalled, favorite;
         public bool IsInstalled { get => isInstalled; set { if (isInstalled == value) return; isInstalled = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsInstalled))); } }
         public bool Favorite { get => favorite; set { if (favorite == value) return; favorite = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Favorite))); } }

@@ -8,5 +8,6 @@
   <ItemGroup>
     <Compile Include="SettingsFileTests.cs" />
     <Compile Include="../source/HeliumHybrid/SettingsFile.cs" Link="SettingsFile.cs" />
+    <Compile Include="../source/HeliumHybrid/Logic.cs" Link="Logic.cs" />
   </ItemGroup>
 </Project>

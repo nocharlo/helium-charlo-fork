@@ -33,6 +33,7 @@ This project is the result of that experiment. I'm sharing it in case anyone els
 - **Smart selection:** Automatically reveal selected games inside collapsed Navigator groups.
 - **Library indicators:** Favorite stars and distinct styling for installed and uninstalled games.
 - **Improved stability:** Better preservation of scroll position, group expansion, and selection during library updates.
+- **Upcoming v0.2.7:** Recent Activity groups games by last played date, with Hybrid and Detailed views.
 
 The Navigator uses Playnite's existing library data. It doesn't maintain a separate database or modify your game metadata.
 
@@ -76,16 +77,14 @@ I don't consider this a substitute for programming expertise. It's an experiment
 
 **If you're a Playnite developer and see a better way to implement any of this, contributions and code reviews are very welcome.** I have no attachment to the AI-generated code itself.
 
-## What's Next?
+## Roadmap
 
-**v0.3.0 — Recent Activity & Continue Playing**
+- **v0.2.7 — Recent Activity:** Upcoming Navigator grouping with Hybrid and Detailed modes.
+- **Future 0.2.x:** Steam-style Navigator refinements.
+- **v0.3.0:** Broader library layout redesign.
+- **Continue Playing:** Archived experiment; not part of the planned releases.
 
-The next milestone will explore chronological Navigator grouping and a compact Continue Playing shelf above the native Grid.
-
-Longer-term, I'd like to bring more of the modern Steam Library experience to Playnite without sacrificing its native functionality.
-
-These are plans, not implemented features or promised release dates.
-
+These are plans, not promised release dates.
 ## Known Limitations
 
 - Some unusual mouse interactions remain insufficiently tested.
