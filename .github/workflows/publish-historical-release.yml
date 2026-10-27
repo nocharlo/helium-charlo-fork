@@ -1,0 +1,108 @@
+name: Publish inspected historical release asset
+
+# Deliberately manual and isolated from PR/push/tag events.
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Exact existing release tag
+        required: true
+        type: choice
+        options:
+          - v0.2.5
+          - v.0.2.6
+          - v0.2.7
+      verified_run_id:
+        description: Successful main-branch historical repair build run ID
+        required: true
+        type: string
+      approved_sha256:
+        description: SHA-256 of the exact .pext tested in isolated Playnite
+        required: true
+        type: string
+      runtime_tested:
+        description: I tested this exact SHA-256 package in isolated Playnite
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: historical-release-asset-replacement
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify manually approved provenance, hash and Playnite acceptance
+        id: verify
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+          RUN_ID: ${{ inputs.verified_run_id }}
+          APPROVED_SHA: ${{ inputs.approved_sha256 }}
+          RUNTIME_TESTED: ${{ inputs.runtime_tested }}
+        run: |
+          if ($env:RUNTIME_TESTED -ne 'true') { throw 'Isolated Playnite testing must be confirmed' }
+          if ($env:RUN_ID -notmatch '^[0-9]+$') { throw 'Invalid workflow run ID' }
+          if ($env:APPROVED_SHA -notmatch '^[a-fA-F0-9]{64}$') { throw 'Invalid approved SHA-256' }
+          $run = (gh api ('repos/' + $env:GITHUB_REPOSITORY + '/actions/runs/' + $env:RUN_ID) | ConvertFrom-Json)
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect source workflow run' }
+          if ($run.conclusion -ne 'success' -or $run.event -notin @('push', 'workflow_dispatch') -or $run.head_branch -ne 'main' -or $run.name -ne 'Historical release repair candidates') {
+            throw 'Only successful protected main-branch rebuild runs are eligible'
+          }
+          if ($run.head_sha -ne $env:GITHUB_SHA) {
+            throw 'Build verifier commit is different; rerun historical rebuild from current main'
+          }
+          $version = $env:TAG.TrimStart([char[]]@('v','.'))
+          $tagRef = (gh api ('repos/' + $env:GITHUB_REPOSITORY + '/git/ref/tags/' + $env:TAG) | ConvertFrom-Json)
+          if ($LASTEXITCODE -ne 0 -or $tagRef.object.type -ne 'commit') { throw 'Unexpected historical tag ref' }
+          $sourceCommit = $tagRef.object.sha
+          $folder = Join-Path $env:RUNNER_TEMP ('release-' + $version)
+          New-Item -ItemType Directory -Path $folder | Out-Null
+          gh run download $env:RUN_ID --name ('helium-fixed-' + $version) --dir $folder
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot retrieve verified artifact' }
+          $asset = Join-Path $folder ('Helium-Navigator-v' + $version + '.pext')
+          $evidence = Join-Path $folder 'release-evidence.json'
+          if (-not (Test-Path -LiteralPath $asset -PathType Leaf) -or -not (Test-Path -LiteralPath $evidence -PathType Leaf)) {
+            throw 'Missing expected asset or provenance evidence'
+          }
+          python scripts/rebuild_historical_release.py verify --evidence $evidence --artifact $asset --tag $env:TAG --commit $sourceCommit
+          if ($LASTEXITCODE -ne 0) { throw 'Evidence / package / source tag mismatch' }
+          $actualSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $asset).Hash.ToLowerInvariant()
+          if ($actualSha -ne $env:APPROVED_SHA.ToLowerInvariant()) { throw 'Downloaded asset differs from the runtime-approved SHA-256' }
+          'asset=' + $asset >> $env:GITHUB_OUTPUT
+          'sha256=' + $actualSha >> $env:GITHUB_OUTPUT
+          Write-Output ('Verified exact approved asset SHA-256: ' + $actualSha)
+      - name: Replace only approved extension asset and verify published digest
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+          ASSET: ${{ steps.verify.outputs.asset }}
+          SHA: ${{ steps.verify.outputs.sha256 }}
+        run: |
+          $before = (gh api ('repos/' + $env:GITHUB_REPOSITORY + '/releases/tags/' + $env:TAG) | ConvertFrom-Json)
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect existing public release' }
+          $name = Split-Path -Leaf $env:ASSET
+          $previous = @($before.assets | Where-Object { $_.name -eq $name })
+          if ($previous.Count -ne 1) { throw 'Existing release extension asset missing or ambiguous' }
+          Write-Output ('Previous public asset digest: ' + $previous[0].digest)
+          gh release upload $env:TAG $env:ASSET --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub release upload failed' }
+          $after = (gh api ('repos/' + $env:GITHUB_REPOSITORY + '/releases/tags/' + $env:TAG) | ConvertFrom-Json)
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot verify published release digest' }
+          $published = @($after.assets | Where-Object { $_.name -eq $name })
+          if ($published.Count -ne 1 -or $published[0].digest -ne ('sha256:' + $env:SHA)) {
+            throw 'Published digest does not match runtime-approved package: investigate immediately'
+          }
+          Write-Output ('PASS public asset now equals reviewed SHA-256: ' + $env:SHA)
