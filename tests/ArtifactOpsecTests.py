@@ -58,6 +58,16 @@ class ArtifactOpsecTests(unittest.TestCase):
             b"Source: https://github.com/nocharlo/helium-charlo-fork", "README.md"
         ))
 
+    def test_png_noise_does_not_look_like_a_local_path(self):
+        # Non-printable binary payloads previously produced false positives.
+        data = b"\x89PNG\r\n" + b"u:/\xe7\xff\x80" + b"C:/\xd6\xf9\x00"
+        self.assertEqual([], findings(data, "cover.png"))
+
+    def test_windows_profile_with_spaces_still_detected(self):
+        self.assertIn("embedded absolute filesystem path",
+                      findings(b"C:\\Users\\Actual User\\build\\file.pdb",
+                               "HeliumCharlo.dll"))
+
     def test_text_placeholder_does_not_block(self):
         # Documentation or template strings with obviously fake example names
         # are not private paths. The same content in a DLL still fails.
