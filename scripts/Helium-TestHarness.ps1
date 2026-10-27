@@ -174,6 +174,11 @@ switch($Action){
   ExpandChecked $pext (Join-Path $out 'verify-extension');ExpandChecked $pthm (Join-Path $out 'verify-theme')
   $null=Pair (Join-Path $out 'verify-theme\theme.yaml') (Join-Path $out 'verify-extension\extension.yaml')
   if((Get-FileHash (Join-Path $out 'verify-extension\HeliumCharlo.dll')).Hash -ne (Get-FileHash $dlls[0].FullName).Hash){throw 'Packaged DLL mismatch'}
+  # The source diff can be clean while the DLL leaks an absolute PDB path.
+  $python=Get-Command python -ErrorAction SilentlyContinue
+  if(-not $python){throw 'Python 3 required for release artifact OPSEC scan'}
+  & $python.Source (Join-Path $repo 'scripts\check_artifact_opsec.py') $pext $pthm
+  if($LASTEXITCODE -ne 0){throw 'Release artifact OPSEC scan failed; do not publish these packages'}
   $sourceDirty=@(& git -C $repo status --porcelain).Count -gt 0
   Json (Join-Path $out 'build.json') ([ordered]@{version=$version;sourceCommit=(& git -C $repo rev-parse HEAD).Trim();sourceDirty=$sourceDirty;themePackage=$pthm;extensionPackage=$pext;themeSha256=(Get-FileHash $pthm).Hash;extensionSha256=(Get-FileHash $pext).Hash;builtUtc=[DateTime]::UtcNow.ToString('o')})
   "PASS: compiled and packaged $version in $out"
