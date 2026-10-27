@@ -18,8 +18,11 @@ TEXT_EXTENSIONS = {".md", ".txt", ".xaml", ".xml", ".json", ".yaml", ".yml"}
 # A drive-rooted path anywhere in an embedded string (not just in CodeView).
 WINDOWS_PATH = re.compile(
     r"(?i)(?<![A-Za-z0-9])"
-    r"[A-Z]:[\\/](?:[^\x00-\x20\\/:*?\"<>|]+[\\/])*"
-    r"[^\x00-\x20\\/:*?\"<>|]+"
+    # At least two realistic, printable path components. Raw PNG/JPEG pixel
+    # bytes frequently contain accidental two-letter patterns like "u:/ÿ";
+    # these are not evidence of developer-machine paths.
+    r"[A-Z]:[\\/][A-Za-z0-9_.$~ -]+"
+    r"(?:[\\/][A-Za-z0-9_.$~ -]+)+"
 )
 # UNC server/share, with optional descendants. Require backslashes to avoid
 # falsely identifying URLs (https://github.com/...) as network paths.
