@@ -237,6 +237,15 @@ namespace HeliumHybrid
             panelRequested = false;
             switchButton.Command.Execute(null);
             RecomputeLayout();
+            // Playnite can clear its selection while changing the native view.
+            // Restore the explicitly chosen game after the Details view is loaded.
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
+                if (!active || !navigatedDetails || library.ActiveDesktopView != DesktopView.Details) return;
+                var selected = library.SelectedIds();
+                if (selected.Count != 0 && !selected.Contains(id)) return;
+                SelectGame(id);
+                RecomputeLayout();
+            }));
         }
         private void OpenGridPanel(Guid id)
         {
