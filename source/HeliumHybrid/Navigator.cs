@@ -34,6 +34,16 @@ namespace HeliumHybrid
         private readonly Thumb grip;
         private readonly FrameworkElement tools;
         private readonly Button backButton;
+        private readonly Button recentButton, readyButton, filtersButton;
+        private readonly Button closeFilters, clearAllFilters;
+        private readonly TextBlock filterIndicator;
+        private readonly ScrollViewer advancedPanel;
+        private readonly NavigatorFilterPanel filterPanel;
+        private readonly ReadyToPlayState readyState = new ReadyToPlayState();
+        private bool filtersOpen, shortcutGroupingChange;
+        private volatile bool filterOptionsDirty;
+        private int? shortcutGroupingOverride;
+        private int previousGrouping;
         private Button reopenButton;
         private readonly DispatcherTimer timer, searchTimer;
         private readonly DispatcherTimer coverClickTimer, sidebarClickTimer;
@@ -68,7 +78,8 @@ namespace HeliumHybrid
         private List<GameRow> rows = new List<GameRow>();
         private ListCollectionView view;
         private int rebuildGeneration;
-        private int EffectiveGrouping => NavigatorRefreshDecision.EffectiveGrouping(prefs.Grouping, library.Grouping, prefs.RecentActivityGroupingStyle);
+        private int NavigatorGrouping => shortcutGroupingOverride ?? prefs.Grouping;
+        private int EffectiveGrouping => NavigatorRefreshDecision.EffectiveGrouping(NavigatorGrouping, library.Grouping, prefs.RecentActivityGroupingStyle);
         private readonly NavigatorGroupState groupState = new NavigatorGroupState();
         public Navigator(IPlayniteAPI api, HybridPlugin plugin)
         {
@@ -86,10 +97,20 @@ namespace HeliumHybrid
             status = (TextBlock)root.FindName("Status"); toggle = (Button)root.FindName("CollapseButton");
             grip = (Thumb)root.FindName("ResizeGrip"); tools = (FrameworkElement)root.FindName("Tools");
             backButton = (Button)root.FindName("BackButton");
+            recentButton = (Button)root.FindName("RecentButton");
+            readyButton = (Button)root.FindName("ReadyButton");
+            filtersButton = (Button)root.FindName("FiltersButton");
+            closeFilters = (Button)root.FindName("CloseFilters");
+            clearAllFilters = (Button)root.FindName("ClearAllFilters");
+            filterIndicator = (TextBlock)root.FindName("FilterIndicator");
+            advancedPanel = (ScrollViewer)root.FindName("AdvancedPanel");
+            filterPanel = new NavigatorFilterPanel(api, (StackPanel)root.FindName("FilterSections"),
+                change => Safe(() => ApplyGlobalFilterChange(change)));
             grouping.SelectedIndex = Math.Max(0, Math.Min(4, prefs.Grouping));
+            previousGrouping = grouping.SelectedIndex == 4 ? 0 : grouping.SelectedIndex;
             groupState.Mode = EffectiveGrouping;
             timer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(1500) };
-            timer.Tick += (s, e) => { RecomputeLayout(); Refresh(); };
+            timer.Tick += (s, e) => { RecomputeLayout(); Refresh(); Safe(RefreshGlobalFilterUi); };
             searchTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(180) };
             searchTimer.Tick += (s, e) => { searchTimer.Stop(); ApplySearch(); };
             coverClickTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher);
@@ -106,8 +127,27 @@ namespace HeliumHybrid
                     Safe(() => Navigate(pendingSidebarId, prefs.SidebarClickAction));
             };
             search.TextChanged += (s, e) => { searchTimer.Stop(); searchTimer.Start(); };
-            grouping.SelectionChanged += (s, e) => { prefs.Grouping = grouping.SelectedIndex; groupState.Mode = EffectiveGrouping; Interlocked.Exchange(ref dirty, 1); Refresh(); Save(); };
+            grouping.SelectionChanged += (s, e) => {
+                if (grouping.SelectedIndex < 0) return;
+                if (shortcutGroupingChange)
+                    shortcutGroupingOverride = Logic.ShortcutGroupingOverride(prefs.Grouping, grouping.SelectedIndex);
+                else { shortcutGroupingOverride = null; prefs.Grouping = grouping.SelectedIndex; }
+                if (grouping.SelectedIndex != 4) previousGrouping = grouping.SelectedIndex;
+                groupState.Mode = EffectiveGrouping;
+                Interlocked.Exchange(ref dirty, 1); Refresh();
+                UpdateShortcutState();
+                if (!shortcutGroupingChange) Save();
+            };
             backButton.Click += (sender, args) => Safe(ReturnToGrid);
+            recentButton.Click += (sender, args) => Safe(() => {
+                shortcutGroupingChange = true;
+                try { grouping.SelectedIndex = Logic.ToggleRecentGrouping(grouping.SelectedIndex, previousGrouping); }
+                finally { shortcutGroupingChange = false; }
+            });
+            readyButton.Click += (sender, args) => Safe(() => ApplyGlobalFilterChange(state => readyState.Toggle(state)));
+            filtersButton.Click += (sender, args) => Safe(() => { filtersOpen = !filtersOpen; ShowFilterPanel(); });
+            closeFilters.Click += (sender, args) => { filtersOpen = false; ShowFilterPanel(); };
+            clearAllFilters.Click += (sender, args) => Safe(() => ApplyGlobalFilterChange(NavigatorFilterComposer.Clear));
             toggle.Click += (sender, args) => {
                 prefs.Collapsed = !prefs.Collapsed;
                 ApplySize(); RecomputeLayout(); Save(); if (!IsCollapsed()) Refresh();
@@ -214,7 +254,7 @@ namespace HeliumHybrid
         }
         private void ReturnToGrid()
         {
-            if (!navigatedDetails || library.ActiveDesktopView != DesktopView.Details) return;
+            if (!active || IsCollapsed() || library.ActiveDesktopView != DesktopView.Details) return;
             var switchButton = FindNamed(window, "HeliumCharlo_SwitchGrid") as Button;
             if (switchButton?.Command == null || !switchButton.Command.CanExecute(null)) return;
             switchButton.Command.Execute(null);
@@ -266,14 +306,22 @@ namespace HeliumHybrid
             api.Database.Series.ItemUpdated += MetadataUpdated;
             api.Database.Categories.ItemUpdated += MetadataUpdated;
             api.Database.Platforms.ItemUpdated += MetadataUpdated;
+            api.Database.Genres.ItemUpdated += MetadataUpdated;
+            api.Database.Tags.ItemUpdated += MetadataUpdated;
+            api.Database.Sources.ItemUpdated += MetadataUpdated;
+            api.Database.CompletionStatuses.ItemUpdated += MetadataUpdated;
             api.Database.Series.ItemCollectionChanged += MetadataChanged;
             api.Database.Categories.ItemCollectionChanged += MetadataChanged;
             api.Database.Platforms.ItemCollectionChanged += MetadataChanged;
+            api.Database.Genres.ItemCollectionChanged += MetadataChanged;
+            api.Database.Tags.ItemCollectionChanged += MetadataChanged;
+            api.Database.Sources.ItemCollectionChanged += MetadataChanged;
+            api.Database.CompletionStatuses.ItemCollectionChanged += MetadataChanged;
             lastDesktopView = library.ActiveDesktopView;
             window = Window.GetWindow(this);
             if (window != null) window.SizeChanged += WindowSizeChanged;
             RecomputeLayout();
-            Interlocked.Exchange(ref dirty, 1); Refresh(); timer.Start();
+            Interlocked.Exchange(ref dirty, 1); Refresh(); RefreshGlobalFilterUi(); timer.Start();
         }
         private void OnUnloaded(object sender, RoutedEventArgs args)
         {
@@ -285,9 +333,17 @@ namespace HeliumHybrid
             api.Database.Series.ItemUpdated -= MetadataUpdated;
             api.Database.Categories.ItemUpdated -= MetadataUpdated;
             api.Database.Platforms.ItemUpdated -= MetadataUpdated;
+            api.Database.Genres.ItemUpdated -= MetadataUpdated;
+            api.Database.Tags.ItemUpdated -= MetadataUpdated;
+            api.Database.Sources.ItemUpdated -= MetadataUpdated;
+            api.Database.CompletionStatuses.ItemUpdated -= MetadataUpdated;
             api.Database.Series.ItemCollectionChanged -= MetadataChanged;
             api.Database.Categories.ItemCollectionChanged -= MetadataChanged;
             api.Database.Platforms.ItemCollectionChanged -= MetadataChanged;
+            api.Database.Genres.ItemCollectionChanged -= MetadataChanged;
+            api.Database.Tags.ItemCollectionChanged -= MetadataChanged;
+            api.Database.Sources.ItemCollectionChanged -= MetadataChanged;
+            api.Database.CompletionStatuses.ItemCollectionChanged -= MetadataChanged;
             if (window != null) window.SizeChanged -= WindowSizeChanged;
             if (reopenButton != null) { reopenButton.Click -= ReopenClicked; reopenButton.Visibility = Visibility.Collapsed; reopenButton = null; }
             window = null;
@@ -307,8 +363,8 @@ namespace HeliumHybrid
                 Refresh();
             }
         }
-        private void MetadataUpdated<T>(object sender, ItemUpdatedEventArgs<T> args) where T : DatabaseObject { Interlocked.Exchange(ref dirty, 1); }
-        private void MetadataChanged<T>(object sender, ItemCollectionChangedEventArgs<T> args) where T : DatabaseObject { Interlocked.Exchange(ref dirty, 1); }
+        private void MetadataUpdated<T>(object sender, ItemUpdatedEventArgs<T> args) where T : DatabaseObject { filterOptionsDirty = true; Interlocked.Exchange(ref dirty, 1); }
+        private void MetadataChanged<T>(object sender, ItemCollectionChangedEventArgs<T> args) where T : DatabaseObject { filterOptionsDirty = true; Interlocked.Exchange(ref dirty, 1); }
         private void GamesUpdated(object sender, ItemUpdatedEventArgs<Game> args)
         {
             lock (updateGate) foreach (var update in args.UpdatedItems) pendingGameIds.Add(update.NewData.Id);
@@ -338,7 +394,7 @@ namespace HeliumHybrid
                 var ids = orderChanged ? NavigatorRefreshDecision.SortedIds(orderIds) : lastIds;
                 var changed = Interlocked.Exchange(ref dirty, 0) != 0;
                 var membershipChanged = NavigatorRefreshDecision.MembershipChanged(ids, lastIds);
-                var viewState = library.ViewState(prefs.Grouping);
+                var viewState = library.ViewState(NavigatorGrouping);
                 var viewStateChanged = NavigatorRefreshDecision.ViewStateChanged(viewState, lastViewState);
                 if (!changed && !membershipChanged && !orderChanged && !viewStateChanged)
                     changed = UpdateGameRows(games);
@@ -346,7 +402,7 @@ namespace HeliumHybrid
                 var rebuild = NavigatorRefreshDecision.ShouldRebuild(changed, membershipChanged,
                     orderChanged, viewStateChanged);
                 var diagnosticState = diagnostics.Enabled
-                    ? diagnostics.Capture(() => library.DiagnosticViewState(prefs.Grouping)) : null;
+                    ? diagnostics.Capture(() => library.DiagnosticViewState(NavigatorGrouping)) : null;
                 if (!rebuild) {
                     SyncSelection(false);
                     diagnostics.Record(diagnosticState, changed, membershipChanged, orderChanged,
@@ -439,6 +495,50 @@ namespace HeliumHybrid
             status.Text = view.IsEmpty ? "No games found. Check the global filters too." : "";
             SyncSelection(false);
         }
+        private void ApplyGlobalFilterChange(Func<FilterPresetSettings, FilterPresetSettings> change)
+        {
+            var current = api.MainView.GetCurrentFilterSettings() ?? new FilterPresetSettings();
+            var next = change(current);
+            if (NavigatorFilterComposer.Same(current, next)) return;
+            // A temporary, unsaved preset with null view options changes filters without changing native sort or grouping.
+            api.MainView.ApplyFilterPreset(NavigatorFilterComposer.TemporaryPreset(next));
+            Interlocked.Exchange(ref dirty, 1);
+            RefreshGlobalFilterUi();
+            Refresh();
+        }
+        private void RefreshGlobalFilterUi()
+        {
+            if (!active || IsCollapsed() || Visibility != Visibility.Visible) return;
+            var current = api.MainView.GetCurrentFilterSettings() ?? new FilterPresetSettings();
+            readyState.Observe(current);
+            filterIndicator.Text = NavigatorFilterComposer.HasActiveFilters(current) ? "Global filters active" : "";
+            readyButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
+                readyState.IsActive(current) ? "#FF355675" : "#FF293747"));
+            readyButton.IsEnabled = !readyState.IsActive(current) || readyState.OwnsRestriction;
+            readyButton.ToolTip = readyButton.IsEnabled ? "Ready to Play: installed games" :
+                "Installed filter is managed by Playnite; edit it in Advanced Filters";
+            filtersButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
+                filtersOpen ? "#FF355675" : "#FF293747"));
+            if (filtersOpen) {
+                filterPanel.Refresh(current, filterOptionsDirty);
+                filterOptionsDirty = false;
+            }
+            UpdateShortcutState();
+        }
+        private void UpdateShortcutState()
+        {
+            recentButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
+                grouping.SelectedIndex == 4 ? "#FF355675" : "#FF293747"));
+            backButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
+                active && library.ActiveDesktopView == DesktopView.Grid ? "#FF355675" : "#FF293747"));
+        }
+        private void ShowFilterPanel()
+        {
+            list.Visibility = filtersOpen ? Visibility.Collapsed : Visibility.Visible;
+            advancedPanel.Visibility = filtersOpen ? Visibility.Visible : Visibility.Collapsed;
+            if (filtersOpen) filterPanel.Refresh(api.MainView.GetCurrentFilterSettings() ?? new FilterPresetSettings(), true);
+            RefreshGlobalFilterUi();
+        }
         private void RevealSelected(HashSet<Guid> selected)
         {
             if (view == null || IsCollapsed() || Visibility != Visibility.Visible) return;
@@ -500,12 +600,14 @@ namespace HeliumHybrid
             Visibility = Visibility.Visible;
             bool collapsed = IsCollapsed();
             Width = collapsed ? 0 : prefs.Width;
-            list.Visibility = tools.Visibility = status.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+            tools.Visibility = status.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+            list.Visibility = collapsed || filtersOpen ? Visibility.Collapsed : Visibility.Visible;
+            advancedPanel.Visibility = collapsed || !filtersOpen ? Visibility.Collapsed : Visibility.Visible;
             grip.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
             toggle.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
             if (reopenButton != null) reopenButton.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
-            backButton.Visibility = navigatedDetails && library.ActiveDesktopView == DesktopView.Details && !collapsed ? Visibility.Visible : Visibility.Collapsed;
-            toggle.Content = "<<";
+            backButton.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+            UpdateShortcutState();
         }
         private void ReopenClicked(object sender, RoutedEventArgs args)
         {

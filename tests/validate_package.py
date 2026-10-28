@@ -28,6 +28,12 @@ xname = '{http://schemas.microsoft.com/winfx/2006/xaml}Name'
 nav = ET.parse(root / 'source/HeliumHybrid/Navigator.xaml')
 names = {n.attrib[xname] for n in nav.iter() if xname in n.attrib}
 assert {'CollapseButton','Search','Grouping','Count','Status','Games','ResizeGrip','BackButton'} <= names
+contract = {'RecentButton':'Button', 'ReadyButton':'Button', 'FiltersButton':'Button',
+            'CloseFilters':'Button', 'ClearAllFilters':'Button', 'FilterIndicator':'TextBlock',
+            'AdvancedPanel':'ScrollViewer', 'FilterSections':'StackPanel'}
+for name, kind in contract.items():
+    matches = [n for n in nav.iter() if n.attrib.get(xname) == name]
+    assert len(matches) == 1 and matches[0].tag.endswith('}' + kind), (name, kind)
 lib = ET.parse(root / 'theme/Views/Library.xaml')
 assert [n for n in lib.iter() if n.attrib.get(xname) == 'HeliumCharlo_Navigator']
 assert [n for n in lib.iter() if n.attrib.get(xname) == 'HeliumCharlo_SwitchDetails']
@@ -37,6 +43,7 @@ assert len(overlays) == 1 and overlays[0].attrib['Visibility'] == 'Collapsed'
 details = ET.parse(root / 'theme/Views/LibraryDetailsView.xaml')
 assert [n for n in details.iter() if n.attrib.get(xname) == 'HeliumCharlo_NativeDetailsList']
 source = (root / 'source/HeliumHybrid/Navigator.cs').read_text()
+assert all(f'FindName("{name}")' in source for name in contract)
 assert 'OpenNativeDetails(id)' in source and 'BackButton' in source
 assert 'GetSettingsView' in (root / 'source/HeliumHybrid/Plugin.cs').read_text()
 assert 'Settings.MigrateNavigation();' in (root / 'source/HeliumHybrid/Plugin.cs').read_text()

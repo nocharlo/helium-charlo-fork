@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.8 — Navigator Header & Advanced Filters (candidate)
+
+- Added compact Navigator shortcuts for Grid, Recent Activity, and installed games.
+- Added an Advanced Filters panel that edits Playnite's current global filters without saving or mutating user presets.
+- Kept local name search, existing grouping and settings compatibility.
+- Automated source, package and privacy checks do not establish Playnite runtime or visual acceptance; those checks were intentionally not run for this candidate.
+
 ## v0.2.7 — Recent Activity (release candidate)
 
 - Added Recent Activity grouping using Playnite LastActivity and the local calendar.

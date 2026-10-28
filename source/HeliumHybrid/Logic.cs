@@ -25,6 +25,10 @@ namespace HeliumHybrid
             if (!specified && grouping == 4) return 1; // Preserve Detailed for existing Recent Activity users.
             return storedStyle == 1 ? 1 : 0;
         }
+        public static int ToggleRecentGrouping(int current, int previous) =>
+            current == 4 ? (previous >= 0 && previous < 4 ? previous : 0) : 4;
+        public static int? ShortcutGroupingOverride(int saved, int selected) =>
+            saved == selected ? (int?)null : selected;
         public static double ClampWidth(double width) { return double.IsNaN(width) || double.IsInfinity(width) ? 230 : Math.Max(180, Math.Min(380, width)); }
         // The available library width is measured in WPF device-independent pixels.
         public static bool Compact(int mode, bool wasCompact, double width)
