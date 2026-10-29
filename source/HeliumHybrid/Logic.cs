@@ -29,6 +29,8 @@ namespace HeliumHybrid
             current == 4 ? (previous >= 0 && previous < 4 ? previous : 0) : 4;
         public static int? ShortcutGroupingOverride(int saved, int selected) =>
             saved == selected ? (int?)null : selected;
+        public static bool ShouldRestoreSelection(Guid desired, IEnumerable<Guid> current) =>
+            desired != Guid.Empty && (current == null || !current.Any());
         public static double ClampWidth(double width) { return double.IsNaN(width) || double.IsInfinity(width) ? 230 : Math.Max(180, Math.Min(380, width)); }
         // The available library width is measured in WPF device-independent pixels.
         public static bool Compact(int mode, bool wasCompact, double width)

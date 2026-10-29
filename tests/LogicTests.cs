@@ -31,6 +31,12 @@ class LogicTests
             Logic.RecentActivityStyle(4, 1, true) == 1 &&
             Logic.RecentActivityStyle(4, 7, true) == 0,
             "Activity style defaults to Hybrid but migrates existing activity users to Detailed");
+        var gameA = Guid.NewGuid();
+        var gameB = Guid.NewGuid();
+        Check(Logic.ShouldRestoreSelection(gameA, new Guid[0]), "Restore selection cleared by native view switch");
+        Check(!Logic.ShouldRestoreSelection(gameA, new[] { gameA }), "Keep selection already restored by Playnite");
+        Check(!Logic.ShouldRestoreSelection(gameA, new[] { gameB }), "Do not override a newer selection");
+        Check(!Logic.ShouldRestoreSelection(Guid.Empty, new Guid[0]), "Do not select an unknown game");
         Console.WriteLine("PASS: " + assertions + " checks; 50,000-game scenario: " + watch.ElapsedMilliseconds + " ms.");
     }
 }
