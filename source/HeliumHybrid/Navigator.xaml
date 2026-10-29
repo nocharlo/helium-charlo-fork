@@ -22,15 +22,15 @@
       </ControlTemplate></Setter.Value></Setter>
     </Style>
     <Style x:Key="HomeButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolbarButtonStyle}">
-      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Background" Value="#FF363940"/>
       <Setter Property="Foreground" Value="{StaticResource SteamTextBrush}"/>
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
         <Border x:Name="Face" Background="{TemplateBinding Background}" BorderBrush="Transparent" BorderThickness="1" CornerRadius="3">
           <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
         </Border>
         <ControlTemplate.Triggers>
-          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Face" Property="Background" Value="#55343840"/></Trigger>
-          <Trigger Property="IsPressed" Value="True"><Setter TargetName="Face" Property="Background" Value="#66303640"/></Trigger>
+          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Face" Property="Background" Value="#FF41454B"/></Trigger>
+          <Trigger Property="IsPressed" Value="True"><Setter TargetName="Face" Property="Background" Value="#FF303640"/></Trigger>
           <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Face" Property="BorderBrush" Value="#FF667583"/></Trigger>
         </ControlTemplate.Triggers>
       </ControlTemplate></Setter.Value></Setter>
@@ -75,24 +75,16 @@
     <StackPanel x:Name="Tools" DockPanel.Dock="Top">
       <Grid Height="36" Margin="5,0,5,7">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="29"/><ColumnDefinition Width="29"/><ColumnDefinition Width="13"/></Grid.ColumnDefinitions>
-        <Border x:Name="HomeSurface" Grid.Column="0" Height="36" Margin="0,0,3,0" Background="#FF363940" CornerRadius="3" ClipToBounds="True">
-          <Grid ClipToBounds="True">
-            <Border Width="105" Height="72" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,25,0" Background="#FFAAB7C8" Opacity="0.14" IsHitTestVisible="False">
-              <Border.OpacityMask><ImageBrush ImageSource="{DynamicResource NavigatorPlayniteLogo}" Stretch="Uniform"/></Border.OpacityMask>
-            </Border>
-            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="32"/></Grid.ColumnDefinitions>
-              <Button x:Name="HomeButton" Grid.Column="0" Style="{StaticResource HomeButtonStyle}" ToolTip="Home: back to Grid"><TextBlock Text="Home" FontSize="14" FontWeight="SemiBold" Foreground="#FFC8CCD2" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="8,0,0,0"/></Button>
-              <Button x:Name="BackButton" Grid.Column="1" Style="{StaticResource ToolbarButtonStyle}" Width="28" Height="28" Margin="0,0,4,0" Background="#FF41454B" ToolTip="Back to Grid">
-                <Viewbox Width="19" Height="19"><Canvas Width="24" Height="24">
-                  <Rectangle Canvas.Left="4" Canvas.Top="4" Width="7" Height="7" RadiusX="0.8" RadiusY="0.8" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                  <Rectangle Canvas.Left="13" Canvas.Top="4" Width="7" Height="7" RadiusX="0.8" RadiusY="0.8" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                  <Rectangle Canvas.Left="4" Canvas.Top="13" Width="7" Height="7" RadiusX="0.8" RadiusY="0.8" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                  <Rectangle Canvas.Left="13" Canvas.Top="13" Width="7" Height="7" RadiusX="0.8" RadiusY="0.8" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                </Canvas></Viewbox>
-              </Button>
-            </Grid>
+        <Button x:Name="HomeButton" Grid.Column="0" Style="{StaticResource HomeButtonStyle}" Height="36" Margin="0,0,3,0" ToolTip="Home: back to Grid">
+          <Grid><TextBlock Text="Home" FontSize="14" FontWeight="SemiBold" Foreground="#FFC8CCD2" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="9,0,31,0"/>
+            <Viewbox Width="19" Height="19" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,7,0" IsHitTestVisible="False"><Canvas Width="24" Height="24">
+              <Rectangle Canvas.Left="4" Canvas.Top="4" Width="7" Height="7" RadiusX="0.8" RadiusY="0.8" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+              <Rectangle Canvas.Left="13" Canvas.Top="4" Width="7" Height="7" RadiusX="0.8" RadiusY="0.8" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+              <Rectangle Canvas.Left="4" Canvas.Top="13" Width="7" Height="7" RadiusX="0.8" RadiusY="0.8" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+              <Rectangle Canvas.Left="13" Canvas.Top="13" Width="7" Height="7" RadiusX="0.8" RadiusY="0.8" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+            </Canvas></Viewbox>
           </Grid>
-        </Border>
+        </Button>
         <Button x:Name="RecentButton" Grid.Column="1" Style="{StaticResource ToolbarButtonStyle}" Width="27" Height="27" ToolTip="Toggle Recent Activity">
           <Viewbox Width="19" Height="19"><Canvas Width="24" Height="24">
             <Ellipse Canvas.Left="3" Canvas.Top="3" Width="18" Height="18" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2"/>
@@ -126,7 +118,35 @@
           <TextBlock x:Name="FilterIndicator" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,1,1,0" Foreground="#FF78B9E7" FontSize="9" IsHitTestVisible="False"/>
         </Grid>
       </Border>
-      <ComboBox x:Name="Grouping" Style="{StaticResource QuietGroupingStyle}" SelectedIndex="0" Height="28" Margin="5,0,5,2">
+      <Button x:Name="SortGroupButton" Height="42" Margin="5,0,5,2" Background="#FF25272C" Foreground="#FFE5EAF1" BorderThickness="0" HorizontalContentAlignment="Stretch" ToolTip="Sort and group games">
+        <Grid Margin="7,2"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/></Grid.ColumnDefinitions>
+          <StackPanel><TextBlock Text="Sort &amp; Group" FontSize="12" FontWeight="SemiBold"/><TextBlock x:Name="SortSummary" Foreground="#FFA5B0BD" FontSize="10" TextTrimming="CharacterEllipsis"/></StackPanel>
+          <Path Grid.Column="1" Data="M2,3 L7,8 L12,3" Stroke="#FFA5B0BD" StrokeThickness="1.7" Fill="Transparent" VerticalAlignment="Center"/>
+        </Grid>
+      </Button>
+      <Popup x:Name="SortGroupPopup" Placement="Right" PlacementTarget="{Binding ElementName=SortGroupButton}" HorizontalOffset="5" StaysOpen="False" AllowsTransparency="True" Focusable="False">
+        <Border Width="310" Background="#FF30343D" BorderBrush="#FF48515E" BorderThickness="1" CornerRadius="5" Padding="12">
+          <Border.Resources>
+            <Style TargetType="RadioButton"><Setter Property="Foreground" Value="#FFE5EAF1"/><Setter Property="Margin" Value="0,2"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton">
+              <Border x:Name="Face" Background="#FF363B44" BorderBrush="Transparent" BorderThickness="1" CornerRadius="3" Padding="7,5"><StackPanel Orientation="Horizontal"><Ellipse Width="12" Height="12" Stroke="#FFA5B0BD" StrokeThickness="1.5" Margin="0,0,7,0"><Ellipse.Style><Style TargetType="Ellipse"><Setter Property="Fill" Value="Transparent"/><Style.Triggers><DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=RadioButton}}" Value="True"><Setter Property="Fill" Value="#FF56B8F4"/></DataTrigger></Style.Triggers></Style></Ellipse.Style></Ellipse><ContentPresenter/></StackPanel></Border>
+              <ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Face" Property="Background" Value="#FF405773"/></Trigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Face" Property="BorderBrush" Value="#FF64788C"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Face" Property="BorderBrush" Value="#FF8FC8EE"/></Trigger></ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter></Style>
+          </Border.Resources>
+          <StackPanel>
+            <DockPanel><TextBlock Text="SORT &amp; GROUP" Foreground="#FFE5EAF1" FontWeight="SemiBold" FontSize="12" DockPanel.Dock="Left"/><Button x:Name="SortClose" Content="×" DockPanel.Dock="Right" Width="24" Height="23" Background="Transparent" BorderThickness="0" Foreground="#FFE5EAF1"/></DockPanel>
+            <TextBlock Text="GROUP BY" Foreground="#FF56B8F4" FontWeight="SemiBold" FontSize="10" Margin="0,10,0,3"/>
+            <UniformGrid Columns="2"><RadioButton x:Name="GroupNative" Content="Native" GroupName="NavigatorGroup" Tag="0"/><RadioButton x:Name="GroupSeries" Content="Series" GroupName="NavigatorGroup" Tag="1"/><RadioButton x:Name="GroupCategory" Content="Category" GroupName="NavigatorGroup" Tag="2"/><RadioButton x:Name="GroupPlatform" Content="Platform" GroupName="NavigatorGroup" Tag="3"/></UniformGrid>
+            <Border Height="1" Background="#FF48515E" Margin="0,9,0,0"/>
+            <TextBlock Text="SORT BY" Foreground="#FF56B8F4" FontWeight="SemiBold" FontSize="10" Margin="0,9,0,3"/>
+            <TextBlock x:Name="SortByText" Foreground="#FFE5EAF1" FontSize="12" TextWrapping="Wrap" ToolTip="Sort field follows the Playnite library"/>
+            <Border Height="1" Background="#FF48515E" Margin="0,9,0,0"/>
+            <TextBlock Text="ORDER" Foreground="#FF56B8F4" FontWeight="SemiBold" FontSize="10" Margin="0,9,0,3"/>
+            <UniformGrid Columns="2"><RadioButton x:Name="OrderAscending" Content="↑ Ascending" GroupName="NavigatorOrder"/><RadioButton x:Name="OrderDescending" Content="↓ Descending" GroupName="NavigatorOrder"/></UniformGrid>
+            <Button x:Name="SortDone" Content="Done" HorizontalAlignment="Right" Margin="0,10,0,0" Padding="14,4" Background="#FF405773" Foreground="#FFE5EAF1" BorderThickness="0"/>
+          </StackPanel>
+        </Border>
+      </Popup>
+      <ComboBox x:Name="Grouping" Visibility="Collapsed" SelectedIndex="0">
         <ComboBoxItem Content="Native / alphabetical"/><ComboBoxItem Content="Series"/>
         <ComboBoxItem Content="Category / collection"/><ComboBoxItem Content="Platform"/>
         <ComboBoxItem Content="Recent Activity"/>
