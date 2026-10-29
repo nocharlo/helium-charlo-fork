@@ -33,7 +33,7 @@ namespace HeliumHybrid
         private readonly Button toggle;
         private readonly Thumb grip;
         private readonly FrameworkElement tools;
-        private readonly Button backButton;
+        private readonly Button homeButton, backButton;
         private readonly Button recentButton, readyButton, filtersButton;
         private readonly Button closeFilters, clearAllFilters;
         private readonly TextBlock filterIndicator;
@@ -96,6 +96,7 @@ namespace HeliumHybrid
             grouping = (ComboBox)root.FindName("Grouping"); count = (TextBlock)root.FindName("Count");
             status = (TextBlock)root.FindName("Status"); toggle = (Button)root.FindName("CollapseButton");
             grip = (Thumb)root.FindName("ResizeGrip"); tools = (FrameworkElement)root.FindName("Tools");
+            homeButton = (Button)root.FindName("HomeButton");
             backButton = (Button)root.FindName("BackButton");
             recentButton = (Button)root.FindName("RecentButton");
             readyButton = (Button)root.FindName("ReadyButton");
@@ -138,6 +139,7 @@ namespace HeliumHybrid
                 UpdateShortcutState();
                 if (!shortcutGroupingChange) Save();
             };
+            homeButton.Click += (sender, args) => Safe(ReturnToGrid);
             backButton.Click += (sender, args) => Safe(ReturnToGrid);
             recentButton.Click += (sender, args) => Safe(() => {
                 shortcutGroupingChange = true;
@@ -520,14 +522,14 @@ namespace HeliumHybrid
             if (!active || IsCollapsed() || Visibility != Visibility.Visible) return;
             var current = api.MainView.GetCurrentFilterSettings() ?? new FilterPresetSettings();
             readyState.Observe(current);
-            filterIndicator.Text = NavigatorFilterComposer.HasActiveFilters(current) ? "Global filters active" : "";
-            readyButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
-                readyState.IsActive(current) ? "#FF355675" : "#FF293747"));
+            var hasFilters = NavigatorFilterComposer.HasActiveFilters(current);
+            filterIndicator.Text = hasFilters ? "•" : "";
+            filtersButton.ToolTip = hasFilters ? "Global filters active — edit in Advanced Filters" : "Advanced Filters";
+            readyButton.Foreground = (Brush)root.Resources[readyState.IsActive(current) ? "SteamActiveBrush" : "SteamIconBrush"];
             readyButton.IsEnabled = !readyState.IsActive(current) || readyState.OwnsRestriction;
             readyButton.ToolTip = readyButton.IsEnabled ? "Ready to Play: installed games" :
                 "Installed filter is managed by Playnite; edit it in Advanced Filters";
-            filtersButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
-                filtersOpen ? "#FF355675" : "#FF293747"));
+            filtersButton.Foreground = (Brush)root.Resources[filtersOpen ? "SteamActiveBrush" : "SteamIconBrush"];
             if (filtersOpen) {
                 filterPanel.Refresh(current, filterOptionsDirty);
                 filterOptionsDirty = false;
@@ -536,10 +538,8 @@ namespace HeliumHybrid
         }
         private void UpdateShortcutState()
         {
-            recentButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
-                grouping.SelectedIndex == 4 ? "#FF355675" : "#FF293747"));
-            backButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
-                active && library.ActiveDesktopView == DesktopView.Grid ? "#FF355675" : "#FF293747"));
+            recentButton.Foreground = (Brush)root.Resources[grouping.SelectedIndex == 4 ? "SteamActiveBrush" : "SteamIconBrush"];
+            backButton.Foreground = (Brush)root.Resources[active && library.ActiveDesktopView == DesktopView.Grid ? "SteamActiveBrush" : "SteamIconBrush"];
         }
         private void ShowFilterPanel()
         {
@@ -615,7 +615,7 @@ namespace HeliumHybrid
             grip.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
             toggle.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
             if (reopenButton != null) reopenButton.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
-            backButton.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+            backButton.Visibility = homeButton.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
             UpdateShortcutState();
         }
         private void ReopenClicked(object sender, RoutedEventArgs args)
