@@ -29,11 +29,17 @@ namespace HeliumHybrid
         private readonly ListBox list;
         private readonly TextBox search;
         private readonly ComboBox grouping;
+        private readonly Popup sortGroupPopup;
+        private readonly Button sortGroupButton;
+        private readonly TextBlock sortSummary, sortByText;
+        private readonly RadioButton[] groupOptions;
+        private readonly RadioButton orderAscending, orderDescending;
+        private bool updatingSortGroupUi;
         private readonly TextBlock count, status;
         private readonly Button toggle;
         private readonly Thumb grip;
         private readonly FrameworkElement tools;
-        private readonly Button homeButton, backButton;
+        private readonly Button homeButton;
         private readonly Button recentButton, readyButton, filtersButton;
         private readonly Button closeFilters, clearAllFilters;
         private readonly TextBlock filterIndicator;
@@ -94,10 +100,16 @@ namespace HeliumHybrid
             list = (ListBox)root.FindName("Games"); search = (TextBox)root.FindName("Search");
             list.Tag = groupState;
             grouping = (ComboBox)root.FindName("Grouping"); count = (TextBlock)root.FindName("Count");
+            sortGroupPopup = (Popup)root.FindName("SortGroupPopup");
+            sortGroupButton = (Button)root.FindName("SortGroupButton");
+            sortSummary = (TextBlock)root.FindName("SortSummary"); sortByText = (TextBlock)root.FindName("SortByText");
+            groupOptions = new[] { "GroupNative", "GroupSeries", "GroupCategory", "GroupPlatform" }
+                .Select(name => (RadioButton)root.FindName(name)).ToArray();
+            orderAscending = (RadioButton)root.FindName("OrderAscending");
+            orderDescending = (RadioButton)root.FindName("OrderDescending");
             status = (TextBlock)root.FindName("Status"); toggle = (Button)root.FindName("CollapseButton");
             grip = (Thumb)root.FindName("ResizeGrip"); tools = (FrameworkElement)root.FindName("Tools");
             homeButton = (Button)root.FindName("HomeButton");
-            backButton = (Button)root.FindName("BackButton");
             recentButton = (Button)root.FindName("RecentButton");
             readyButton = (Button)root.FindName("ReadyButton");
             filtersButton = (Button)root.FindName("FiltersButton");
@@ -111,7 +123,7 @@ namespace HeliumHybrid
             previousGrouping = grouping.SelectedIndex == 4 ? 0 : grouping.SelectedIndex;
             groupState.Mode = EffectiveGrouping;
             timer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(1500) };
-            timer.Tick += (s, e) => { RecomputeLayout(); Refresh(); Safe(RefreshGlobalFilterUi); };
+            timer.Tick += (s, e) => { RecomputeLayout(); Refresh(); Safe(RefreshGlobalFilterUi); UpdateSortGroupUi(); };
             searchTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(180) };
             searchTimer.Tick += (s, e) => { searchTimer.Stop(); ApplySearch(); };
             coverClickTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher);
@@ -137,20 +149,31 @@ namespace HeliumHybrid
                 groupState.Mode = EffectiveGrouping;
                 Interlocked.Exchange(ref dirty, 1); Refresh();
                 UpdateShortcutState();
+                UpdateSortGroupUi();
                 if (!shortcutGroupingChange) Save();
             };
+            sortGroupButton.Click += (s, e) => { UpdateSortGroupUi(); sortGroupPopup.IsOpen = !sortGroupPopup.IsOpen; };
+            foreach (var option in groupOptions) option.Checked += (s, e) => {
+                if (updatingSortGroupUi) return;
+                grouping.SelectedIndex = int.Parse(((RadioButton)s).Tag.ToString(), System.Globalization.CultureInfo.InvariantCulture);
+            };
+            orderAscending.Checked += (s, e) => SetNativeDirection(SortOrderDirection.Ascending);
+            orderDescending.Checked += (s, e) => SetNativeDirection(SortOrderDirection.Descending);
+            ((Button)root.FindName("SortClose")).Click += (s, e) => sortGroupPopup.IsOpen = false;
+            ((Button)root.FindName("SortDone")).Click += (s, e) => sortGroupPopup.IsOpen = false;
+            sortGroupPopup.PreviewKeyDown += (s, e) => { if (e.Key == Key.Escape) { sortGroupPopup.IsOpen = false; e.Handled = true; } };
             homeButton.Click += (sender, args) => Safe(ReturnToGrid);
-            backButton.Click += (sender, args) => Safe(ReturnToGrid);
             recentButton.Click += (sender, args) => Safe(() => {
                 shortcutGroupingChange = true;
                 try { grouping.SelectedIndex = Logic.ToggleRecentGrouping(grouping.SelectedIndex, previousGrouping); }
                 finally { shortcutGroupingChange = false; }
             });
             readyButton.Click += (sender, args) => Safe(() => ApplyGlobalFilterChange(state => readyState.Toggle(state)));
-            filtersButton.Click += (sender, args) => Safe(() => { filtersOpen = !filtersOpen; ShowFilterPanel(); });
+            filtersButton.Click += (sender, args) => Safe(() => { sortGroupPopup.IsOpen = false; filtersOpen = !filtersOpen; ShowFilterPanel(); });
             closeFilters.Click += (sender, args) => { filtersOpen = false; ShowFilterPanel(); };
             clearAllFilters.Click += (sender, args) => Safe(() => ApplyGlobalFilterChange(NavigatorFilterComposer.Clear));
             toggle.Click += (sender, args) => {
+                sortGroupPopup.IsOpen = false;
                 prefs.Collapsed = !prefs.Collapsed;
                 ApplySize(); RecomputeLayout(); Save(); if (!IsCollapsed()) Refresh();
             };
@@ -172,6 +195,7 @@ namespace HeliumHybrid
             
             menu.Items.Add(play); list.ContextMenu = menu;
             Loaded += OnLoaded; Unloaded += OnUnloaded;
+            UpdateSortGroupUi();
             ApplySize();
         }
         private ListBoxItem RowUnderPointer(DependencyObject source)
@@ -342,6 +366,7 @@ namespace HeliumHybrid
         }
         private void OnUnloaded(object sender, RoutedEventArgs args)
         {
+            sortGroupPopup.IsOpen = false;
             if (!active) return; active = false; timer.Stop(); searchTimer.Stop(); coverClickTimer.Stop(); sidebarClickTimer.Stop(); sidebarDownItem = null; panelRequested = false; UnbindGridClicks();
             plugin.SelectionChanged -= SelectionChanged;
             plugin.SettingsChanged -= SettingsUpdated;
@@ -523,6 +548,41 @@ namespace HeliumHybrid
             RefreshGlobalFilterUi();
             Refresh();
         }
+        private static string FriendlySort(string value)
+        {
+            if (value == "LastActivity") return "Last Played";
+            if (value == "PlayCount") return "Most Played";
+            return System.Text.RegularExpressions.Regex.Replace(value ?? "Name", "(?<=[a-z])(?=[A-Z])", " ");
+        }
+        private void UpdateSortGroupUi()
+        {
+            if (sortSummary == null) return;
+            var recent = grouping.SelectedIndex == 4;
+            var labels = new[] { "Native", "Series", "Category", "Platform" };
+            var index = grouping.SelectedIndex;
+            var name = index >= 0 && index < labels.Length ? labels[index] : "Native";
+            var sort = FriendlySort(library.SortOrder);
+            var direction = library.SortDirection;
+            sortSummary.Text = recent ? "Recent Activity · Last Played · Descending" :
+                name + " · " + sort + " · " + direction;
+            sortByText.Text = recent ? "Recent Activity: Last Played" : "Following Playnite: " + sort;
+            updatingSortGroupUi = true;
+            try {
+                for (var i = 0; i < groupOptions.Length; i++) groupOptions[i].IsChecked = !recent && i == index;
+                orderAscending.IsChecked = !recent && direction == "Ascending";
+                orderDescending.IsChecked = recent || direction == "Descending";
+            } finally { updatingSortGroupUi = false; }
+        }
+        private void SetNativeDirection(SortOrderDirection direction)
+        {
+            if (updatingSortGroupUi) return;
+            Safe(() => {
+                if (grouping.SelectedIndex == 4) grouping.SelectedIndex = previousGrouping;
+                api.MainView.SortOrderDirection = direction;
+                Interlocked.Exchange(ref dirty, 1);
+                Refresh(); UpdateSortGroupUi();
+            });
+        }
         private void RefreshGlobalFilterUi()
         {
             if (!active || IsCollapsed() || Visibility != Visibility.Visible) return;
@@ -545,7 +605,7 @@ namespace HeliumHybrid
         private void UpdateShortcutState()
         {
             recentButton.Foreground = (Brush)root.Resources[grouping.SelectedIndex == 4 ? "SteamActiveBrush" : "SteamIconBrush"];
-            backButton.Foreground = (Brush)root.Resources[active && library.ActiveDesktopView == DesktopView.Grid ? "SteamActiveBrush" : "SteamIconBrush"];
+            homeButton.Foreground = (Brush)root.Resources[active && library.ActiveDesktopView == DesktopView.Grid ? "SteamActiveBrush" : "SteamIconBrush"];
         }
         private void ShowFilterPanel()
         {
@@ -607,6 +667,7 @@ namespace HeliumHybrid
         {
             if (active && (library.ActiveDesktopView == DesktopView.List ||
                 (library.ActiveDesktopView == DesktopView.Details && !navigatedDetails))) {
+                sortGroupPopup.IsOpen = false;
                 Visibility = Visibility.Collapsed;
                 Width = 0;
                 if (reopenButton != null) reopenButton.Visibility = Visibility.Collapsed;
@@ -614,6 +675,7 @@ namespace HeliumHybrid
             }
             Visibility = Visibility.Visible;
             bool collapsed = IsCollapsed();
+            if (collapsed) sortGroupPopup.IsOpen = false;
             Width = collapsed ? 0 : prefs.Width;
             tools.Visibility = status.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
             list.Visibility = collapsed || filtersOpen ? Visibility.Collapsed : Visibility.Visible;
@@ -621,7 +683,7 @@ namespace HeliumHybrid
             grip.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
             toggle.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
             if (reopenButton != null) reopenButton.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
-            backButton.Visibility = homeButton.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+            homeButton.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
             UpdateShortcutState();
         }
         private void ReopenClicked(object sender, RoutedEventArgs args)

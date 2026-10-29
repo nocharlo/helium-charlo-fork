@@ -45,7 +45,6 @@
     </DataTemplate>
 
     <BitmapImage x:Key="PlayniteLogo" UriSource="{ThemeFile 'Images/applogo.png'}" popt:Freeze="True" />
-    <BitmapImage x:Key="NavigatorPlayniteLogo" UriSource="{ThemeFile 'Images/navigator_playnite_logo.png'}" popt:Freeze="True" />
     <BitmapImage x:Key="DefaultGameIcon" UriSource="{ThemeFile 'Images/applogo_dark.png'}" popt:Freeze="True" />
     <BitmapImage x:Key="DefaultGameCover" UriSource="{ThemeFile 'Images/custom_cover_background.png'}" popt:Freeze="True" />
 
