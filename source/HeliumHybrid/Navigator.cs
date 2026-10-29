@@ -268,10 +268,16 @@ namespace HeliumHybrid
             if (!active || IsCollapsed() || library.ActiveDesktopView != DesktopView.Details) return;
             var switchButton = FindNamed(window, "HeliumCharlo_SwitchGrid") as Button;
             if (switchButton?.Command == null || !switchButton.Command.CanExecute(null)) return;
+            var selectedId = (list.SelectedItem as GameRow)?.Id ?? library.SelectedIds().FirstOrDefault();
             switchButton.Command.Execute(null);
             navigatedDetails = false;
             RecomputeLayout();
-            if (prefs.PreserveGridScroll) Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(RestoreGridScroll));
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
+                if (!active || library.ActiveDesktopView != DesktopView.Grid) return;
+                if (Logic.ShouldRestoreSelection(selectedId, library.SelectedIds())) SelectGame(selectedId);
+                SyncSelection(false);
+                if (prefs.PreserveGridScroll) RestoreGridScroll();
+            }));
         }
         private void CaptureGridScroll()
         {

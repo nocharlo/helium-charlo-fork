@@ -22,15 +22,15 @@
       </ControlTemplate></Setter.Value></Setter>
     </Style>
     <Style x:Key="HomeButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolbarButtonStyle}">
-      <Setter Property="Background" Value="#FF363940"/>
+      <Setter Property="Background" Value="Transparent"/>
       <Setter Property="Foreground" Value="{StaticResource SteamTextBrush}"/>
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
         <Border x:Name="Face" Background="{TemplateBinding Background}" BorderBrush="Transparent" BorderThickness="1" CornerRadius="3">
           <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
         </Border>
         <ControlTemplate.Triggers>
-          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Face" Property="Background" Value="#FF343840"/></Trigger>
-          <Trigger Property="IsPressed" Value="True"><Setter TargetName="Face" Property="Background" Value="#FF303640"/></Trigger>
+          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Face" Property="Background" Value="#55343840"/></Trigger>
+          <Trigger Property="IsPressed" Value="True"><Setter TargetName="Face" Property="Background" Value="#66303640"/></Trigger>
           <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Face" Property="BorderBrush" Value="#FF667583"/></Trigger>
         </ControlTemplate.Triggers>
       </ControlTemplate></Setter.Value></Setter>
@@ -73,30 +73,24 @@
   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="5"/></Grid.ColumnDefinitions>
   <DockPanel x:Name="MainPanel" Grid.Column="0" Margin="3,3,2,3">
     <StackPanel x:Name="Tools" DockPanel.Dock="Top">
-      <Grid Height="38" Margin="5,0,5,6">
-        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="32"/></Grid.ColumnDefinitions>
-        <Button x:Name="HomeButton" Grid.Column="0" Style="{StaticResource HomeButtonStyle}" Height="36" Margin="0,0,4,0" ToolTip="Home: back to Grid">
-          <Grid Height="34" ClipToBounds="True">
-            <Image Source="{DynamicResource PlayniteLogo}" Width="90" Height="90" Opacity="0.09" Stretch="Uniform" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" IsHitTestVisible="False"/>
-            <TextBlock Text="Home" Foreground="{StaticResource SteamTextBrush}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,0,0"/>
-          </Grid>
-        </Button>
-        <Button x:Name="BackButton" Grid.Column="1" Style="{StaticResource ToolbarButtonStyle}" Width="30" Height="30" ToolTip="Back to Grid">
-          <Viewbox Width="19" Height="19"><Canvas Width="24" Height="24">
-            <Rectangle Canvas.Left="4" Canvas.Top="4" Width="7" Height="7" RadiusX="1" RadiusY="1" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-            <Rectangle Canvas.Left="13" Canvas.Top="4" Width="7" Height="7" RadiusX="1" RadiusY="1" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-            <Rectangle Canvas.Left="4" Canvas.Top="13" Width="7" Height="7" RadiusX="1" RadiusY="1" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-            <Rectangle Canvas.Left="13" Canvas.Top="13" Width="7" Height="7" RadiusX="1" RadiusY="1" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-          </Canvas></Viewbox>
-        </Button>
-      </Grid>
-      <Grid Height="33" Margin="5,0,5,7">
+      <Grid Height="36" Margin="5,0,5,7">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="29"/><ColumnDefinition Width="29"/><ColumnDefinition Width="13"/></Grid.ColumnDefinitions>
-        <Border x:Name="GamesHeader" Grid.Column="0" Height="31" Margin="0,0,3,0" Background="#FF25272C" CornerRadius="3" ToolTip="Games library">
-          <Grid><TextBlock Text="Games" Foreground="{StaticResource SteamTextBrush}" FontSize="14" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="7,0,22,0"/>
-            <Viewbox Width="12" Height="12" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,6,0">
-              <Canvas Width="24" Height="24"><Path Data="M6,9 L12,15 L18,9" Fill="Transparent" Stroke="{StaticResource SteamIconBrush}" StrokeThickness="1.9" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/></Canvas>
-            </Viewbox>
+        <Border x:Name="HomeSurface" Grid.Column="0" Height="36" Margin="0,0,3,0" Background="#FF363940" CornerRadius="3" ClipToBounds="True">
+          <Grid ClipToBounds="True">
+            <Border Width="105" Height="72" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,25,0" Background="#FFAAB7C8" Opacity="0.14" IsHitTestVisible="False">
+              <Border.OpacityMask><ImageBrush ImageSource="{DynamicResource NavigatorPlayniteLogo}" Stretch="Uniform"/></Border.OpacityMask>
+            </Border>
+            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="32"/></Grid.ColumnDefinitions>
+              <Button x:Name="HomeButton" Grid.Column="0" Style="{StaticResource HomeButtonStyle}" ToolTip="Home: back to Grid"><TextBlock Text="Home" FontSize="14" FontWeight="SemiBold" Foreground="#FFC8CCD2" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="8,0,0,0"/></Button>
+              <Button x:Name="BackButton" Grid.Column="1" Style="{StaticResource ToolbarButtonStyle}" Width="28" Height="28" Margin="0,0,4,0" Background="#FF41454B" ToolTip="Back to Grid">
+                <Viewbox Width="19" Height="19"><Canvas Width="24" Height="24">
+                  <Rectangle Canvas.Left="4" Canvas.Top="4" Width="7" Height="7" RadiusX="0.8" RadiusY="0.8" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                  <Rectangle Canvas.Left="13" Canvas.Top="4" Width="7" Height="7" RadiusX="0.8" RadiusY="0.8" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                  <Rectangle Canvas.Left="4" Canvas.Top="13" Width="7" Height="7" RadiusX="0.8" RadiusY="0.8" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                  <Rectangle Canvas.Left="13" Canvas.Top="13" Width="7" Height="7" RadiusX="0.8" RadiusY="0.8" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                </Canvas></Viewbox>
+              </Button>
+            </Grid>
           </Grid>
         </Border>
         <Button x:Name="RecentButton" Grid.Column="1" Style="{StaticResource ToolbarButtonStyle}" Width="27" Height="27" ToolTip="Toggle Recent Activity">
