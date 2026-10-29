@@ -2,54 +2,142 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:local="clr-namespace:HeliumHybrid;assembly=HeliumCharlo" Background="#FF202731">
   <Grid.Resources>
-    <Style x:Key="QuickButtonStyle" TargetType="Button">
+    <SolidColorBrush x:Key="SteamIconBrush" Color="#FF9B9DA1"/>
+    <SolidColorBrush x:Key="SteamActiveBrush" Color="#FFB7CBE0"/>
+    <SolidColorBrush x:Key="SteamTextBrush" Color="#FFC0C2C5"/>
+    <SolidColorBrush x:Key="SteamMutedBrush" Color="#FF92969D"/>
+    <Style x:Key="ToolbarButtonStyle" TargetType="Button">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{StaticResource SteamIconBrush}"/>
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
-        <Border x:Name="Face" Background="{TemplateBinding Background}" BorderBrush="#FF435568" BorderThickness="1" CornerRadius="2">
-          <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"/>
+        <Border x:Name="Face" Background="{TemplateBinding Background}" BorderBrush="Transparent" BorderThickness="1" CornerRadius="3">
+          <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Border>
         <ControlTemplate.Triggers>
-          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Face" Property="Background" Value="#FF42617D"/></Trigger>
+          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Face" Property="Background" Value="#FF343840"/></Trigger>
+          <Trigger Property="IsPressed" Value="True"><Setter TargetName="Face" Property="Background" Value="#FF303640"/></Trigger>
+          <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Face" Property="BorderBrush" Value="#FF667583"/></Trigger>
           <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger>
         </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style x:Key="HomeButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolbarButtonStyle}">
+      <Setter Property="Background" Value="#FF363940"/>
+      <Setter Property="Foreground" Value="{StaticResource SteamTextBrush}"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+        <Border x:Name="Face" Background="{TemplateBinding Background}" BorderBrush="Transparent" BorderThickness="1" CornerRadius="3">
+          <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
+        </Border>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Face" Property="Background" Value="#FF343840"/></Trigger>
+          <Trigger Property="IsPressed" Value="True"><Setter TargetName="Face" Property="Background" Value="#FF303640"/></Trigger>
+          <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Face" Property="BorderBrush" Value="#FF667583"/></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style x:Key="QuietGroupingStyle" TargetType="ComboBox">
+      <Setter Property="Foreground" Value="{StaticResource SteamTextBrush}"/>
+      <Setter Property="Background" Value="#FF25272C"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBox">
+        <Grid>
+          <ToggleButton x:Name="DropToggle" Focusable="False" ClickMode="Press" BorderBrush="Transparent"
+                        IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+            <ToggleButton.Template><ControlTemplate TargetType="ToggleButton">
+              <Border x:Name="Face" Background="#FF25272C" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="3">
+                <Grid>
+                  <ContentPresenter Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                    ContentTemplate="{Binding SelectionBoxItemTemplate, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                    Margin="7,0,25,0" VerticalAlignment="Center"/>
+                  <Viewbox Width="11" Height="11" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0">
+                    <Canvas Width="24" Height="24"><Path Data="M6,9 L12,15 L18,9" Fill="Transparent" Stroke="{StaticResource SteamIconBrush}" StrokeThickness="1.9" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/></Canvas>
+                  </Viewbox>
+                </Grid>
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Face" Property="Background" Value="#FF343840"/></Trigger>
+                <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Face" Property="BorderBrush" Value="#FF667583"/></Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate></ToggleButton.Template>
+          </ToggleButton>
+          <Popup x:Name="PART_Popup" AllowsTransparency="True" Focusable="False" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" StaysOpen="True">
+            <Border Background="#FF25272C" BorderBrush="#FF41454D" BorderThickness="1" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" MaxHeight="300">
+              <ScrollViewer CanContentScroll="True" VerticalScrollBarVisibility="Auto"><ItemsPresenter/></ScrollViewer>
+            </Border>
+          </Popup>
+        </Grid>
+        <ControlTemplate.Triggers><Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="DropToggle" Property="BorderBrush" Value="#FF667583"/></Trigger></ControlTemplate.Triggers>
       </ControlTemplate></Setter.Value></Setter>
     </Style>
   </Grid.Resources>
   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="5"/></Grid.ColumnDefinitions>
   <DockPanel x:Name="MainPanel" Grid.Column="0" Margin="3,3,2,3">
     <StackPanel x:Name="Tools" DockPanel.Dock="Top">
-      <Grid Margin="0,0,0,5">
-        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="33"/><ColumnDefinition Width="33"/><ColumnDefinition Width="29"/></Grid.ColumnDefinitions>
-        <Button x:Name="BackButton" Grid.Column="0" Style="{StaticResource QuickButtonStyle}" HorizontalContentAlignment="Stretch" Height="28" Margin="0,0,3,0" ToolTip="Back to Grid" Background="#FF293747" Foreground="#FFDAE4EE">
-          <Grid Margin="8,0"><TextBlock Text="Games" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-            <Path HorizontalAlignment="Right" VerticalAlignment="Center" Fill="#FFB9CBDC" Data="M0,0 L8,0 L4,4 Z" Width="8" Height="4" Stretch="Fill"/></Grid>
-        </Button>
-        <Button x:Name="RecentButton" Grid.Column="1" Style="{StaticResource QuickButtonStyle}" Width="30" Height="28" Margin="0,0,3,0" ToolTip="Toggle Recent Activity" Background="#FF293747" Foreground="#FFB9CBDC">
-          <Viewbox Width="17" Height="17"><Grid Width="20" Height="20"><Ellipse Margin="1" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2"/><Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" Data="M10,4 V10 L14,12"/></Grid></Viewbox>
-        </Button>
-        <Button x:Name="ReadyButton" Grid.Column="2" Style="{StaticResource QuickButtonStyle}" Width="30" Height="28" Margin="0,0,3,0" ToolTip="Ready to Play: installed games" Background="#FF293747" Foreground="#FFB9CBDC">
-          <Viewbox Width="14" Height="15"><Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Data="M2,1 L14,8 L2,15 Z"/></Viewbox>
-        </Button>
-        <Button x:Name="CollapseButton" Grid.Column="3" Style="{StaticResource QuickButtonStyle}" Width="26" Height="28" ToolTip="Collapse the Navigator" Background="#FF293747" Foreground="#FFB9CBDC">
-          <Viewbox Width="15" Height="15"><Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" Data="M12,1 L5,8 L12,15"/></Viewbox>
-        </Button>
-      </Grid>
-      <Grid Margin="0,0,0,4">
+      <Grid Height="38" Margin="5,0,5,6">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="32"/></Grid.ColumnDefinitions>
-        <Grid Grid.Column="0" Margin="0,0,3,0">
-          <TextBox x:Name="Search" ToolTip="Search by Name (global filters still apply)" Padding="24,3,4,3"/>
-          <Path IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="7,0,0,0" Stroke="#FF9BAABA" StrokeThickness="2" Data="M12,7 A5,5 0 1 1 2,7 A5,5 0 1 1 12,7 M11,11 L16,16" Width="17" Height="17" Stretch="Fill"/>
-        </Grid>
-        <Button x:Name="FiltersButton" Grid.Column="1" Style="{StaticResource QuickButtonStyle}" Width="29" Height="26" ToolTip="Advanced Filters" Background="#FF293747" Foreground="#FFE0EBF7">
-          <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" Data="M1,2 H18 M5,8 H18 M9,14 H18" Width="18" Height="16" Stretch="Fill"/>
+        <Button x:Name="HomeButton" Grid.Column="0" Style="{StaticResource HomeButtonStyle}" Height="36" Margin="0,0,4,0" ToolTip="Home: back to Grid">
+          <Grid Height="34" ClipToBounds="True">
+            <Image Source="{DynamicResource PlayniteLogo}" Width="90" Height="90" Opacity="0.09" Stretch="Uniform" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" IsHitTestVisible="False"/>
+            <TextBlock Text="Home" Foreground="{StaticResource SteamTextBrush}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,0,0"/>
+          </Grid>
+        </Button>
+        <Button x:Name="BackButton" Grid.Column="1" Style="{StaticResource ToolbarButtonStyle}" Width="30" Height="30" ToolTip="Back to Grid">
+          <Viewbox Width="19" Height="19"><Canvas Width="24" Height="24">
+            <Rectangle Canvas.Left="4" Canvas.Top="4" Width="7" Height="7" RadiusX="1" RadiusY="1" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+            <Rectangle Canvas.Left="13" Canvas.Top="4" Width="7" Height="7" RadiusX="1" RadiusY="1" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+            <Rectangle Canvas.Left="4" Canvas.Top="13" Width="7" Height="7" RadiusX="1" RadiusY="1" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+            <Rectangle Canvas.Left="13" Canvas.Top="13" Width="7" Height="7" RadiusX="1" RadiusY="1" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+          </Canvas></Viewbox>
         </Button>
       </Grid>
-      <TextBlock x:Name="FilterIndicator" Foreground="#FF78B9E7" FontSize="11" Margin="3,0,0,3"/>
-      <ComboBox x:Name="Grouping" SelectedIndex="0" Margin="0,0,0,3">
+      <Grid Height="33" Margin="5,0,5,7">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="29"/><ColumnDefinition Width="29"/><ColumnDefinition Width="13"/></Grid.ColumnDefinitions>
+        <Border x:Name="GamesHeader" Grid.Column="0" Height="31" Margin="0,0,3,0" Background="#FF25272C" CornerRadius="3" ToolTip="Games library">
+          <Grid><TextBlock Text="Games" Foreground="{StaticResource SteamTextBrush}" FontSize="14" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="7,0,22,0"/>
+            <Viewbox Width="12" Height="12" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,6,0">
+              <Canvas Width="24" Height="24"><Path Data="M6,9 L12,15 L18,9" Fill="Transparent" Stroke="{StaticResource SteamIconBrush}" StrokeThickness="1.9" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/></Canvas>
+            </Viewbox>
+          </Grid>
+        </Border>
+        <Button x:Name="RecentButton" Grid.Column="1" Style="{StaticResource ToolbarButtonStyle}" Width="27" Height="27" ToolTip="Toggle Recent Activity">
+          <Viewbox Width="19" Height="19"><Canvas Width="24" Height="24">
+            <Ellipse Canvas.Left="3" Canvas.Top="3" Width="18" Height="18" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2"/>
+            <Path Data="M12,6.5 L12,12 L15.8,15" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+          </Canvas></Viewbox>
+        </Button>
+        <Button x:Name="ReadyButton" Grid.Column="2" Style="{StaticResource ToolbarButtonStyle}" Width="27" Height="27" ToolTip="Ready to Play: installed games">
+          <Viewbox Width="19" Height="19"><Canvas Width="24" Height="24">
+            <Ellipse Canvas.Left="3" Canvas.Top="3" Width="18" Height="18" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2"/>
+            <Path Data="M10,8 L16.4,12 L10,16 Z" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+          </Canvas></Viewbox>
+        </Button>
+        <Button x:Name="CollapseButton" Grid.Column="3" Style="{StaticResource ToolbarButtonStyle}" Width="13" Height="23" Foreground="#FF666B72" ToolTip="Collapse the Navigator">
+          <Viewbox Width="10" Height="10"><Canvas Width="24" Height="24"><Path Data="M15,6 L9,12 L15,18" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/></Canvas></Viewbox>
+        </Button>
+      </Grid>
+      <Border Height="37" Margin="5,0,5,4" Background="#FF24262B" BorderThickness="1" CornerRadius="3">
+        <Border.Style><Style TargetType="Border"><Setter Property="BorderBrush" Value="Transparent"/><Style.Triggers><Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter Property="BorderBrush" Value="#FF667583"/></Trigger></Style.Triggers></Style></Border.Style>
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="32"/><ColumnDefinition Width="*"/><ColumnDefinition Width="32"/></Grid.ColumnDefinitions>
+          <Viewbox Grid.Column="0" Width="21" Height="21" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"><Canvas Width="24" Height="24">
+            <Ellipse Canvas.Left="3" Canvas.Top="3" Width="14" Height="14" Fill="Transparent" Stroke="{StaticResource SteamIconBrush}" StrokeThickness="2.3"/>
+            <Path Data="M15.5,15.5 L21,21" Stroke="{StaticResource SteamIconBrush}" StrokeThickness="2.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+          </Canvas></Viewbox>
+          <TextBox x:Name="Search" Grid.Column="1" ToolTip="Search by Name (global filters still apply)" Background="Transparent" BorderThickness="0" Foreground="{StaticResource SteamTextBrush}" CaretBrush="{StaticResource SteamTextBrush}" Padding="0,7,2,4" VerticalContentAlignment="Center"/>
+          <TextBlock Grid.Column="1" Text="Search by name" Foreground="{StaticResource SteamMutedBrush}" VerticalAlignment="Center" IsHitTestVisible="False">
+            <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=Search}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+          </TextBlock>
+          <Button x:Name="FiltersButton" Grid.Column="2" Style="{StaticResource ToolbarButtonStyle}" Width="31" Height="32" ToolTip="Advanced Filters">
+            <Viewbox Width="20" Height="20"><Canvas Width="24" Height="24"><Path Data="M2.5,6.5 L21.5,6.5 M5.5,12 L18.5,12 M8.5,17.5 L15.5,17.5" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2.5" StrokeStartLineCap="Flat" StrokeEndLineCap="Flat"/></Canvas></Viewbox>
+          </Button>
+          <TextBlock x:Name="FilterIndicator" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,1,1,0" Foreground="#FF78B9E7" FontSize="9" IsHitTestVisible="False"/>
+        </Grid>
+      </Border>
+      <ComboBox x:Name="Grouping" Style="{StaticResource QuietGroupingStyle}" SelectedIndex="0" Height="28" Margin="5,0,5,2">
         <ComboBoxItem Content="Native / alphabetical"/><ComboBoxItem Content="Series"/>
         <ComboBoxItem Content="Category / collection"/><ComboBoxItem Content="Platform"/>
         <ComboBoxItem Content="Recent Activity"/>
       </ComboBox>
-      <TextBlock x:Name="Count" Foreground="#FF9BAABA" FontSize="11" Margin="3,0,0,3"/>
+      <TextBlock x:Name="Count" Foreground="{StaticResource SteamMutedBrush}" FontSize="11" Margin="7,0,0,3"/>
     </StackPanel>
     <TextBlock x:Name="Status" DockPanel.Dock="Bottom" Foreground="#FFC5CED8" TextWrapping="Wrap" FontSize="11"/>
     <Grid>
