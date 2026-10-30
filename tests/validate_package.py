@@ -28,7 +28,8 @@ xname = '{http://schemas.microsoft.com/winfx/2006/xaml}Name'
 nav = ET.parse(root / 'source/HeliumHybrid/Navigator.xaml')
 names = {n.attrib[xname] for n in nav.iter() if xname in n.attrib}
 assert {'CollapseButton','Search','Grouping','Count','Status','Games','ResizeGrip',
-        'HomeButton','SortGroupButton','SortGroupPopup','SortSummary','SortByText'} <= names
+        'HomeButton','SortGroupButton','SortGroupPopup','SortSummary',
+        'SortNative','SortName','SortLastPlayed','SortPlaytime','SortReleaseDate'} <= names
 assert 'BackButton' not in names and 'HomeSurface' not in names
 home = next(n for n in nav.iter() if n.attrib.get(xname) == 'HomeButton')
 assert home.tag.endswith('}Button')

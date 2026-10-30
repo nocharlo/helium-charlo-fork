@@ -10,6 +10,8 @@ public sealed class TestPreferences
     public int GridCoverClickAction { get; set; } = 0;
     public int Grouping { get; set; }
     public int RecentActivityGroupingStyle { get; set; }
+    public int SortMode { get; set; }
+    public bool SortDescending { get; set; }
     [XmlIgnore] public bool RecentActivityGroupingStyleSpecified { get; set; }
 }
 
@@ -60,6 +62,13 @@ internal static class SettingsFileTests
             var reloaded = SettingsFile.Load<TestPreferences>(legacyPath, ex => throw ex, out canSave);
             Check(reloaded.RecentActivityGroupingStyleSpecified && reloaded.RecentActivityGroupingStyle == 1,
                 "Migrated grouping style persists in XML");
+            reloaded.SortMode = 3; reloaded.SortDescending = true;
+            SettingsFile.Save(legacyPath, reloaded);
+            var sorted = SettingsFile.Load<TestPreferences>(legacyPath, ex => throw ex, out canSave);
+            Check(sorted.SortMode == 3 && sorted.SortDescending,
+                "Independent sort mode and direction persist across restart");
+            Check(legacy.SortMode == 0 && !legacy.SortDescending,
+                "Older settings default to Following Playnite without changing native order");
             Check(Logic.RecentActivityStyle(0, new TestPreferences().RecentActivityGroupingStyle, false) == 0,
                 "New settings default to Hybrid");
             Console.WriteLine("PASS: settings missing, persisted, corrupt backup, recovery and restart reload.");

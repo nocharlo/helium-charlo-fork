@@ -103,6 +103,10 @@ class NavigatorRefreshDecisionTests
         var activityAfter = new[] { new NavigatorProjectedRow { Id = first, Name = "Item", Group = "Last 7 Days", ActivityTicks = 11, GroupOrder = long.MaxValue } };
         Check(NavigatorRefreshDecision.ClassifyRows(activityBefore, activityAfter) == NavigatorRowChange.Structural,
             "Updated activity within the same group rebuilds chronological order");
+        var sortBefore = new[] { new NavigatorProjectedRow { Id = first, Name = "Item", Group = "A", SortValue = 10 } };
+        var sortAfter = new[] { new NavigatorProjectedRow { Id = first, Name = "Item", Group = "A", SortValue = 11 } };
+        Check(NavigatorRefreshDecision.ClassifyRows(sortBefore, sortAfter) == NavigatorRowChange.Structural,
+            "Changed sort metadata rebuilds rows even when membership and title are unchanged");
         Check(NavigatorRefreshDecision.EffectiveGrouping(0, "CompletionStatus") == 4,
             "Default follows native completion grouping");
         Check(NavigatorRefreshDecision.EffectiveGrouping(0, "Series") == 5 &&
