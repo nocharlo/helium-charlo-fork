@@ -31,7 +31,8 @@ namespace HeliumHybrid
                 if (oldRow.Id != newRow.Id || oldRow.Name != newRow.Name ||
                     oldRow.Key != newRow.Key || oldRow.Group != newRow.Group ||
                     oldRow.IconPath != newRow.IconPath ||
-                    oldRow.ActivityTicks != newRow.ActivityTicks || oldRow.GroupOrder != newRow.GroupOrder) return NavigatorRowChange.Structural;
+                    oldRow.ActivityTicks != newRow.ActivityTicks || oldRow.GroupOrder != newRow.GroupOrder ||
+                    oldRow.SortValue != newRow.SortValue) return NavigatorRowChange.Structural;
                 visual |= oldRow.IsInstalled != newRow.IsInstalled || oldRow.Favorite != newRow.Favorite;
             }
             return visual ? NavigatorRowChange.Visual : NavigatorRowChange.None;

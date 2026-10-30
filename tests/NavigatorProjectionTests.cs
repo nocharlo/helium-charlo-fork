@@ -138,6 +138,61 @@ class NavigatorProjectionTests
         } finally { Thread.CurrentThread.CurrentCulture = previousCulture; }
         Check(hybrid.Select(row => row.Id).SequenceEqual(detailed.Select(row => row.Id)),
             "Style switch changes headings without changing chronological game order");
+        var delta = Guid.Parse("00000000-0000-0000-0000-000000000004");
+        var sortingClock = new DateTime(2026, 10, 20, 12, 0, 0);
+        var sortable = new[] {
+            new NavigatorSource { Id = alpha, Name = "Beta", LastActivity = sortingClock.AddDays(-3),
+                Playtime = 0, ReleaseDate = new DateTime(2021, 1, 1), GroupNames = new[]{"Second"} },
+            new NavigatorSource { Id = beta, Name = "Alpha", LastActivity = sortingClock.AddDays(-1),
+                Playtime = 50, ReleaseDate = new DateTime(2020, 5, 1), GroupNames = new[]{"First","Second"} },
+            new NavigatorSource { Id = gamma, Name = "Gamma", Playtime = 50,
+                GroupNames = new[]{"First"} },
+            new NavigatorSource { Id = delta, Name = null, LastActivity = DateTime.MinValue,
+                Playtime = 70, ReleaseDate = DateTime.MinValue, GroupNames = new[]{"First"} }
+        };
+        Guid[] Sorted(NavigatorSortMode mode, bool descending = false) =>
+            NavigatorProjection.Build(sortable, 0, icon => icon, sortingClock, mode, descending)
+                .Select(row => row.Id).ToArray();
+        Check(Sorted(NavigatorSortMode.FollowingPlaynite, true).SequenceEqual(new[]{alpha,beta,gamma,delta}),
+            "Following Playnite preserves incoming native order without double reversing");
+        Check(Sorted(NavigatorSortMode.Name).SequenceEqual(new[]{beta,alpha,gamma,delta}) &&
+            Sorted(NavigatorSortMode.Name, true).SequenceEqual(new[]{gamma,alpha,beta,delta}),
+            "Name ascending and descending keep missing title last");
+        Check(Sorted(NavigatorSortMode.LastPlayed).SequenceEqual(new[]{alpha,beta,gamma,delta}) &&
+            Sorted(NavigatorSortMode.LastPlayed, true).SequenceEqual(new[]{beta,alpha,gamma,delta}),
+            "Last Played dates sort both directions and missing activity stays last");
+        Check(Sorted(NavigatorSortMode.Playtime).SequenceEqual(new[]{alpha,beta,gamma,delta}) &&
+            Sorted(NavigatorSortMode.Playtime, true).SequenceEqual(new[]{delta,beta,gamma,alpha}),
+            "Zero playtime is a valid value and equal values tie by name");
+        Check(Sorted(NavigatorSortMode.ReleaseDate).SequenceEqual(new[]{beta,alpha,gamma,delta}) &&
+            Sorted(NavigatorSortMode.ReleaseDate, true).SequenceEqual(new[]{alpha,beta,gamma,delta}),
+            "Release Date orders both directions with missing dates last");
+        var groupedSort = NavigatorProjection.Build(sortable, 1, icon => icon, sortingClock,
+            NavigatorSortMode.Playtime, true);
+        Check(groupedSort.Select(row => row.Group).SequenceEqual(new[]{"First","First","First","Second","Second"}) &&
+            groupedSort.Take(3).Select(row => row.Id).SequenceEqual(new[]{delta,beta,gamma}) &&
+            groupedSort.Skip(3).Select(row => row.Id).SequenceEqual(new[]{beta,alpha}),
+            "Independent groups retain structure while each group follows selected sort");
+        Check(groupedSort.Count(row => row.Id == beta) == 2,
+            "A selected game retains its identity across multiple sorted group occurrences");
+        var filteredSort = NavigatorProjection.Build(sortable.Where(game => game.Id != beta), 0,
+            icon => icon, sortingClock, NavigatorSortMode.Playtime, true);
+        Check(filteredSort.All(row => row.Id != beta) && filteredSort.Count == 3,
+            "Sorting a filtered source never reintroduces excluded games");
+        var tie = NavigatorProjection.Build(new[] {
+            new NavigatorSource { Id = beta, Name = "Same", Playtime = 9 },
+            new NavigatorSource { Id = alpha, Name = "Same", Playtime = 9 }
+        }, 0, icon => icon, sortingClock, NavigatorSortMode.Playtime, true);
+        Check(tie.Select(row => row.Id).SequenceEqual(new[]{alpha,beta}),
+            "Equal values and equal names break ties by stable identity");
+        Check(NavigatorSortPolicy.ValidMode(-1) == NavigatorSortMode.FollowingPlaynite &&
+            NavigatorSortPolicy.ValidMode(99) == NavigatorSortMode.FollowingPlaynite,
+            "Unknown saved sort modes migrate to native ordering");
+        var recentUnchanged = NavigatorProjection.Build(sortable, 8, icon => icon, sortingClock,
+            NavigatorSortMode.Playtime, false);
+        Check(recentUnchanged.Select(row => row.Id).SequenceEqual(
+            NavigatorProjection.Build(sortable, 8, icon => icon, sortingClock).Select(row => row.Id)),
+            "Recent Activity buckets ignore normal sorting preferences");
         Console.WriteLine("PASS: " + checks + " NavigatorProjection checks.");
     }
 }

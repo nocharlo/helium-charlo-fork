@@ -138,7 +138,8 @@
             <UniformGrid Columns="2"><RadioButton x:Name="GroupNative" Content="Native" GroupName="NavigatorGroup" Tag="0"/><RadioButton x:Name="GroupSeries" Content="Series" GroupName="NavigatorGroup" Tag="1"/><RadioButton x:Name="GroupCategory" Content="Category" GroupName="NavigatorGroup" Tag="2"/><RadioButton x:Name="GroupPlatform" Content="Platform" GroupName="NavigatorGroup" Tag="3"/></UniformGrid>
             <Border Height="1" Background="#FF48515E" Margin="0,9,0,0"/>
             <TextBlock Text="SORT BY" Foreground="#FF56B8F4" FontWeight="SemiBold" FontSize="10" Margin="0,9,0,3"/>
-            <TextBlock x:Name="SortByText" Foreground="#FFE5EAF1" FontSize="12" TextWrapping="Wrap" ToolTip="Sort field follows the Playnite library"/>
+            <RadioButton x:Name="SortNative" Content="Following Playnite" GroupName="NavigatorSort" Tag="0" ToolTip="Use the current Playnite library order"/>
+            <UniformGrid Columns="2"><RadioButton x:Name="SortName" Content="Name" GroupName="NavigatorSort" Tag="1"/><RadioButton x:Name="SortLastPlayed" Content="Last Played" GroupName="NavigatorSort" Tag="2"/><RadioButton x:Name="SortPlaytime" Content="Playtime" GroupName="NavigatorSort" Tag="3"/><RadioButton x:Name="SortReleaseDate" Content="Release Date" GroupName="NavigatorSort" Tag="4"/></UniformGrid>
             <Border Height="1" Background="#FF48515E" Margin="0,9,0,0"/>
             <TextBlock Text="ORDER" Foreground="#FF56B8F4" FontWeight="SemiBold" FontSize="10" Margin="0,9,0,3"/>
             <UniformGrid Columns="2"><RadioButton x:Name="OrderAscending" Content="↑ Ascending" GroupName="NavigatorOrder"/><RadioButton x:Name="OrderDescending" Content="↓ Descending" GroupName="NavigatorOrder"/></UniformGrid>
