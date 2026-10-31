@@ -24,7 +24,7 @@ The finalization attempt did not alter the portable installation: the harness st
 - `NavigatorFilterComposerTests`: PASS, 34 checks.
 - `SettingsFileTests`: PASS, including missing, persisted, corrupt-backup, recovery, migration, and restart-reload cases.
 - Release build: PASS, 0 warnings and 0 errors.
-- Harness package structure checks: PASS before the OPSEC scanner step; the paired manifests, stable IDs, matching version, packaged DLL, and archive extraction were verified.
+- Harness package structure checks: the paired manifests, stable IDs, matching version, packaged DLL, and archive extraction were verified.
 - Previously reported Python groups of 21 and 8 checks were not re-executed and no retained finalization report was used to substantiate their counts; they are not counted as current evidence.
 
 ## Advanced Filters integration
