@@ -9,7 +9,7 @@
 - Preserved local search and synchronized global filter, game selection, Grid, and Full Details behavior.
 - Improved explicit-selection visibility and corrected scroll-to-selected behavior after deliberate reordering.
 - Added Escape dismissal for the Sort & Group popup and retained Navigator width and other settings across restarts.
-- Maintainer-led manual QA covered the portable candidate and the primary Playnite installation, including navigation, organization controls, Recent Activity, filter/search combinations, selection visibility, popup dismissal, width persistence, and an extended stability run. These observations are manual acceptance evidence, not automated coverage of every Playnite configuration.
+- I tested the candidate in both portable Playnite and my main installation: navigation, sorting and grouping, Recent Activity, filter/search combinations, selection visibility, popup dismissal, width persistence, and extended use. This covers the interactions I tried, not every possible Playnite setup.
 
 ## v0.2.8 — Navigator Header & Advanced Filters (development candidate)
 
@@ -24,7 +24,7 @@
 - Hybrid groups previous years annually; Detailed groups them by month. Both preserve independent expansion state.
 - Preserved native filters, Navigator search, selection, Reveal Selected Game, and chronological ordering.
 - Fixed month labels to remain in English under Portuguese and English Windows cultures.
-- The maintainer manually validated the v0.2.7 candidate in Playnite; automated and package checks are recorded in the PR.
+- I tested the v0.2.7 candidate in Playnite; the PR also records the automated and package checks.
 
 ## v0.2.6 — Navigator Essentials
 
@@ -54,7 +54,7 @@ This is a local candidate. No push or release publication was performed. The two
 
 ## v0.2.3 — previous tested baseline
 
-The maintainer installed and validated this version in Playnite Desktop on Windows. It is based directly on the supplied working v0.2.2 package.
+I installed and tested this version in Playnite Desktop on Windows, starting from the working v0.2.2 package.
 
 - Stabilized the Steam-style game Navigator beside native Grid and Details views, including search, icons, expandable groups and synchronized selection.
 - Added independent sidebar and grid-cover click selectors for native Full Details View or the existing Grid Details Panel.
@@ -65,7 +65,7 @@ The maintainer installed and validated this version in Playnite Desktop on Windo
 
 ## v0.1.0 — initial published baseline
 
-The original working Helium Hybrid (KKCD) prototype introduced a searchable, scrollable game sidebar with icons and grouping alongside the KKCD cover grid; two-way selection synchronization; basic collapse and resize; and separate theme and extension installers. The maintainer tested it on Windows. Its code and exact original metadata remain in Git history.
+The original working Helium Hybrid (KKCD) prototype introduced a searchable, scrollable game sidebar with icons and grouping alongside the KKCD cover grid; two-way selection synchronization; basic collapse and resize; and separate theme and extension installers. I tested it on Windows. Its original code and metadata remain in Git history.
 
 ## Experimental local builds
 
