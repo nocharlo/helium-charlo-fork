@@ -1,6 +1,6 @@
 # v0.2.6 Navigator Essentials: preset synchronization baseline
 
-The first local commit recorded the v0.2.5 behavior and added opt-in diagnostics. The ordering candidate described below now preserves native order and reacts to native view-state changes. Native commands, click handling, Navigator grouping preferences, and Playnite filters remain unchanged. The six preset observations were reported by the maintainer and still require runtime verification on this branch.
+The first local commit recorded the v0.2.5 behavior and added opt-in diagnostics. The ordering candidate described below now preserves native order and reacts to native view-state changes. Native commands, click handling, Navigator grouping preferences, and Playnite filters remain unchanged. I noted six preset behaviors that still need runtime verification on this branch.
 
 ## Baseline source and SDK map (first commit)
 
@@ -19,7 +19,7 @@ The project's C# target is .NET Framework 4.6.2 with PlayniteSDK 6.11.0. The pub
 
 “Expected” means parity with the *active native Grid configuration*, including any user-selected sort field, direction, grouping, and filters. The preset names alone do not prove their saved settings.
 
-| Preset | Maintainer observation | Expected Navigator behavior | Manual evidence needed |
+| Preset | What I observed | Expected Navigator behavior | Manual evidence needed |
 | --- | --- | --- | --- |
 | Favorites | Filtering works | Same filtered membership as Grid; follow the preset's native ordering when ordering parity is implemented | Compare counts and relative order after switching from another preset, then after clearing local search. |
 | Installed | Filtering works | Same installed membership as Grid; preserve native sort and direction | Check installed/uninstalled boundary and a preset switch with unchanged membership. |
