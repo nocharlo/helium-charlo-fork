@@ -82,4 +82,4 @@ After observing a check, save its screenshot from Computer Use and record the re
 | Grouping preference survives full process exit and restart | PASS, observed with Series |
 | No second Navigator installation | PASS, one exact extension ID directory and one matching manifest |
 
-The original `docs/WINDOWS-TESTING.md` contains additional behavioral cases not covered by this architecture baseline. Do not treat those as passed. The local sandbox copies personal library metadata; keep it outside version control and do not publish screenshots or logs without review.
+The original [the v0.2.4 Windows checklist](../v0.2.4/WINDOWS-TESTING.md) contains additional behavioral cases not covered by this architecture baseline. Do not treat those as passed. The local sandbox copies personal library metadata; keep it outside version control and do not publish screenshots or logs without review.

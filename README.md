@@ -63,7 +63,7 @@ Helium consists of two components:
 
 The project targets .NET Framework 4.6.2 and PlayniteSDK 6.11.0.
 
-The repository includes automated tests and an isolated portable Playnite testing environment. See the [technical documentation](docs/ARCHITECTURE.md) and [development guidelines](AGENTS.md) for details.
+The repository includes automated tests and an isolated portable Playnite testing environment. See the [documentation index](docs/README.md) and [development guidelines](AGENTS.md) for details.
 
 ## A Note About Vibe Coding
 

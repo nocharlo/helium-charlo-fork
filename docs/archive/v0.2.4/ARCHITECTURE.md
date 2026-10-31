@@ -1,6 +1,6 @@
 # Architecture of the v0.2.4 library Navigator
 
-This document records the stable v0.2.4 integration. The v0.2.5 extraction map and remaining responsibilities are in [Navigator architecture foundation](NAVIGATOR-ARCHITECTURE.md).
+This document records the stable v0.2.4 integration. The v0.2.5 extraction map and remaining responsibilities are in [Navigator architecture foundation](../v0.2.5/NAVIGATOR-ARCHITECTURE.md).
 
 ## Components
 
