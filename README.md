@@ -41,6 +41,16 @@ This project is the result of that experiment. I'm sharing it in case anyone els
 
 The Navigator uses Playnite's existing library data. It doesn't maintain a separate database or modify your game metadata.
 
+## Screenshots
+
+Click any screenshot to view it at full resolution.
+
+| Hybrid Grid & Details | Full Details View |
+|:---:|:---:|
+| [![Navigator, Grid and game details](docs/images/hybrid-layout.webp)](docs/images/hybrid-layout.webp) | [![Navigator alongside the Full Details view](docs/images/full-details.webp)](docs/images/full-details.webp) |
+| **Recent Activity** | **Sort & Group** |
+| [![Navigator showing chronological recent activity groups](docs/images/recent-activity.webp)](docs/images/recent-activity.webp) | [![Navigator independent Sort and Group popup](docs/images/sort-and-group.webp)](docs/images/sort-and-group.webp) |
+
 ## Installation
 
 **Requires Playnite 10 Desktop on Windows.**
