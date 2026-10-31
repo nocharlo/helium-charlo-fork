@@ -54,7 +54,8 @@ namespace HeliumHybrid
                 Id = game.Id, Name = game.Name, SortingName = game.SortingName,
                 Icon = game.Icon, GroupNames = GroupNames(game, grouping),
                 IsInstalled = game.IsInstalled, Favorite = game.Favorite,
-                LastActivity = grouping == 8 || grouping == 9 ? game.LastActivity : (DateTime?)null
+                LastActivity = game.LastActivity, Playtime = game.Playtime,
+                ReleaseDate = game.ReleaseDate?.Date
             });
         }
 

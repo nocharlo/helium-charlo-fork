@@ -2,6 +2,7 @@
 /tests/obj/
 /source/HeliumHybrid/bin/
 /source/HeliumHybrid/obj/
+/source/*-build-check/
 **/test-runs/
 **/ExtensionsData/
 **/library/
