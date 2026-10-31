@@ -1,11 +1,22 @@
 # Changelog
 
-## v0.2.8 — Navigator Header & Advanced Filters (candidate)
+## v0.3.0 — Navigator Experience
+
+- Integrated a unified Home control with the native Grid navigation command and preserved the selected game when returning from Details.
+- Added independent Navigator grouping and sorting controls, including native order, name, last played, playtime, release date, and ascending or descending direction.
+- Added Recent Activity with Hybrid and Detailed chronological grouping and independent expansion state.
+- Added Advanced Filters that compose with Playnite's current global filter state without saving or editing user presets, plus a Ready to Play shortcut.
+- Preserved local search and synchronized global filter, game selection, Grid, and Full Details behavior.
+- Improved explicit-selection visibility and corrected scroll-to-selected behavior after deliberate reordering.
+- Added Escape dismissal for the Sort & Group popup and retained Navigator width and other settings across restarts.
+- Maintainer-led manual QA covered the portable candidate and the primary Playnite installation, including navigation, organization controls, Recent Activity, filter/search combinations, selection visibility, popup dismissal, width persistence, and an extended stability run. These observations are manual acceptance evidence, not automated coverage of every Playnite configuration.
+
+## v0.2.8 — Navigator Header & Advanced Filters (development candidate)
 
 - Added compact Navigator shortcuts for Grid, Recent Activity, and installed games.
 - Added an Advanced Filters panel that edits Playnite's current global filters without saving or mutating user presets.
 - Kept local name search, existing grouping and settings compatibility.
-- Automated source, package and privacy checks do not establish Playnite runtime or visual acceptance; those checks were intentionally not run for this candidate.
+- This candidate was incorporated into v0.3.0 and was not published as a stable release.
 
 ## v0.2.7 — Recent Activity (release candidate)
 
