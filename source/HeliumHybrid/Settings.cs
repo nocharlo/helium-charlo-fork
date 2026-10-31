@@ -15,6 +15,9 @@ namespace HeliumHybrid
         public double Width { get; set; } = 230;
         public bool Collapsed { get; set; }
         public int Grouping { get; set; }
+        // 0 follows Playnite; other values sort Navigator rows within each group.
+        public int SortMode { get; set; }
+        public bool SortDescending { get; set; }
         public int RecentActivityGroupingStyle { get; set; } // 0: Hybrid, 1: Detailed.
         [XmlIgnore] public bool RecentActivityGroupingStyleSpecified { get; set; }
         // 0: Automatic, 1: Always hidden, 2: Always visible.
@@ -34,6 +37,7 @@ namespace HeliumHybrid
             RecentActivityGroupingStyle = Logic.RecentActivityStyle(Grouping, RecentActivityGroupingStyle,
                 RecentActivityGroupingStyleSpecified);
             RecentActivityGroupingStyleSpecified = true;
+            SortMode = (int)NavigatorSortPolicy.ValidMode(SortMode);
         }
         public bool PreserveGridScroll { get; set; } = true;
         public bool AutomaticallyRevealSelectedGame { get; set; } = true;
@@ -66,6 +70,7 @@ namespace HeliumHybrid
             return errors.Count == 0;
         }
         private Preferences Copy() => new Preferences { Width = Width, Collapsed = Collapsed, Grouping = Grouping,
+            SortMode = SortMode, SortDescending = SortDescending,
             LayoutMode = LayoutMode, SteamMode = SteamMode, OpenFromGridCover = OpenFromGridCover,
             SidebarClickAction = SidebarClickAction, GridCoverClickAction = GridCoverClickAction,
             PreserveGridScroll = PreserveGridScroll, AutomaticallyRevealSelectedGame = AutomaticallyRevealSelectedGame,
@@ -74,6 +79,7 @@ namespace HeliumHybrid
         private void Assign(Preferences value)
         {
             Width = value.Width; Collapsed = value.Collapsed; Grouping = value.Grouping;
+            SortMode = value.SortMode; SortDescending = value.SortDescending;
             LayoutMode = value.LayoutMode; SteamMode = value.SteamMode;
             OpenFromGridCover = value.OpenFromGridCover; PreserveGridScroll = value.PreserveGridScroll;
             AutomaticallyRevealSelectedGame = value.AutomaticallyRevealSelectedGame;

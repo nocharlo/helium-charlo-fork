@@ -29,11 +29,27 @@ namespace HeliumHybrid
         private readonly ListBox list;
         private readonly TextBox search;
         private readonly ComboBox grouping;
+        private readonly Popup sortGroupPopup;
+        private readonly Button sortGroupButton;
+        private readonly TextBlock sortSummary;
+        private readonly RadioButton[] groupOptions, sortOptions;
+        private readonly RadioButton orderAscending, orderDescending;
+        private bool updatingSortGroupUi;
         private readonly TextBlock count, status;
         private readonly Button toggle;
         private readonly Thumb grip;
         private readonly FrameworkElement tools;
-        private readonly Button backButton;
+        private readonly Button homeButton;
+        private readonly Button recentButton, readyButton, filtersButton;
+        private readonly Button closeFilters, clearAllFilters;
+        private readonly TextBlock filterIndicator;
+        private readonly ScrollViewer advancedPanel;
+        private readonly NavigatorFilterPanel filterPanel;
+        private readonly ReadyToPlayState readyState = new ReadyToPlayState();
+        private bool filtersOpen, shortcutGroupingChange;
+        private volatile bool filterOptionsDirty;
+        private int? shortcutGroupingOverride;
+        private int previousGrouping;
         private Button reopenButton;
         private readonly DispatcherTimer timer, searchTimer;
         private readonly DispatcherTimer coverClickTimer, sidebarClickTimer;
@@ -68,7 +84,10 @@ namespace HeliumHybrid
         private List<GameRow> rows = new List<GameRow>();
         private ListCollectionView view;
         private int rebuildGeneration;
-        private int EffectiveGrouping => NavigatorRefreshDecision.EffectiveGrouping(prefs.Grouping, library.Grouping, prefs.RecentActivityGroupingStyle);
+        private HashSet<Guid> revealAfterExplicitReorganization;
+        private int NavigatorGrouping => shortcutGroupingOverride ?? prefs.Grouping;
+        private NavigatorSortMode SortMode => NavigatorSortPolicy.ValidMode(prefs.SortMode);
+        private int EffectiveGrouping => NavigatorRefreshDecision.EffectiveGrouping(NavigatorGrouping, library.Grouping, prefs.RecentActivityGroupingStyle);
         private readonly NavigatorGroupState groupState = new NavigatorGroupState();
         public Navigator(IPlayniteAPI api, HybridPlugin plugin)
         {
@@ -83,13 +102,32 @@ namespace HeliumHybrid
             list = (ListBox)root.FindName("Games"); search = (TextBox)root.FindName("Search");
             list.Tag = groupState;
             grouping = (ComboBox)root.FindName("Grouping"); count = (TextBlock)root.FindName("Count");
+            sortGroupPopup = (Popup)root.FindName("SortGroupPopup");
+            sortGroupButton = (Button)root.FindName("SortGroupButton");
+            sortSummary = (TextBlock)root.FindName("SortSummary");
+            groupOptions = new[] { "GroupNative", "GroupSeries", "GroupCategory", "GroupPlatform" }
+                .Select(name => (RadioButton)root.FindName(name)).ToArray();
+            sortOptions = new[] { "SortNative", "SortName", "SortLastPlayed", "SortPlaytime", "SortReleaseDate" }
+                .Select(name => (RadioButton)root.FindName(name)).ToArray();
+            orderAscending = (RadioButton)root.FindName("OrderAscending");
+            orderDescending = (RadioButton)root.FindName("OrderDescending");
             status = (TextBlock)root.FindName("Status"); toggle = (Button)root.FindName("CollapseButton");
             grip = (Thumb)root.FindName("ResizeGrip"); tools = (FrameworkElement)root.FindName("Tools");
-            backButton = (Button)root.FindName("BackButton");
+            homeButton = (Button)root.FindName("HomeButton");
+            recentButton = (Button)root.FindName("RecentButton");
+            readyButton = (Button)root.FindName("ReadyButton");
+            filtersButton = (Button)root.FindName("FiltersButton");
+            closeFilters = (Button)root.FindName("CloseFilters");
+            clearAllFilters = (Button)root.FindName("ClearAllFilters");
+            filterIndicator = (TextBlock)root.FindName("FilterIndicator");
+            advancedPanel = (ScrollViewer)root.FindName("AdvancedPanel");
+            filterPanel = new NavigatorFilterPanel(api, (StackPanel)root.FindName("FilterSections"),
+                change => Safe(() => ApplyGlobalFilterChange(change)));
             grouping.SelectedIndex = Math.Max(0, Math.Min(4, prefs.Grouping));
+            previousGrouping = grouping.SelectedIndex == 4 ? 0 : grouping.SelectedIndex;
             groupState.Mode = EffectiveGrouping;
             timer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(1500) };
-            timer.Tick += (s, e) => { RecomputeLayout(); Refresh(); };
+            timer.Tick += (s, e) => { RecomputeLayout(); Refresh(); Safe(RefreshGlobalFilterUi); UpdateSortGroupUi(); };
             searchTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(180) };
             searchTimer.Tick += (s, e) => { searchTimer.Stop(); ApplySearch(); };
             coverClickTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher);
@@ -106,9 +144,46 @@ namespace HeliumHybrid
                     Safe(() => Navigate(pendingSidebarId, prefs.SidebarClickAction));
             };
             search.TextChanged += (s, e) => { searchTimer.Stop(); searchTimer.Start(); };
-            grouping.SelectionChanged += (s, e) => { prefs.Grouping = grouping.SelectedIndex; groupState.Mode = EffectiveGrouping; Interlocked.Exchange(ref dirty, 1); Refresh(); Save(); };
-            backButton.Click += (sender, args) => Safe(ReturnToGrid);
+            grouping.SelectionChanged += (s, e) => {
+                if (grouping.SelectedIndex < 0) return;
+                if (shortcutGroupingChange)
+                    shortcutGroupingOverride = Logic.ShortcutGroupingOverride(prefs.Grouping, grouping.SelectedIndex);
+                else { shortcutGroupingOverride = null; prefs.Grouping = grouping.SelectedIndex; }
+                if (grouping.SelectedIndex != 4) previousGrouping = grouping.SelectedIndex;
+                groupState.Mode = EffectiveGrouping;
+                Interlocked.Exchange(ref dirty, 1); Refresh();
+                UpdateShortcutState();
+                UpdateSortGroupUi();
+                if (!shortcutGroupingChange) Save();
+            };
+            sortGroupButton.Click += (s, e) => { UpdateSortGroupUi(); sortGroupPopup.IsOpen = !sortGroupPopup.IsOpen; };
+            foreach (var option in groupOptions) option.Checked += (s, e) => {
+                if (updatingSortGroupUi) return;
+                RequestRevealAfterExplicitReorganization();
+                grouping.SelectedIndex = int.Parse(((RadioButton)s).Tag.ToString(), System.Globalization.CultureInfo.InvariantCulture);
+            };
+            foreach (var option in sortOptions) option.Checked += (s, e) => {
+                if (updatingSortGroupUi) return;
+                SetSortMode(NavigatorSortPolicy.ValidMode(int.Parse(((RadioButton)s).Tag.ToString(),
+                    System.Globalization.CultureInfo.InvariantCulture)));
+            };
+            orderAscending.Checked += (s, e) => SetSortDirection(false);
+            orderDescending.Checked += (s, e) => SetSortDirection(true);
+            ((Button)root.FindName("SortClose")).Click += (s, e) => sortGroupPopup.IsOpen = false;
+            ((Button)root.FindName("SortDone")).Click += (s, e) => sortGroupPopup.IsOpen = false;
+            sortGroupPopup.PreviewKeyDown += SortGroupPopupPreviewKeyDown;
+            homeButton.Click += (sender, args) => Safe(ReturnToGrid);
+            recentButton.Click += (sender, args) => Safe(() => {
+                shortcutGroupingChange = true;
+                try { grouping.SelectedIndex = Logic.ToggleRecentGrouping(grouping.SelectedIndex, previousGrouping); }
+                finally { shortcutGroupingChange = false; }
+            });
+            readyButton.Click += (sender, args) => Safe(() => ApplyGlobalFilterChange(state => readyState.Toggle(state)));
+            filtersButton.Click += (sender, args) => Safe(() => { sortGroupPopup.IsOpen = false; filtersOpen = !filtersOpen; ShowFilterPanel(); });
+            closeFilters.Click += (sender, args) => { filtersOpen = false; ShowFilterPanel(); };
+            clearAllFilters.Click += (sender, args) => Safe(() => ApplyGlobalFilterChange(NavigatorFilterComposer.Clear));
             toggle.Click += (sender, args) => {
+                sortGroupPopup.IsOpen = false;
                 prefs.Collapsed = !prefs.Collapsed;
                 ApplySize(); RecomputeLayout(); Save(); if (!IsCollapsed()) Refresh();
             };
@@ -130,6 +205,7 @@ namespace HeliumHybrid
             
             menu.Items.Add(play); list.ContextMenu = menu;
             Loaded += OnLoaded; Unloaded += OnUnloaded;
+            UpdateSortGroupUi();
             ApplySize();
         }
         private ListBoxItem RowUnderPointer(DependencyObject source)
@@ -197,6 +273,15 @@ namespace HeliumHybrid
             panelRequested = false;
             switchButton.Command.Execute(null);
             RecomputeLayout();
+            // Playnite can clear its selection while changing the native view.
+            // Restore the explicitly chosen game after the Details view is loaded.
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
+                if (!active || !navigatedDetails || library.ActiveDesktopView != DesktopView.Details) return;
+                var selected = library.SelectedIds();
+                if (selected.Count != 0 && !selected.Contains(id)) return;
+                SelectGame(id);
+                RecomputeLayout();
+            }));
         }
         private void OpenGridPanel(Guid id)
         {
@@ -214,13 +299,19 @@ namespace HeliumHybrid
         }
         private void ReturnToGrid()
         {
-            if (!navigatedDetails || library.ActiveDesktopView != DesktopView.Details) return;
+            if (!active || IsCollapsed() || library.ActiveDesktopView != DesktopView.Details) return;
             var switchButton = FindNamed(window, "HeliumCharlo_SwitchGrid") as Button;
             if (switchButton?.Command == null || !switchButton.Command.CanExecute(null)) return;
+            var selectedId = (list.SelectedItem as GameRow)?.Id ?? library.SelectedIds().FirstOrDefault();
             switchButton.Command.Execute(null);
             navigatedDetails = false;
             RecomputeLayout();
-            if (prefs.PreserveGridScroll) Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(RestoreGridScroll));
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
+                if (!active || library.ActiveDesktopView != DesktopView.Grid) return;
+                if (Logic.ShouldRestoreSelection(selectedId, library.SelectedIds())) SelectGame(selectedId);
+                SyncSelection(false);
+                if (prefs.PreserveGridScroll) RestoreGridScroll();
+            }));
         }
         private void CaptureGridScroll()
         {
@@ -266,17 +357,29 @@ namespace HeliumHybrid
             api.Database.Series.ItemUpdated += MetadataUpdated;
             api.Database.Categories.ItemUpdated += MetadataUpdated;
             api.Database.Platforms.ItemUpdated += MetadataUpdated;
+            api.Database.Genres.ItemUpdated += MetadataUpdated;
+            api.Database.Tags.ItemUpdated += MetadataUpdated;
+            api.Database.Sources.ItemUpdated += MetadataUpdated;
+            api.Database.CompletionStatuses.ItemUpdated += MetadataUpdated;
             api.Database.Series.ItemCollectionChanged += MetadataChanged;
             api.Database.Categories.ItemCollectionChanged += MetadataChanged;
             api.Database.Platforms.ItemCollectionChanged += MetadataChanged;
+            api.Database.Genres.ItemCollectionChanged += MetadataChanged;
+            api.Database.Tags.ItemCollectionChanged += MetadataChanged;
+            api.Database.Sources.ItemCollectionChanged += MetadataChanged;
+            api.Database.CompletionStatuses.ItemCollectionChanged += MetadataChanged;
             lastDesktopView = library.ActiveDesktopView;
             window = Window.GetWindow(this);
-            if (window != null) window.SizeChanged += WindowSizeChanged;
+            if (window != null) {
+                window.SizeChanged += WindowSizeChanged;
+                window.PreviewKeyDown += WindowPreviewKeyDown;
+            }
             RecomputeLayout();
-            Interlocked.Exchange(ref dirty, 1); Refresh(); timer.Start();
+            Interlocked.Exchange(ref dirty, 1); Refresh(); RefreshGlobalFilterUi(); timer.Start();
         }
         private void OnUnloaded(object sender, RoutedEventArgs args)
         {
+            sortGroupPopup.IsOpen = false;
             if (!active) return; active = false; timer.Stop(); searchTimer.Stop(); coverClickTimer.Stop(); sidebarClickTimer.Stop(); sidebarDownItem = null; panelRequested = false; UnbindGridClicks();
             plugin.SelectionChanged -= SelectionChanged;
             plugin.SettingsChanged -= SettingsUpdated;
@@ -285,10 +388,21 @@ namespace HeliumHybrid
             api.Database.Series.ItemUpdated -= MetadataUpdated;
             api.Database.Categories.ItemUpdated -= MetadataUpdated;
             api.Database.Platforms.ItemUpdated -= MetadataUpdated;
+            api.Database.Genres.ItemUpdated -= MetadataUpdated;
+            api.Database.Tags.ItemUpdated -= MetadataUpdated;
+            api.Database.Sources.ItemUpdated -= MetadataUpdated;
+            api.Database.CompletionStatuses.ItemUpdated -= MetadataUpdated;
             api.Database.Series.ItemCollectionChanged -= MetadataChanged;
             api.Database.Categories.ItemCollectionChanged -= MetadataChanged;
             api.Database.Platforms.ItemCollectionChanged -= MetadataChanged;
-            if (window != null) window.SizeChanged -= WindowSizeChanged;
+            api.Database.Genres.ItemCollectionChanged -= MetadataChanged;
+            api.Database.Tags.ItemCollectionChanged -= MetadataChanged;
+            api.Database.Sources.ItemCollectionChanged -= MetadataChanged;
+            api.Database.CompletionStatuses.ItemCollectionChanged -= MetadataChanged;
+            if (window != null) {
+                window.SizeChanged -= WindowSizeChanged;
+                window.PreviewKeyDown -= WindowPreviewKeyDown;
+            }
             if (reopenButton != null) { reopenButton.Click -= ReopenClicked; reopenButton.Visibility = Visibility.Collapsed; reopenButton = null; }
             window = null;
             RestoreDetails();
@@ -307,8 +421,8 @@ namespace HeliumHybrid
                 Refresh();
             }
         }
-        private void MetadataUpdated<T>(object sender, ItemUpdatedEventArgs<T> args) where T : DatabaseObject { Interlocked.Exchange(ref dirty, 1); }
-        private void MetadataChanged<T>(object sender, ItemCollectionChangedEventArgs<T> args) where T : DatabaseObject { Interlocked.Exchange(ref dirty, 1); }
+        private void MetadataUpdated<T>(object sender, ItemUpdatedEventArgs<T> args) where T : DatabaseObject { filterOptionsDirty = true; Interlocked.Exchange(ref dirty, 1); }
+        private void MetadataChanged<T>(object sender, ItemCollectionChangedEventArgs<T> args) where T : DatabaseObject { filterOptionsDirty = true; Interlocked.Exchange(ref dirty, 1); }
         private void GamesUpdated(object sender, ItemUpdatedEventArgs<Game> args)
         {
             lock (updateGate) foreach (var update in args.UpdatedItems) pendingGameIds.Add(update.NewData.Id);
@@ -338,7 +452,7 @@ namespace HeliumHybrid
                 var ids = orderChanged ? NavigatorRefreshDecision.SortedIds(orderIds) : lastIds;
                 var changed = Interlocked.Exchange(ref dirty, 0) != 0;
                 var membershipChanged = NavigatorRefreshDecision.MembershipChanged(ids, lastIds);
-                var viewState = library.ViewState(prefs.Grouping);
+                var viewState = library.ViewState(NavigatorGrouping);
                 var viewStateChanged = NavigatorRefreshDecision.ViewStateChanged(viewState, lastViewState);
                 if (!changed && !membershipChanged && !orderChanged && !viewStateChanged)
                     changed = UpdateGameRows(games);
@@ -346,7 +460,7 @@ namespace HeliumHybrid
                 var rebuild = NavigatorRefreshDecision.ShouldRebuild(changed, membershipChanged,
                     orderChanged, viewStateChanged);
                 var diagnosticState = diagnostics.Enabled
-                    ? diagnostics.Capture(() => library.DiagnosticViewState(prefs.Grouping)) : null;
+                    ? diagnostics.Capture(() => library.DiagnosticViewState(NavigatorGrouping)) : null;
                 if (!rebuild) {
                     SyncSelection(false);
                     diagnostics.Record(diagnosticState, changed, membershipChanged, orderChanged,
@@ -362,10 +476,11 @@ namespace HeliumHybrid
                 var effectiveGrouping = EffectiveGrouping;
                 groupState.Mode = effectiveGrouping;
                 var projectionStart = diagnostics.Enabled ? Stopwatch.GetTimestamp() : 0;
-                var projected = NavigatorProjection.Build(library.Sources(games, effectiveGrouping), effectiveGrouping, library.ResolveIcon);
+                var projected = NavigatorProjection.Build(library.Sources(games, effectiveGrouping), effectiveGrouping,
+                    library.ResolveIcon, sortMode: SortMode, descending: prefs.SortDescending);
                 rows = projected.Select(row => new GameRow {
                     Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group, IconPath = row.IconPath, ActivityTicks = row.ActivityTicks, GroupOrder = row.GroupOrder,
-                    IsInstalled = row.IsInstalled, Favorite = row.Favorite
+                    IsInstalled = row.IsInstalled, Favorite = row.Favorite, SortValue = row.SortValue
                 }).ToList();
                 var projectionMs = diagnostics.Enabled ? NavigatorDiagnostics.MillisecondsSince(projectionStart) : 0;
                 var viewStart = diagnostics.Enabled ? Stopwatch.GetTimestamp() : 0;
@@ -382,8 +497,19 @@ namespace HeliumHybrid
                 SyncSelection(false); status.Text = ""; reportedError = false;
                 var generation = ++rebuildGeneration;
                 var currentView = view;
+                var revealRequest = revealAfterExplicitReorganization;
                 Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
                     if (!active || generation != rebuildGeneration || !ReferenceEquals(view, currentView)) return;
+                    if (revealRequest != null) {
+                        if (ReferenceEquals(revealAfterExplicitReorganization, revealRequest))
+                            revealAfterExplicitReorganization = null;
+                        var selected = library.SelectedIds();
+                        selected.IntersectWith(revealRequest);
+                        if (selected.Count != 0 && currentView.Cast<GameRow>().Any(row => selected.Contains(row.Id))) {
+                            RevealSelected(selected);
+                            return;
+                        }
+                    }
                     FindScroll(list)?.ScrollToVerticalOffset(scrollOffset);
                 }));
                 diagnostics.Record(diagnosticState, changed, membershipChanged, orderChanged,
@@ -410,11 +536,11 @@ namespace HeliumHybrid
                 var existing = rows.Where(row => row.Id == id).ToList();
                 if (existing.Count == 0 || !byId.TryGetValue(id, out var game)) continue;
                 var projected = NavigatorProjection.Build(library.Sources(new[] { game }, EffectiveGrouping),
-                    EffectiveGrouping, library.ResolveIcon);
+                    EffectiveGrouping, library.ResolveIcon, sortMode: SortMode, descending: prefs.SortDescending);
                 var prior = existing.Select(row => new NavigatorProjectedRow {
                     Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group,
                     IconPath = row.IconPath, IsInstalled = row.IsInstalled, Favorite = row.Favorite,
-                    ActivityTicks = row.ActivityTicks, GroupOrder = row.GroupOrder
+                    ActivityTicks = row.ActivityTicks, GroupOrder = row.GroupOrder, SortValue = row.SortValue
                 });
                 var kind = NavigatorRefreshDecision.ClassifyRows(prior, projected);
                 if (kind == NavigatorRowChange.Structural) return true;
@@ -438,6 +564,128 @@ namespace HeliumHybrid
             count.Text = NavigatorProjection.DistinctGameCount(view.Cast<GameRow>().Select(r => r.Id)) + " games";
             status.Text = view.IsEmpty ? "No games found. Check the global filters too." : "";
             SyncSelection(false);
+        }
+        private void ApplyGlobalFilterChange(Func<FilterPresetSettings, FilterPresetSettings> change)
+        {
+            var current = api.MainView.GetCurrentFilterSettings() ?? new FilterPresetSettings();
+            var next = change(current);
+            if (NavigatorFilterComposer.Same(current, next)) return;
+            // A temporary, unsaved preset with null view options changes filters without changing native sort or grouping.
+            api.MainView.ApplyFilterPreset(NavigatorFilterComposer.TemporaryPreset(next));
+            Interlocked.Exchange(ref dirty, 1);
+            RefreshGlobalFilterUi();
+            Refresh();
+        }
+        private static string FriendlySort(string value)
+        {
+            if (value == "LastActivity") return "Last Played";
+            if (value == "PlayCount") return "Most Played";
+            return System.Text.RegularExpressions.Regex.Replace(value ?? "Name", "(?<=[a-z])(?=[A-Z])", " ");
+        }
+        private static string SortLabel(NavigatorSortMode mode)
+        {
+            switch (mode) {
+                case NavigatorSortMode.Name: return "Name";
+                case NavigatorSortMode.LastPlayed: return "Last Played";
+                case NavigatorSortMode.Playtime: return "Playtime";
+                case NavigatorSortMode.ReleaseDate: return "Release Date";
+                default: return "Following Playnite";
+            }
+        }
+        private void UpdateSortGroupUi()
+        {
+            if (sortSummary == null) return;
+            var recent = grouping.SelectedIndex == 4;
+            var labels = new[] { "Native", "Series", "Category", "Platform" };
+            var index = grouping.SelectedIndex;
+            var name = index >= 0 && index < labels.Length ? labels[index] : "Native";
+            var mode = SortMode;
+            var sort = mode == NavigatorSortMode.FollowingPlaynite ? FriendlySort(library.SortOrder) : SortLabel(mode);
+            var direction = mode == NavigatorSortMode.FollowingPlaynite ? library.SortDirection :
+                (prefs.SortDescending ? "Descending" : "Ascending");
+            sortSummary.Text = recent ? "Recent Activity · Last Played · Descending" :
+                name + " · " + sort + " · " + direction;
+            updatingSortGroupUi = true;
+            try {
+                for (var i = 0; i < groupOptions.Length; i++) groupOptions[i].IsChecked = !recent && i == index;
+                for (var i = 0; i < sortOptions.Length; i++) sortOptions[i].IsChecked = !recent && i == (int)mode;
+                orderAscending.IsChecked = !recent && direction == "Ascending";
+                orderDescending.IsChecked = recent || direction == "Descending";
+            } finally { updatingSortGroupUi = false; }
+        }
+        private void SetSortMode(NavigatorSortMode mode)
+        {
+            if (updatingSortGroupUi) return;
+            Safe(() => {
+                RequestRevealAfterExplicitReorganization();
+                prefs.SortMode = (int)mode;
+                if (grouping.SelectedIndex == 4) grouping.SelectedIndex = previousGrouping;
+                else { Interlocked.Exchange(ref dirty, 1); Refresh(); Save(); }
+                UpdateSortGroupUi();
+            });
+        }
+        private void SetSortDirection(bool descending)
+        {
+            if (updatingSortGroupUi) return;
+            Safe(() => {
+                RequestRevealAfterExplicitReorganization();
+                prefs.SortDescending = descending;
+                if (SortMode == NavigatorSortMode.FollowingPlaynite)
+                    api.MainView.SortOrderDirection = descending ? SortOrderDirection.Descending : SortOrderDirection.Ascending;
+                if (grouping.SelectedIndex == 4) grouping.SelectedIndex = previousGrouping;
+                else { Interlocked.Exchange(ref dirty, 1); Refresh(); Save(); }
+                UpdateSortGroupUi();
+            });
+        }
+        private void RequestRevealAfterExplicitReorganization()
+        {
+            var selected = library.SelectedIds();
+            revealAfterExplicitReorganization = selected.Count == 0 ? null : selected;
+        }
+        private void SortGroupPopupPreviewKeyDown(object sender, KeyEventArgs args)
+        {
+            CloseSortGroupOnEscape(args);
+        }
+        private void WindowPreviewKeyDown(object sender, KeyEventArgs args)
+        {
+            CloseSortGroupOnEscape(args);
+        }
+        private void CloseSortGroupOnEscape(KeyEventArgs args)
+        {
+            if (!sortGroupPopup.IsOpen || args.Key != Key.Escape) return;
+            sortGroupPopup.IsOpen = false;
+            args.Handled = true;
+        }
+        private void RefreshGlobalFilterUi()
+        {
+            if (!active || IsCollapsed() || Visibility != Visibility.Visible) return;
+            var current = api.MainView.GetCurrentFilterSettings() ?? new FilterPresetSettings();
+            readyState.Observe(current);
+            var hasFilters = NavigatorFilterComposer.HasActiveFilters(current);
+            filterIndicator.Text = hasFilters ? "•" : "";
+            filtersButton.ToolTip = hasFilters ? "Global filters active — edit in Advanced Filters" : "Advanced Filters";
+            readyButton.Foreground = (Brush)root.Resources[readyState.IsActive(current) ? "SteamActiveBrush" : "SteamIconBrush"];
+            readyButton.IsEnabled = !readyState.IsActive(current) || readyState.OwnsRestriction;
+            readyButton.ToolTip = readyButton.IsEnabled ? "Ready to Play: installed games" :
+                "Installed filter is managed by Playnite; edit it in Advanced Filters";
+            filtersButton.Foreground = (Brush)root.Resources[filtersOpen ? "SteamActiveBrush" : "SteamIconBrush"];
+            if (filtersOpen) {
+                filterPanel.Refresh(current, filterOptionsDirty);
+                filterOptionsDirty = false;
+            }
+            UpdateShortcutState();
+        }
+        private void UpdateShortcutState()
+        {
+            recentButton.Foreground = (Brush)root.Resources[grouping.SelectedIndex == 4 ? "SteamActiveBrush" : "SteamIconBrush"];
+            homeButton.Foreground = (Brush)root.Resources[active && library.ActiveDesktopView == DesktopView.Grid ? "SteamActiveBrush" : "SteamIconBrush"];
+        }
+        private void ShowFilterPanel()
+        {
+            list.Visibility = filtersOpen ? Visibility.Collapsed : Visibility.Visible;
+            advancedPanel.Visibility = filtersOpen ? Visibility.Visible : Visibility.Collapsed;
+            if (filtersOpen) filterPanel.Refresh(api.MainView.GetCurrentFilterSettings() ?? new FilterPresetSettings(), true);
+            RefreshGlobalFilterUi();
         }
         private void RevealSelected(HashSet<Guid> selected)
         {
@@ -492,6 +740,7 @@ namespace HeliumHybrid
         {
             if (active && (library.ActiveDesktopView == DesktopView.List ||
                 (library.ActiveDesktopView == DesktopView.Details && !navigatedDetails))) {
+                sortGroupPopup.IsOpen = false;
                 Visibility = Visibility.Collapsed;
                 Width = 0;
                 if (reopenButton != null) reopenButton.Visibility = Visibility.Collapsed;
@@ -499,13 +748,16 @@ namespace HeliumHybrid
             }
             Visibility = Visibility.Visible;
             bool collapsed = IsCollapsed();
+            if (collapsed) sortGroupPopup.IsOpen = false;
             Width = collapsed ? 0 : prefs.Width;
-            list.Visibility = tools.Visibility = status.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+            tools.Visibility = status.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+            list.Visibility = collapsed || filtersOpen ? Visibility.Collapsed : Visibility.Visible;
+            advancedPanel.Visibility = collapsed || !filtersOpen ? Visibility.Collapsed : Visibility.Visible;
             grip.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
             toggle.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
             if (reopenButton != null) reopenButton.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
-            backButton.Visibility = navigatedDetails && library.ActiveDesktopView == DesktopView.Details && !collapsed ? Visibility.Visible : Visibility.Collapsed;
-            toggle.Content = "<<";
+            homeButton.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+            UpdateShortcutState();
         }
         private void ReopenClicked(object sender, RoutedEventArgs args)
         {

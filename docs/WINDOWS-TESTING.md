@@ -1,10 +1,10 @@
 # Windows acceptance checklist — v0.2.4 stability hotfix
 
-Back up v0.2.3 before testing. Use the maintainer's configuration: **Sidebar game click: Open Grid Details Panel**, **Grid cover click: Open Full Details View**, **Restore grid scroll position: enabled**. Note the view, selected game and Playnite log for failures.
+Back up v0.2.3 before testing. Use these settings: **Sidebar game click: Open Grid Details Panel**, **Grid cover click: Open Full Details View**, **Restore grid scroll position: enabled**. Note the view, selected game and Playnite log for failures.
 
-## Maintainer's v0.2.4 results
+## My v0.2.4 test results
 
-The maintainer installed the paired v0.2.4 packages in Playnite on Windows and reported **12 passed, 2 failed, 1 pending** checks. The failures are pressing one Navigator row and releasing over another, and dragging within the list then releasing over another game; either can leave the list behaving as though a mouse interaction is still active. The cause is unconfirmed. Preference persistence after a full Playnite restart remains pending. These results were reported by the maintainer, not reproduced by an automated test.
+I installed the paired v0.2.4 packages in Playnite on Windows and recorded **12 passed, 2 failed, 1 pending** checks. The failures are pressing one Navigator row and releasing over another, and dragging within the list then releasing over another game; either can leave the list behaving as though a mouse interaction is still active. The cause is unconfirmed. Preference persistence after a full Playnite restart remains pending. These were manual observations, not automated test results.
 
 ## Checklist for future regression testing
 

@@ -24,9 +24,9 @@ The theme view templates, Grid Details background, ThemeModifier values, convert
 
 ## Validation and limitations
 
-After this report was written, the maintainer tested the paired v0.2.4 packages in Playnite on Windows and accepted them for normal use: 12 checks passed, 2 mouse-release interactions failed, and preference persistence after a full restart remains untested. The mouse failures are not claimed fixed. The source and package verification in this report predates that acceptance test.
+After writing this report, I tested the paired v0.2.4 packages in Playnite on Windows and accepted them for normal use: 12 checks passed, 2 mouse-release interactions failed, and preference persistence after a full restart remains untested. The mouse failures are not claimed fixed. The source and package verification in this report predates that acceptance test.
 
-The extension compiled as an optimized .NET Framework 4.6.2 DLL against PlayniteSDK 6.11.0. Standalone settings tests exercised missing, valid and corrupt XML, original-byte backup, save and reload. Existing logic tests cover search, groups and layout. XAML/XML parsing, manifests and package integrity were checked. Static checks verify the native command bridge and persistent IDs. Linux cannot run Playnite Desktop or WPF interactions, so mouse, keyboard, view transitions, converter and installed extension combinations require the maintainer's Windows checklist. The normal save uses `File.Replace`, supported by the target Windows filesystem; storage errors are logged and leave the original file intact whenever replacement fails.
+The extension compiled as an optimized .NET Framework 4.6.2 DLL against PlayniteSDK 6.11.0. Standalone settings tests exercised missing, valid and corrupt XML, original-byte backup, save and reload. Existing logic tests cover search, groups and layout. XAML/XML parsing, manifests and package integrity were checked. Static checks verify the native command bridge and persistent IDs. Linux cannot run Playnite Desktop or WPF interactions, so mouse, keyboard, view transitions, converter and installed extension combinations still need the Windows checklist. The normal save uses `File.Replace`, supported by the target Windows filesystem; storage errors are logged and leave the original file intact whenever replacement fails.
 
 ## Install and rollback
 
