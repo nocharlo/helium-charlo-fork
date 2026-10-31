@@ -84,6 +84,7 @@ namespace HeliumHybrid
         private List<GameRow> rows = new List<GameRow>();
         private ListCollectionView view;
         private int rebuildGeneration;
+        private HashSet<Guid> revealAfterExplicitReorganization;
         private int NavigatorGrouping => shortcutGroupingOverride ?? prefs.Grouping;
         private NavigatorSortMode SortMode => NavigatorSortPolicy.ValidMode(prefs.SortMode);
         private int EffectiveGrouping => NavigatorRefreshDecision.EffectiveGrouping(NavigatorGrouping, library.Grouping, prefs.RecentActivityGroupingStyle);
@@ -158,6 +159,7 @@ namespace HeliumHybrid
             sortGroupButton.Click += (s, e) => { UpdateSortGroupUi(); sortGroupPopup.IsOpen = !sortGroupPopup.IsOpen; };
             foreach (var option in groupOptions) option.Checked += (s, e) => {
                 if (updatingSortGroupUi) return;
+                RequestRevealAfterExplicitReorganization();
                 grouping.SelectedIndex = int.Parse(((RadioButton)s).Tag.ToString(), System.Globalization.CultureInfo.InvariantCulture);
             };
             foreach (var option in sortOptions) option.Checked += (s, e) => {
@@ -169,7 +171,7 @@ namespace HeliumHybrid
             orderDescending.Checked += (s, e) => SetSortDirection(true);
             ((Button)root.FindName("SortClose")).Click += (s, e) => sortGroupPopup.IsOpen = false;
             ((Button)root.FindName("SortDone")).Click += (s, e) => sortGroupPopup.IsOpen = false;
-            sortGroupPopup.PreviewKeyDown += (s, e) => { if (e.Key == Key.Escape) { sortGroupPopup.IsOpen = false; e.Handled = true; } };
+            sortGroupPopup.PreviewKeyDown += SortGroupPopupPreviewKeyDown;
             homeButton.Click += (sender, args) => Safe(ReturnToGrid);
             recentButton.Click += (sender, args) => Safe(() => {
                 shortcutGroupingChange = true;
@@ -368,7 +370,10 @@ namespace HeliumHybrid
             api.Database.CompletionStatuses.ItemCollectionChanged += MetadataChanged;
             lastDesktopView = library.ActiveDesktopView;
             window = Window.GetWindow(this);
-            if (window != null) window.SizeChanged += WindowSizeChanged;
+            if (window != null) {
+                window.SizeChanged += WindowSizeChanged;
+                window.PreviewKeyDown += WindowPreviewKeyDown;
+            }
             RecomputeLayout();
             Interlocked.Exchange(ref dirty, 1); Refresh(); RefreshGlobalFilterUi(); timer.Start();
         }
@@ -394,7 +399,10 @@ namespace HeliumHybrid
             api.Database.Tags.ItemCollectionChanged -= MetadataChanged;
             api.Database.Sources.ItemCollectionChanged -= MetadataChanged;
             api.Database.CompletionStatuses.ItemCollectionChanged -= MetadataChanged;
-            if (window != null) window.SizeChanged -= WindowSizeChanged;
+            if (window != null) {
+                window.SizeChanged -= WindowSizeChanged;
+                window.PreviewKeyDown -= WindowPreviewKeyDown;
+            }
             if (reopenButton != null) { reopenButton.Click -= ReopenClicked; reopenButton.Visibility = Visibility.Collapsed; reopenButton = null; }
             window = null;
             RestoreDetails();
@@ -489,8 +497,19 @@ namespace HeliumHybrid
                 SyncSelection(false); status.Text = ""; reportedError = false;
                 var generation = ++rebuildGeneration;
                 var currentView = view;
+                var revealRequest = revealAfterExplicitReorganization;
                 Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
                     if (!active || generation != rebuildGeneration || !ReferenceEquals(view, currentView)) return;
+                    if (revealRequest != null) {
+                        if (ReferenceEquals(revealAfterExplicitReorganization, revealRequest))
+                            revealAfterExplicitReorganization = null;
+                        var selected = library.SelectedIds();
+                        selected.IntersectWith(revealRequest);
+                        if (selected.Count != 0 && currentView.Cast<GameRow>().Any(row => selected.Contains(row.Id))) {
+                            RevealSelected(selected);
+                            return;
+                        }
+                    }
                     FindScroll(list)?.ScrollToVerticalOffset(scrollOffset);
                 }));
                 diagnostics.Record(diagnosticState, changed, membershipChanged, orderChanged,
@@ -598,6 +617,7 @@ namespace HeliumHybrid
         {
             if (updatingSortGroupUi) return;
             Safe(() => {
+                RequestRevealAfterExplicitReorganization();
                 prefs.SortMode = (int)mode;
                 if (grouping.SelectedIndex == 4) grouping.SelectedIndex = previousGrouping;
                 else { Interlocked.Exchange(ref dirty, 1); Refresh(); Save(); }
@@ -608,6 +628,7 @@ namespace HeliumHybrid
         {
             if (updatingSortGroupUi) return;
             Safe(() => {
+                RequestRevealAfterExplicitReorganization();
                 prefs.SortDescending = descending;
                 if (SortMode == NavigatorSortMode.FollowingPlaynite)
                     api.MainView.SortOrderDirection = descending ? SortOrderDirection.Descending : SortOrderDirection.Ascending;
@@ -615,6 +636,25 @@ namespace HeliumHybrid
                 else { Interlocked.Exchange(ref dirty, 1); Refresh(); Save(); }
                 UpdateSortGroupUi();
             });
+        }
+        private void RequestRevealAfterExplicitReorganization()
+        {
+            var selected = library.SelectedIds();
+            revealAfterExplicitReorganization = selected.Count == 0 ? null : selected;
+        }
+        private void SortGroupPopupPreviewKeyDown(object sender, KeyEventArgs args)
+        {
+            CloseSortGroupOnEscape(args);
+        }
+        private void WindowPreviewKeyDown(object sender, KeyEventArgs args)
+        {
+            CloseSortGroupOnEscape(args);
+        }
+        private void CloseSortGroupOnEscape(KeyEventArgs args)
+        {
+            if (!sortGroupPopup.IsOpen || args.Key != Key.Escape) return;
+            sortGroupPopup.IsOpen = false;
+            args.Handled = true;
         }
         private void RefreshGlobalFilterUi()
         {
