@@ -93,9 +93,18 @@ I don't consider this a substitute for programming expertise. It's an experiment
 
 ## Roadmap
 
-- **v0.3.0 — Navigator Experience:** Completed feature milestone focused on Navigator navigation, organization, filtering, selection, and persistence.
-- **Future:** A broader Grid and Details visual redesign remains under consideration, without a promised version or date.
-- **Helium Home:** Continue Playing and library shelves remain future ideas. The earlier Continue Playing prototype is archived and is not part of v0.3.0.
+- **v0.3.1 — Navigator Organization & Customization (In Development):** Expands the grouping and sorting catalog, introduces a redesigned Sort & Group interface, and allows users to customize which organization modes appear. Also includes reorganized plugin settings, UX refinements, targeted refactoring, performance improvements, and reliability fixes.
+
+- **v0.3.2 — Intelligent Filters (Planned):** Redesigns Advanced Filters around a more compact, searchable, and intuitive interface. Planned improvements include easier metadata selection, clearer active-filter states, better navigation through large option lists, and performance refinements.
+
+- **v0.3.3 — Contextual Actions (Planned):** Expands the Navigator's game context menu with useful actions such as Play/Install, Edit, Set Category, and Set Completion Status. Additional integrations, including Friendly Set Playtime, may be explored depending on compatibility and available public Playnite APIs.
+
+### Beyond v0.3.x
+
+- **Theme Evolution:** Further refinements to the Grid and Details views, with a stronger visual identity and improved consistency across the Helium experience.
+- **Helium Home:** An experimental Steam-inspired library homepage featuring ideas such as Continue Playing and customizable game shelves. The earlier prototype remains archived, and its inclusion in a future release depends on technical feasibility and design quality.
+
+**This roadmap represents the project's current direction, not a commitment to specific features or release dates.** Priorities and scope may change as development progresses.
 
 These are ideas, not promises or release dates.
 
