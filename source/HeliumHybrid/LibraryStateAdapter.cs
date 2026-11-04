@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Playnite.SDK;
 using Playnite.SDK.Models;
+using Playnite.SDK.Plugins;
 
 namespace HeliumHybrid
 {
@@ -50,22 +51,44 @@ namespace HeliumHybrid
 
         internal IEnumerable<NavigatorSource> Sources(IEnumerable<Game> games, int grouping)
         {
+            var libraries = grouping == (int)NavigatorGroupPolicy.Library
+                ? api.Addons.Plugins.OfType<LibraryPlugin>().ToDictionary(p => p.Id, p => p.Name) : null;
             return games.Select(game => new NavigatorSource {
                 Id = game.Id, Name = game.Name, SortingName = game.SortingName,
-                Icon = game.Icon, GroupNames = GroupNames(game, grouping),
+                Icon = game.Icon, Groups = Groups(game, grouping, libraries),
                 IsInstalled = game.IsInstalled, Favorite = game.Favorite,
                 LastActivity = game.LastActivity, Playtime = game.Playtime,
-                ReleaseDate = game.ReleaseDate?.Date
+                ReleaseDate = game.ReleaseDate?.Date, Added = game.Added, Modified = game.Modified,
+                PlayCount = game.PlayCount, InstallSize = game.InstallSize, UserScore = game.UserScore,
+                CommunityScore = game.CommunityScore, CriticScore = game.CriticScore,
+                CompletionStatus = game.CompletionStatus?.Name
             });
         }
 
-        private static IEnumerable<string> GroupNames(Game game, int grouping)
+        private static IEnumerable<NavigatorGroupIdentity> Metadata(IEnumerable<DatabaseObject> values) =>
+            values?.Where(value => value != null && !string.IsNullOrWhiteSpace(value.Name))
+                .Select(value => new NavigatorGroupIdentity("metadata:" + value.Id, value.Name));
+
+        internal static IEnumerable<NavigatorGroupIdentity> Groups(Game game, int grouping, IDictionary<Guid, string> libraries = null)
         {
             switch (grouping) {
-                case 1: case 5: return game.Series?.Select(value => value.Name);
-                case 2: case 6: return game.Categories?.Select(value => value.Name);
-                case 3: case 7: return game.Platforms?.Select(value => value.Name);
-                case 4: return new[] { game.CompletionStatus?.Name ?? "None" };
+                case 1: case 5: return Metadata(game.Series);
+                case 2: case 6: return Metadata(game.Categories);
+                case 3: case 7: return Metadata(game.Platforms);
+                case 4: return Metadata(new[] { game.CompletionStatus });
+                case (int)NavigatorGroupPolicy.Genre: return Metadata(game.Genres);
+                case (int)NavigatorGroupPolicy.Tags: return Metadata(game.Tags);
+                case (int)NavigatorGroupPolicy.Developer: return Metadata(game.Developers);
+                case (int)NavigatorGroupPolicy.Publisher: return Metadata(game.Publishers);
+                case (int)NavigatorGroupPolicy.Features: return Metadata(game.Features);
+                case (int)NavigatorGroupPolicy.Source: return Metadata(new[] { game.Source });
+                case (int)NavigatorGroupPolicy.Region: return Metadata(game.Regions);
+                case (int)NavigatorGroupPolicy.AgeRating: return Metadata(game.AgeRatings);
+                case (int)NavigatorGroupPolicy.Library:
+                    if (game.PluginId == Guid.Empty) return new[] { new NavigatorGroupIdentity("library:manual", "Manually Added") };
+                    string name;
+                    return new[] { new NavigatorGroupIdentity("library:" + game.PluginId,
+                        libraries != null && libraries.TryGetValue(game.PluginId, out name) ? name : "Unavailable library") };
                 default: return null;
             }
         }

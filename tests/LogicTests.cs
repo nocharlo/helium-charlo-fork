@@ -11,7 +11,7 @@ class LogicTests
         Check(Logic.SearchKey("Pokémon — Special Edition").Contains(Logic.SearchKey("pokemon")), "Accent-insensitive search");
         Check(Logic.SearchKey(null) == "", "Missing title");
         Check(Logic.SearchKey("GOD OF WAR").Contains(Logic.SearchKey("god of war")), "Case-insensitive search");
-        Check(Logic.Groups(null).Single() == "No group", "No series");
+        Check(!Logic.Groups(null).Any(), "Missing metadata has no assigned group name");
         Check(Logic.Groups(new[]{"Series A", "Series A", "", " ", "Series B"}).Count() == 2, "Unique group membership");
         Check(Logic.ClampWidth(-100) == 180 && Logic.ClampWidth(900) == 380 && Logic.ClampWidth(double.NaN) == 230, "Valid width");
         Check(Logic.Compact(0, false, 850), "Compact at narrow width");

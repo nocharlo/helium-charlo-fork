@@ -32,8 +32,9 @@ namespace HeliumHybrid
         private readonly Popup sortGroupPopup;
         private readonly Button sortGroupButton;
         private readonly TextBlock sortSummary;
-        private readonly RadioButton[] groupOptions, sortOptions;
+        private readonly ComboBox groupOptions, sortOptions;
         private readonly RadioButton orderAscending, orderDescending;
+        private readonly FrameworkElement orderSection;
         private bool updatingSortGroupUi;
         private readonly TextBlock count, status;
         private readonly Button toggle;
@@ -50,6 +51,11 @@ namespace HeliumHybrid
         private volatile bool filterOptionsDirty;
         private int? shortcutGroupingOverride;
         private int previousGrouping;
+        private int SelectedGrouping
+        {
+            get => (grouping.SelectedItem as OrganizationMode)?.Id ?? 0;
+            set => grouping.SelectedItem = NavigatorOrganization.Group(value);
+        }
         private Button reopenButton;
         private readonly DispatcherTimer timer, searchTimer;
         private readonly DispatcherTimer coverClickTimer, sidebarClickTimer;
@@ -105,12 +111,11 @@ namespace HeliumHybrid
             sortGroupPopup = (Popup)root.FindName("SortGroupPopup");
             sortGroupButton = (Button)root.FindName("SortGroupButton");
             sortSummary = (TextBlock)root.FindName("SortSummary");
-            groupOptions = new[] { "GroupNative", "GroupSeries", "GroupCategory", "GroupPlatform" }
-                .Select(name => (RadioButton)root.FindName(name)).ToArray();
-            sortOptions = new[] { "SortNative", "SortName", "SortLastPlayed", "SortPlaytime", "SortReleaseDate" }
-                .Select(name => (RadioButton)root.FindName(name)).ToArray();
+            groupOptions = (ComboBox)root.FindName("GroupOptions");
+            sortOptions = (ComboBox)root.FindName("SortOptions");
             orderAscending = (RadioButton)root.FindName("OrderAscending");
             orderDescending = (RadioButton)root.FindName("OrderDescending");
+            orderSection = (FrameworkElement)root.FindName("OrderSection");
             status = (TextBlock)root.FindName("Status"); toggle = (Button)root.FindName("CollapseButton");
             grip = (Thumb)root.FindName("ResizeGrip"); tools = (FrameworkElement)root.FindName("Tools");
             homeButton = (Button)root.FindName("HomeButton");
@@ -123,8 +128,9 @@ namespace HeliumHybrid
             advancedPanel = (ScrollViewer)root.FindName("AdvancedPanel");
             filterPanel = new NavigatorFilterPanel(api, (StackPanel)root.FindName("FilterSections"),
                 change => Safe(() => ApplyGlobalFilterChange(change)));
-            grouping.SelectedIndex = Math.Max(0, Math.Min(4, prefs.Grouping));
-            previousGrouping = grouping.SelectedIndex == 4 ? 0 : grouping.SelectedIndex;
+            grouping.ItemsSource = NavigatorOrganization.Groups;
+            SelectedGrouping = prefs.Grouping;
+            previousGrouping = SelectedGrouping == 4 ? 0 : SelectedGrouping;
             groupState.Mode = EffectiveGrouping;
             timer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(1500) };
             timer.Tick += (s, e) => { RecomputeLayout(); Refresh(); Safe(RefreshGlobalFilterUi); UpdateSortGroupUi(); };
@@ -145,11 +151,11 @@ namespace HeliumHybrid
             };
             search.TextChanged += (s, e) => { searchTimer.Stop(); searchTimer.Start(); };
             grouping.SelectionChanged += (s, e) => {
-                if (grouping.SelectedIndex < 0) return;
+                if (!(grouping.SelectedItem is OrganizationMode) || updatingSortGroupUi) return;
                 if (shortcutGroupingChange)
-                    shortcutGroupingOverride = Logic.ShortcutGroupingOverride(prefs.Grouping, grouping.SelectedIndex);
-                else { shortcutGroupingOverride = null; prefs.Grouping = grouping.SelectedIndex; }
-                if (grouping.SelectedIndex != 4) previousGrouping = grouping.SelectedIndex;
+                    shortcutGroupingOverride = Logic.ShortcutGroupingOverride(prefs.Grouping, SelectedGrouping);
+                else { shortcutGroupingOverride = null; prefs.Grouping = SelectedGrouping; }
+                if (SelectedGrouping != 4) previousGrouping = SelectedGrouping;
                 groupState.Mode = EffectiveGrouping;
                 Interlocked.Exchange(ref dirty, 1); Refresh();
                 UpdateShortcutState();
@@ -157,25 +163,28 @@ namespace HeliumHybrid
                 if (!shortcutGroupingChange) Save();
             };
             sortGroupButton.Click += (s, e) => { UpdateSortGroupUi(); sortGroupPopup.IsOpen = !sortGroupPopup.IsOpen; };
-            foreach (var option in groupOptions) option.Checked += (s, e) => {
-                if (updatingSortGroupUi) return;
+            NavigatorOrganizationControls.ConfigureSelector(groupOptions, mode => {
+                if (updatingSortGroupUi || mode.Id == SelectedGrouping) return;
                 RequestRevealAfterExplicitReorganization();
-                grouping.SelectedIndex = int.Parse(((RadioButton)s).Tag.ToString(), System.Globalization.CultureInfo.InvariantCulture);
-            };
-            foreach (var option in sortOptions) option.Checked += (s, e) => {
-                if (updatingSortGroupUi) return;
-                SetSortMode(NavigatorSortPolicy.ValidMode(int.Parse(((RadioButton)s).Tag.ToString(),
-                    System.Globalization.CultureInfo.InvariantCulture)));
+                SelectedGrouping = mode.Id;
+            });
+            NavigatorOrganizationControls.ConfigureSelector(sortOptions, mode => {
+                if (!updatingSortGroupUi && mode.Id != (int)SortMode) SetSortMode(mode.SortPolicy);
+            });
+            PopulateOrganizationChoices();
+            sortGroupPopup.Opened += (s, e) => { PopulateOrganizationChoices(); groupOptions.Focus(); };
+            sortGroupPopup.Closed += (s, e) => {
+                groupOptions.IsDropDownOpen = sortOptions.IsDropDownOpen = false;
             };
             orderAscending.Checked += (s, e) => SetSortDirection(false);
             orderDescending.Checked += (s, e) => SetSortDirection(true);
-            ((Button)root.FindName("SortClose")).Click += (s, e) => sortGroupPopup.IsOpen = false;
-            ((Button)root.FindName("SortDone")).Click += (s, e) => sortGroupPopup.IsOpen = false;
+            ((Button)root.FindName("SortClose")).Click += (s, e) => DismissSortGroup();
+            ((Button)root.FindName("SortDone")).Click += (s, e) => DismissSortGroup();
             sortGroupPopup.PreviewKeyDown += SortGroupPopupPreviewKeyDown;
             homeButton.Click += (sender, args) => Safe(ReturnToGrid);
             recentButton.Click += (sender, args) => Safe(() => {
                 shortcutGroupingChange = true;
-                try { grouping.SelectedIndex = Logic.ToggleRecentGrouping(grouping.SelectedIndex, previousGrouping); }
+                try { SelectedGrouping = Logic.ToggleRecentGrouping(SelectedGrouping, previousGrouping); }
                 finally { shortcutGroupingChange = false; }
             });
             readyButton.Click += (sender, args) => Safe(() => ApplyGlobalFilterChange(state => readyState.Toggle(state)));
@@ -361,6 +370,10 @@ namespace HeliumHybrid
             api.Database.Tags.ItemUpdated += MetadataUpdated;
             api.Database.Sources.ItemUpdated += MetadataUpdated;
             api.Database.CompletionStatuses.ItemUpdated += MetadataUpdated;
+            api.Database.AgeRatings.ItemUpdated += MetadataUpdated;
+            api.Database.Regions.ItemUpdated += MetadataUpdated;
+            api.Database.Features.ItemUpdated += MetadataUpdated;
+            api.Database.Companies.ItemUpdated += MetadataUpdated;
             api.Database.Series.ItemCollectionChanged += MetadataChanged;
             api.Database.Categories.ItemCollectionChanged += MetadataChanged;
             api.Database.Platforms.ItemCollectionChanged += MetadataChanged;
@@ -368,6 +381,10 @@ namespace HeliumHybrid
             api.Database.Tags.ItemCollectionChanged += MetadataChanged;
             api.Database.Sources.ItemCollectionChanged += MetadataChanged;
             api.Database.CompletionStatuses.ItemCollectionChanged += MetadataChanged;
+            api.Database.AgeRatings.ItemCollectionChanged += MetadataChanged;
+            api.Database.Regions.ItemCollectionChanged += MetadataChanged;
+            api.Database.Features.ItemCollectionChanged += MetadataChanged;
+            api.Database.Companies.ItemCollectionChanged += MetadataChanged;
             lastDesktopView = library.ActiveDesktopView;
             window = Window.GetWindow(this);
             if (window != null) {
@@ -392,6 +409,10 @@ namespace HeliumHybrid
             api.Database.Tags.ItemUpdated -= MetadataUpdated;
             api.Database.Sources.ItemUpdated -= MetadataUpdated;
             api.Database.CompletionStatuses.ItemUpdated -= MetadataUpdated;
+            api.Database.AgeRatings.ItemUpdated -= MetadataUpdated;
+            api.Database.Regions.ItemUpdated -= MetadataUpdated;
+            api.Database.Features.ItemUpdated -= MetadataUpdated;
+            api.Database.Companies.ItemUpdated -= MetadataUpdated;
             api.Database.Series.ItemCollectionChanged -= MetadataChanged;
             api.Database.Categories.ItemCollectionChanged -= MetadataChanged;
             api.Database.Platforms.ItemCollectionChanged -= MetadataChanged;
@@ -399,6 +420,10 @@ namespace HeliumHybrid
             api.Database.Tags.ItemCollectionChanged -= MetadataChanged;
             api.Database.Sources.ItemCollectionChanged -= MetadataChanged;
             api.Database.CompletionStatuses.ItemCollectionChanged -= MetadataChanged;
+            api.Database.AgeRatings.ItemCollectionChanged -= MetadataChanged;
+            api.Database.Regions.ItemCollectionChanged -= MetadataChanged;
+            api.Database.Features.ItemCollectionChanged -= MetadataChanged;
+            api.Database.Companies.ItemCollectionChanged -= MetadataChanged;
             if (window != null) {
                 window.SizeChanged -= WindowSizeChanged;
                 window.PreviewKeyDown -= WindowPreviewKeyDown;
@@ -415,6 +440,7 @@ namespace HeliumHybrid
             if (!active) return;
             prefs.Width = Logic.ClampWidth(prefs.Width);
             ApplySize(); RecomputeLayout();
+            PopulateOrganizationChoices();
             if (groupState.Mode != EffectiveGrouping) {
                 groupState.Mode = EffectiveGrouping;
                 Interlocked.Exchange(ref dirty, 1);
@@ -479,18 +505,18 @@ namespace HeliumHybrid
                 var projected = NavigatorProjection.Build(library.Sources(games, effectiveGrouping), effectiveGrouping,
                     library.ResolveIcon, sortMode: SortMode, descending: prefs.SortDescending);
                 rows = projected.Select(row => new GameRow {
-                    Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group, IconPath = row.IconPath, ActivityTicks = row.ActivityTicks, GroupOrder = row.GroupOrder,
-                    IsInstalled = row.IsInstalled, Favorite = row.Favorite, SortValue = row.SortValue
+                    Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group, GroupIdentity = row.GroupIdentity, IconPath = row.IconPath, ActivityTicks = row.ActivityTicks, GroupOrder = row.GroupOrder,
+                    IsInstalled = row.IsInstalled, Favorite = row.Favorite, SortValue = row.SortValue, SortText = row.SortText
                 }).ToList();
                 var projectionMs = diagnostics.Enabled ? NavigatorDiagnostics.MillisecondsSince(projectionStart) : 0;
                 var viewStart = diagnostics.Enabled ? Stopwatch.GetTimestamp() : 0;
                 syncing = true;
                 try {
                     view = new ListCollectionView(rows);
-                    if (effectiveGrouping != 0) view.GroupDescriptions.Add(new PropertyGroupDescription("Group"));
+                    if (effectiveGrouping != 0) view.GroupDescriptions.Add(new PropertyGroupDescription("GroupIdentity"));
                     list.ItemsSource = view; ApplySearch();
                     if (selectedRow != null) {
-                        var occurrence = rows.FirstOrDefault(row => row.Id == selectedRow.Id && row.Group == selectedRow.Group && view.Contains(row));
+                        var occurrence = rows.FirstOrDefault(row => row.Id == selectedRow.Id && Equals(row.GroupIdentity, selectedRow.GroupIdentity) && view.Contains(row));
                         if (occurrence != null && library.IsSelected(occurrence.Id)) list.SelectedItem = occurrence;
                     }
                 } finally { syncing = false; }
@@ -531,16 +557,18 @@ namespace HeliumHybrid
         {
             var pending = TakePendingGameUpdates();
             if (pending.Length == 0) return false;
-            var byId = games.Where(game => pending.Contains(game.Id)).ToDictionary(game => game.Id);
+            var pendingSet = new HashSet<Guid>(pending);
+            var byId = games.Where(game => pendingSet.Contains(game.Id)).ToDictionary(game => game.Id);
+            var occurrences = rows.Where(row => pendingSet.Contains(row.Id)).ToLookup(row => row.Id);
             foreach (var id in pending) {
-                var existing = rows.Where(row => row.Id == id).ToList();
+                var existing = occurrences[id].ToList();
                 if (existing.Count == 0 || !byId.TryGetValue(id, out var game)) continue;
                 var projected = NavigatorProjection.Build(library.Sources(new[] { game }, EffectiveGrouping),
                     EffectiveGrouping, library.ResolveIcon, sortMode: SortMode, descending: prefs.SortDescending);
                 var prior = existing.Select(row => new NavigatorProjectedRow {
-                    Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group,
+                    Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group, GroupIdentity = row.GroupIdentity,
                     IconPath = row.IconPath, IsInstalled = row.IsInstalled, Favorite = row.Favorite,
-                    ActivityTicks = row.ActivityTicks, GroupOrder = row.GroupOrder, SortValue = row.SortValue
+                    ActivityTicks = row.ActivityTicks, GroupOrder = row.GroupOrder, SortValue = row.SortValue, SortText = row.SortText
                 });
                 var kind = NavigatorRefreshDecision.ClassifyRows(prior, projected);
                 if (kind == NavigatorRowChange.Structural) return true;
@@ -582,35 +610,36 @@ namespace HeliumHybrid
             if (value == "PlayCount") return "Most Played";
             return System.Text.RegularExpressions.Regex.Replace(value ?? "Name", "(?<=[a-z])(?=[A-Z])", " ");
         }
-        private static string SortLabel(NavigatorSortMode mode)
+        private void PopulateOrganizationChoices()
         {
-            switch (mode) {
-                case NavigatorSortMode.Name: return "Name";
-                case NavigatorSortMode.LastPlayed: return "Last Played";
-                case NavigatorSortMode.Playtime: return "Playtime";
-                case NavigatorSortMode.ReleaseDate: return "Release Date";
-                default: return "Following Playnite";
-            }
+            updatingSortGroupUi = true;
+            try {
+                NavigatorOrganizationControls.Choices(groupOptions, prefs.VisibleGroupingModes, true, SelectedGrouping);
+                NavigatorOrganizationControls.Choices(sortOptions, prefs.VisibleSortingModes, false, (int)SortMode);
+            } finally { updatingSortGroupUi = false; }
+            UpdateSortGroupUi();
         }
         private void UpdateSortGroupUi()
         {
             if (sortSummary == null) return;
-            var recent = grouping.SelectedIndex == 4;
-            var labels = new[] { "Native", "Series", "Category", "Platform" };
-            var index = grouping.SelectedIndex;
-            var name = index >= 0 && index < labels.Length ? labels[index] : "Native";
+            var recent = SelectedGrouping == 4;
             var mode = SortMode;
-            var sort = mode == NavigatorSortMode.FollowingPlaynite ? FriendlySort(library.SortOrder) : SortLabel(mode);
+            var sort = mode == NavigatorSortMode.FollowingPlaynite ? FriendlySort(library.SortOrder) : NavigatorOrganization.Sort((int)mode).Label;
             var direction = mode == NavigatorSortMode.FollowingPlaynite ? library.SortDirection :
                 (prefs.SortDescending ? "Descending" : "Ascending");
-            sortSummary.Text = recent ? "Recent Activity · Last Played · Descending" :
-                name + " · " + sort + " · " + direction;
+            var inherited = mode == NavigatorSortMode.FollowingPlaynite;
+            sortSummary.Text = recent && inherited ? "Recent Activity · Newest first" :
+                NavigatorOrganization.Group(SelectedGrouping).Label + " · " + sort + " · " + direction;
             updatingSortGroupUi = true;
             try {
-                for (var i = 0; i < groupOptions.Length; i++) groupOptions[i].IsChecked = !recent && i == index;
-                for (var i = 0; i < sortOptions.Length; i++) sortOptions[i].IsChecked = !recent && i == (int)mode;
-                orderAscending.IsChecked = !recent && direction == "Ascending";
-                orderDescending.IsChecked = recent || direction == "Descending";
+                // Hidden active modes stay represented until another mode is explicitly chosen.
+                var group = NavigatorOrganization.Group(SelectedGrouping);
+                if (!groupOptions.IsKeyboardFocusWithin && !groupOptions.Items.Contains(group)) NavigatorOrganizationControls.Choices(groupOptions, prefs.VisibleGroupingModes, true, SelectedGrouping);
+                if (!groupOptions.IsKeyboardFocusWithin) groupOptions.SelectedItem = group;
+                if (!sortOptions.IsKeyboardFocusWithin) sortOptions.SelectedItem = NavigatorOrganization.Sort((int)mode);
+                orderSection.Visibility = inherited ? Visibility.Collapsed : Visibility.Visible;
+                orderAscending.IsChecked = !prefs.SortDescending;
+                orderDescending.IsChecked = prefs.SortDescending;
             } finally { updatingSortGroupUi = false; }
         }
         private void SetSortMode(NavigatorSortMode mode)
@@ -619,21 +648,17 @@ namespace HeliumHybrid
             Safe(() => {
                 RequestRevealAfterExplicitReorganization();
                 prefs.SortMode = (int)mode;
-                if (grouping.SelectedIndex == 4) grouping.SelectedIndex = previousGrouping;
-                else { Interlocked.Exchange(ref dirty, 1); Refresh(); Save(); }
+                Interlocked.Exchange(ref dirty, 1); Refresh(); Save();
                 UpdateSortGroupUi();
             });
         }
         private void SetSortDirection(bool descending)
         {
-            if (updatingSortGroupUi) return;
+            if (updatingSortGroupUi || SortMode == NavigatorSortMode.FollowingPlaynite) return;
             Safe(() => {
                 RequestRevealAfterExplicitReorganization();
                 prefs.SortDescending = descending;
-                if (SortMode == NavigatorSortMode.FollowingPlaynite)
-                    api.MainView.SortOrderDirection = descending ? SortOrderDirection.Descending : SortOrderDirection.Ascending;
-                if (grouping.SelectedIndex == 4) grouping.SelectedIndex = previousGrouping;
-                else { Interlocked.Exchange(ref dirty, 1); Refresh(); Save(); }
+                Interlocked.Exchange(ref dirty, 1); Refresh(); Save();
                 UpdateSortGroupUi();
             });
         }
@@ -653,8 +678,18 @@ namespace HeliumHybrid
         private void CloseSortGroupOnEscape(KeyEventArgs args)
         {
             if (!sortGroupPopup.IsOpen || args.Key != Key.Escape) return;
-            sortGroupPopup.IsOpen = false;
+            if (groupOptions.IsDropDownOpen || sortOptions.IsDropDownOpen) {
+                groupOptions.IsDropDownOpen = sortOptions.IsDropDownOpen = false;
+                args.Handled = true;
+                return;
+            }
+            DismissSortGroup();
             args.Handled = true;
+        }
+        private void DismissSortGroup()
+        {
+            sortGroupPopup.IsOpen = false;
+            sortGroupButton.Focus();
         }
         private void RefreshGlobalFilterUi()
         {
@@ -677,7 +712,7 @@ namespace HeliumHybrid
         }
         private void UpdateShortcutState()
         {
-            recentButton.Foreground = (Brush)root.Resources[grouping.SelectedIndex == 4 ? "SteamActiveBrush" : "SteamIconBrush"];
+            recentButton.Foreground = (Brush)root.Resources[SelectedGrouping == 4 ? "SteamActiveBrush" : "SteamIconBrush"];
             homeButton.Foreground = (Brush)root.Resources[active && library.ActiveDesktopView == DesktopView.Grid ? "SteamActiveBrush" : "SteamIconBrush"];
         }
         private void ShowFilterPanel()
@@ -691,13 +726,13 @@ namespace HeliumHybrid
         {
             if (view == null || IsCollapsed() || Visibility != Visibility.Visible) return;
             var matching = view.Cast<GameRow>().Where(item => selected.Contains(item.Id)).ToList();
-            var row = matching.FirstOrDefault(item => groupState.IsExpanded(EffectiveGrouping, item.Group)) ??
+            var row = matching.FirstOrDefault(item => groupState.IsExpanded(EffectiveGrouping, item.GroupIdentity)) ??
                 matching.FirstOrDefault();
             if (row == null) return;
             var mode = EffectiveGrouping;
             if (mode != 0) {
-                groupState.SetExpanded(mode, row.Group, true);
-                var visibleGroup = FindGroupExpander(list, row.Group);
+                groupState.SetExpanded(mode, row.GroupIdentity, true);
+                var visibleGroup = FindGroupExpander(list, row.GroupIdentity);
                 if (visibleGroup != null) visibleGroup.IsExpanded = true;
             }
             syncing = true;
@@ -708,17 +743,16 @@ namespace HeliumHybrid
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
                 if (!active || !ReferenceEquals(view, currentView) || !view.Contains(row)) return;
                 if (mode != 0) {
-                    var group = FindGroupExpander(list, row.Group);
+                    var group = FindGroupExpander(list, row.GroupIdentity);
                     if (group != null) group.IsExpanded = true;
                 }
                 list.ScrollIntoView(row);
             }));
         }
-        private static NavigatorGroupExpander FindGroupExpander(DependencyObject root, string name)
+        private static NavigatorGroupExpander FindGroupExpander(DependencyObject root, NavigatorGroupIdentity name)
         {
             if (root is NavigatorGroupExpander expander &&
-                string.Equals((expander.DataContext as CollectionViewGroup)?.Name?.ToString(),
-                    name, StringComparison.Ordinal)) return expander;
+                Equals((expander.DataContext as CollectionViewGroup)?.Name, name)) return expander;
             for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++) {
                 var match = FindGroupExpander(VisualTreeHelper.GetChild(root, i), name);
                 if (match != null) return match;

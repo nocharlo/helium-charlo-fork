@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -18,6 +17,11 @@ namespace HeliumHybrid
         // 0 follows Playnite; other values sort Navigator rows within each group.
         public int SortMode { get; set; }
         public bool SortDescending { get; set; }
+        // Null means an older file: use catalog defaults. Lists are ordered visibility selections.
+        public List<int> VisibleGroupingModes { get; set; }
+        public List<int> VisibleSortingModes { get; set; }
+        [XmlIgnore] public bool VisibleGroupingModesSpecified { get; set; }
+        [XmlIgnore] public bool VisibleSortingModesSpecified { get; set; }
         public int RecentActivityGroupingStyle { get; set; } // 0: Hybrid, 1: Detailed.
         [XmlIgnore] public bool RecentActivityGroupingStyleSpecified { get; set; }
         // 0: Automatic, 1: Always hidden, 2: Always visible.
@@ -38,6 +42,10 @@ namespace HeliumHybrid
                 RecentActivityGroupingStyleSpecified);
             RecentActivityGroupingStyleSpecified = true;
             SortMode = (int)NavigatorSortPolicy.ValidMode(SortMode);
+            Grouping = NavigatorOrganization.Group(Grouping).Id;
+            VisibleGroupingModes = NavigatorOrganization.Normalize(VisibleGroupingModesSpecified ? VisibleGroupingModes : null, true);
+            VisibleSortingModes = NavigatorOrganization.Normalize(VisibleSortingModesSpecified ? VisibleSortingModes : null, false);
+            VisibleGroupingModesSpecified = VisibleSortingModesSpecified = true;
         }
         public bool PreserveGridScroll { get; set; } = true;
         public bool AutomaticallyRevealSelectedGame { get; set; } = true;
@@ -58,6 +66,9 @@ namespace HeliumHybrid
         }
         public void EndEdit()
         {
+            VisibleGroupingModes = NavigatorOrganization.Normalize(VisibleGroupingModes, true);
+            VisibleSortingModes = NavigatorOrganization.Normalize(VisibleSortingModes, false);
+            VisibleGroupingModesSpecified = VisibleSortingModesSpecified = true;
             backup = null;
             Save?.Invoke();
             Changed?.Invoke();
@@ -71,7 +82,11 @@ namespace HeliumHybrid
         }
         private Preferences Copy() => new Preferences { Width = Width, Collapsed = Collapsed, Grouping = Grouping,
             SortMode = SortMode, SortDescending = SortDescending,
-            LayoutMode = LayoutMode, SteamMode = SteamMode, OpenFromGridCover = OpenFromGridCover,
+            VisibleGroupingModes = VisibleGroupingModes == null ? null : new List<int>(VisibleGroupingModes),
+            VisibleSortingModes = VisibleSortingModes == null ? null : new List<int>(VisibleSortingModes),
+            VisibleGroupingModesSpecified = VisibleGroupingModesSpecified, VisibleSortingModesSpecified = VisibleSortingModesSpecified,
+            LayoutMode = LayoutMode,
+            SteamMode = SteamMode, OpenFromGridCover = OpenFromGridCover,
             SidebarClickAction = SidebarClickAction, GridCoverClickAction = GridCoverClickAction,
             PreserveGridScroll = PreserveGridScroll, AutomaticallyRevealSelectedGame = AutomaticallyRevealSelectedGame,
             RecentActivityGroupingStyle = RecentActivityGroupingStyle,
@@ -80,7 +95,12 @@ namespace HeliumHybrid
         {
             Width = value.Width; Collapsed = value.Collapsed; Grouping = value.Grouping;
             SortMode = value.SortMode; SortDescending = value.SortDescending;
-            LayoutMode = value.LayoutMode; SteamMode = value.SteamMode;
+            VisibleGroupingModes = value.VisibleGroupingModes == null ? null : new List<int>(value.VisibleGroupingModes);
+            VisibleSortingModes = value.VisibleSortingModes == null ? null : new List<int>(value.VisibleSortingModes);
+            VisibleGroupingModesSpecified = value.VisibleGroupingModesSpecified;
+            VisibleSortingModesSpecified = value.VisibleSortingModesSpecified;
+            LayoutMode = value.LayoutMode;
+            SteamMode = value.SteamMode;
             OpenFromGridCover = value.OpenFromGridCover; PreserveGridScroll = value.PreserveGridScroll;
             AutomaticallyRevealSelectedGame = value.AutomaticallyRevealSelectedGame;
             RecentActivityGroupingStyle = value.RecentActivityGroupingStyle;
@@ -93,38 +113,94 @@ namespace HeliumHybrid
     {
         public NavigatorSettingsView()
         {
-            var panel = new StackPanel { Margin = new Thickness(18) };
-            panel.Children.Add(new TextBlock { Text = "Navigation", FontWeight = FontWeights.Bold, Margin = new Thickness(0,0,0,8) });
-            panel.Children.Add(NavigationChoice("Sidebar game click", "SidebarClickAction"));
-            panel.Children.Add(NavigationChoice("Grid cover click", "GridCoverClickAction"));
-            panel.Children.Add(BoundCheck("Restore grid scroll position when returning", "PreserveGridScroll"));
-            panel.Children.Add(BoundCheck("Automatically reveal selected game", "AutomaticallyRevealSelectedGame"));
-            var activityStyle = new ComboBox { MaxWidth = 260, HorizontalAlignment = HorizontalAlignment.Left,
-                Margin = new Thickness(0,4,0,8) };
-            activityStyle.Items.Add("Hybrid"); activityStyle.Items.Add("Detailed");
-            activityStyle.SetBinding(ComboBox.SelectedIndexProperty, new Binding("RecentActivityGroupingStyle") { Mode = BindingMode.TwoWay });
-            panel.Children.Add(new TextBlock { Text = "Recent Activity grouping style" });
-            panel.Children.Add(activityStyle);
-            panel.Children.Add(new TextBlock { Text = "Grid details panel", FontWeight = FontWeights.Bold, Margin = new Thickness(0,16,0,7) });
-            var mode = new ComboBox { Margin = new Thickness(0,0,0,8), MaxWidth = 260, HorizontalAlignment = HorizontalAlignment.Left };
-            mode.Items.Add("Automatic"); mode.Items.Add("Always hidden"); mode.Items.Add("Always visible");
-            mode.SetBinding(ComboBox.SelectedIndexProperty, new Binding("LayoutMode") { Mode = BindingMode.TwoWay });
-            panel.Children.Add(mode);
-            panel.Children.Add(new TextBlock { Text = "Sidebar", FontWeight = FontWeights.Bold, Margin = new Thickness(0,16,0,7) });
-            panel.Children.Add(new TextBlock { Text = "Width in pixels (180–380)" });
-            var width = new TextBox { MaxWidth = 100, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0,4,0,8) };
+            var clicks = new StackPanel();
+            var clickActions = new[] { "Open Full Details View", "Open Grid Details Panel" };
+            clicks.Children.Add(Choice("Sidebar game click", "SidebarClickAction", clickActions));
+            clicks.Children.Add(Choice("Grid cover click", "GridCoverClickAction", clickActions));
+            var selection = new StackPanel();
+            selection.Children.Add(BoundCheck("Restore grid scroll position when returning", "PreserveGridScroll"));
+            selection.Children.Add(BoundCheck("Automatically reveal selected game", "AutomaticallyRevealSelectedGame"));
+
+            var width = new TextBox { Width = 96, MinHeight = 26, HorizontalAlignment = HorizontalAlignment.Left, ToolTip = "180–380 px" };
+            System.Windows.Automation.AutomationProperties.SetName(width, "Sidebar width");
             width.SetBinding(TextBox.TextProperty, new Binding("Width") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
-            panel.Children.Add(width);
-            panel.Children.Add(new TextBlock { Text = "Width and expanded state are saved automatically when changed in the sidebar.", TextWrapping = TextWrapping.Wrap });
-            Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+
+            var activity = Section("Recent Activity", ActivityStyle());
+            var organization = new Grid();
+            Action populate = () => {
+                organization.Children.Clear();
+                if (!(DataContext is Preferences prefs)) return;
+                organization.Children.Add(NavigatorOrganizationControls.VisibilityEditor(prefs, true));
+                organization.Children.Add(NavigatorOrganizationControls.VisibilityEditor(prefs, false));
+                NavigatorOrganizationControls.ArrangeEditors(organization, organization.ActualWidth);
+            };
+            organization.SizeChanged += (s, e) => NavigatorOrganizationControls.ArrangeEditors(organization, e.NewSize.Width);
+            Loaded += (s, e) => populate();
+            DataContextChanged += (s, e) => populate();
+
+            var tabs = new TabControl();
+            tabs.Items.Add(Page("Navigation", Section("Click actions", clicks), Section("Selection and scroll", selection)));
+            tabs.Items.Add(Page("Appearance", Section("Grid details panel",
+                Choice("Display mode", "LayoutMode", "Automatic", "Always hidden", "Always visible")),
+                Section("Sidebar width", width)));
+            tabs.Items.Add(Page("Organization", activity, organization));
+            Content = tabs;
         }
-        private static StackPanel NavigationChoice(string title, string path)
+
+        internal static GroupBox Section(string title, FrameworkElement content) => new GroupBox {
+            Header = new TextBlock { Text = title, FontWeight = FontWeights.SemiBold },
+            Content = content, Margin = new Thickness(0, 0, 0, 12),
+            Padding = new Thickness(12, 8, 12, 10), HorizontalContentAlignment = HorizontalAlignment.Stretch
+        };
+
+        private static ListBox ActivityStyle()
+        {
+            var cards = new ListBox {
+                BorderThickness = new Thickness(0), Padding = new Thickness(0),
+                Background = System.Windows.Media.Brushes.Transparent,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch
+            };
+            System.Windows.Automation.AutomationProperties.SetName(cards, "Recent Activity grouping style");
+            ScrollViewer.SetHorizontalScrollBarVisibility(cards, ScrollBarVisibility.Disabled);
+            var columns = new FrameworkElementFactory(typeof(System.Windows.Controls.Primitives.UniformGrid));
+            columns.SetValue(System.Windows.Controls.Primitives.UniformGrid.ColumnsProperty, 2);
+            cards.ItemsPanel = new ItemsPanelTemplate(columns);
+            cards.Items.Add(ActivityCard("Hybrid", "This year by month, older years grouped"));
+            cards.Items.Add(ActivityCard("Detailed", "Month-by-month history"));
+            cards.SetBinding(ListBox.SelectedIndexProperty, new Binding(nameof(Preferences.RecentActivityGroupingStyle)) { Mode = BindingMode.TwoWay });
+            return cards;
+        }
+
+        private static ListBoxItem ActivityCard(string title, string description)
+        {
+            var panel = new StackPanel { Margin = new Thickness(8, 5, 8, 5) };
+            panel.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold });
+            panel.Children.Add(new TextBlock { Text = description, TextWrapping = TextWrapping.Wrap, FontSize = 11, Margin = new Thickness(0, 3, 0, 0) });
+            var card = new ListBoxItem {
+                Content = panel, MinHeight = 68, HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                VerticalContentAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 4)
+            };
+            System.Windows.Automation.AutomationProperties.SetName(card, title + ". " + description);
+            return card;
+        }
+
+        private static TabItem Page(string title, params FrameworkElement[] sections)
+        {
+            var panel = new StackPanel { Margin = new Thickness(14) };
+            foreach (var section in sections) panel.Children.Add(section);
+            return new TabItem { Header = title, Content = new ScrollViewer {
+                Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+            }};
+        }
+
+        private static StackPanel Choice(string title, string path, params string[] options)
         {
             var group = new StackPanel { Margin = new Thickness(0, 4, 0, 8) };
             group.Children.Add(new TextBlock { Text = title });
-            var choice = new ComboBox { MaxWidth = 260, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, 0, 0) };
-            choice.Items.Add("Open Full Details View");
-            choice.Items.Add("Open Grid Details Panel");
+            var choice = new ComboBox { MinWidth = 160, MaxWidth = 260, MinHeight = 26, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 5, 0, 0) };
+            System.Windows.Automation.AutomationProperties.SetName(choice, title);
+            foreach (var option in options) choice.Items.Add(option);
             choice.SetBinding(ComboBox.SelectedIndexProperty, new Binding(path) { Mode = BindingMode.TwoWay });
             group.Children.Add(choice);
             return group;

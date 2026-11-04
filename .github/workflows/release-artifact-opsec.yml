@@ -7,6 +7,8 @@ on:
       - "scripts/Helium-TestHarness.ps1"
       - "scripts/check_artifact_opsec.py"
       - "tests/ArtifactOpsecTests.py"
+      - "tests/**"
+      - "scripts/Test-Navigator.ps1"
       - "source/HeliumHybrid/**"
       - "theme/**"
   workflow_dispatch:
@@ -27,6 +29,9 @@ jobs:
           python-version: "3.11"
       - name: Verify binary leak detector
         run: python tests/ArtifactOpsecTests.py
+      - name: Navigator regression suites
+        shell: pwsh
+        run: ./scripts/Test-Navigator.ps1
       - name: Build and inspect packages
         shell: pwsh
         run: |
