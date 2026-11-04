@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net462</TargetFramework><LangVersion>7.3</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="PlayniteSDK" Version="6.11.0" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net462" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="PresentationCore"/><Reference Include="PresentationFramework"/>
+    <Reference Include="WindowsBase"/><Reference Include="System.Xaml"/>
+    <Compile Include="NavigatorOrganizationTests.cs"/>
+    <Compile Include="../source/HeliumHybrid/NavigatorOrganization.cs"/>
+    <Compile Include="../source/HeliumHybrid/NavigatorOrganizationControls.cs"/>
+    <Compile Include="../source/HeliumHybrid/NavigatorProjection.cs"/>
+    <Compile Include="../source/HeliumHybrid/NavigatorPresentation.cs"/>
+    <Compile Include="../source/HeliumHybrid/NavigatorGroupStateModel.cs"/>
+    <Compile Include="../source/HeliumHybrid/NavigatorGroupState.cs"/>
+    <EmbeddedResource Include="../source/HeliumHybrid/Navigator.xaml" LogicalName="Navigator.xaml"/>
+    <Compile Include="../source/HeliumHybrid/NavigatorRefreshDecision.cs"/>
+    <Compile Include="../source/HeliumHybrid/Settings.cs"/>
+    <Compile Include="../source/HeliumHybrid/SettingsFile.cs"/>
+    <Compile Include="../source/HeliumHybrid/Logic.cs"/>
+  </ItemGroup>
+</Project>

@@ -125,33 +125,71 @@
         </Grid>
       </Button>
       <Popup x:Name="SortGroupPopup" Placement="Right" PlacementTarget="{Binding ElementName=SortGroupButton}" HorizontalOffset="5" StaysOpen="False" AllowsTransparency="True" Focusable="False">
-        <Border Width="310" Background="#FF30343D" BorderBrush="#FF48515E" BorderThickness="1" CornerRadius="5" Padding="12">
+        <Border Width="300" Background="#FF292F38" BorderBrush="#FF485766" BorderThickness="1" CornerRadius="7" Padding="14">
           <Border.Resources>
+            <GroupStyle x:Key="OrganizationMenuGroup">
+              <GroupStyle.HeaderTemplate><DataTemplate>
+                <TextBlock Text="{Binding Name}" Foreground="#FFAEC3D7" FontSize="10" FontWeight="SemiBold" Margin="8,7,8,3"/>
+              </DataTemplate></GroupStyle.HeaderTemplate>
+            </GroupStyle>
             <Style TargetType="RadioButton"><Setter Property="Foreground" Value="#FFE5EAF1"/><Setter Property="Margin" Value="0,2"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton">
-              <Border x:Name="Face" Background="#FF363B44" BorderBrush="Transparent" BorderThickness="1" CornerRadius="3" Padding="7,5"><StackPanel Orientation="Horizontal"><Ellipse Width="12" Height="12" Stroke="#FFA5B0BD" StrokeThickness="1.5" Margin="0,0,7,0"><Ellipse.Style><Style TargetType="Ellipse"><Setter Property="Fill" Value="Transparent"/><Style.Triggers><DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=RadioButton}}" Value="True"><Setter Property="Fill" Value="#FF56B8F4"/></DataTrigger></Style.Triggers></Style></Ellipse.Style></Ellipse><ContentPresenter/></StackPanel></Border>
-              <ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Face" Property="Background" Value="#FF405773"/></Trigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Face" Property="BorderBrush" Value="#FF64788C"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Face" Property="BorderBrush" Value="#FF8FC8EE"/></Trigger></ControlTemplate.Triggers>
+              <Border x:Name="Face" Background="#FF363B44" BorderBrush="Transparent" BorderThickness="1" CornerRadius="3" Padding="7,5">
+                <StackPanel Orientation="Horizontal">
+                  <Ellipse x:Name="OrderMarker" Width="12" Height="12" Fill="Transparent" Stroke="#FFA5B0BD" StrokeThickness="1.5" Margin="0,0,7,0"/>
+                  <ContentPresenter/>
+                </StackPanel>
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="IsChecked" Value="True">
+                  <Setter TargetName="Face" Property="Background" Value="#FF405773"/>
+                  <Setter TargetName="OrderMarker" Property="Fill" Value="#FF56B8F4"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Face" Property="BorderBrush" Value="#FF64788C"/></Trigger>
+                <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Face" Property="BorderBrush" Value="#FF8FC8EE"/></Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                  <Setter TargetName="Face" Property="Background" Value="#FF30343A"/>
+                  <Setter TargetName="Face" Property="BorderBrush" Value="Transparent"/>
+                  <Setter TargetName="OrderMarker" Property="Stroke" Value="#FF858C95"/>
+                  <Setter Property="Foreground" Value="#FFA1A8B0"/>
+                </Trigger>
+                <MultiTrigger>
+                  <MultiTrigger.Conditions>
+                    <Condition Property="IsEnabled" Value="False"/>
+                    <Condition Property="IsChecked" Value="True"/>
+                  </MultiTrigger.Conditions>
+                  <Setter TargetName="Face" Property="Background" Value="#FF41464D"/>
+                  <Setter TargetName="OrderMarker" Property="Fill" Value="#FFB0B6BE"/>
+                </MultiTrigger>
+              </ControlTemplate.Triggers>
             </ControlTemplate></Setter.Value></Setter></Style>
           </Border.Resources>
           <StackPanel>
-            <DockPanel><TextBlock Text="SORT &amp; GROUP" Foreground="#FFE5EAF1" FontWeight="SemiBold" FontSize="12" DockPanel.Dock="Left"/><Button x:Name="SortClose" Content="×" DockPanel.Dock="Right" Width="24" Height="23" Background="Transparent" BorderThickness="0" Foreground="#FFE5EAF1"/></DockPanel>
+            <DockPanel LastChildFill="True">
+              <Button x:Name="SortClose" Content="×" DockPanel.Dock="Right" Width="24" Height="23" Background="Transparent" BorderThickness="0" Foreground="#FFE5EAF1" AutomationProperties.Name="Close Sort and Group"/>
+              <TextBlock Text="Sort &amp; Group" Foreground="#FFE5EAF1" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center"/>
+            </DockPanel>
             <TextBlock Text="GROUP BY" Foreground="#FF56B8F4" FontWeight="SemiBold" FontSize="10" Margin="0,10,0,3"/>
-            <UniformGrid Columns="2"><RadioButton x:Name="GroupNative" Content="Native" GroupName="NavigatorGroup" Tag="0"/><RadioButton x:Name="GroupSeries" Content="Series" GroupName="NavigatorGroup" Tag="1"/><RadioButton x:Name="GroupCategory" Content="Category" GroupName="NavigatorGroup" Tag="2"/><RadioButton x:Name="GroupPlatform" Content="Platform" GroupName="NavigatorGroup" Tag="3"/></UniformGrid>
+            <ComboBox x:Name="GroupOptions" Height="32" MaxDropDownHeight="245" IsEditable="False" AutomationProperties.Name="Group by">
+              <ComboBox.GroupStyle><StaticResource ResourceKey="OrganizationMenuGroup"/></ComboBox.GroupStyle>
+            </ComboBox>
             <Border Height="1" Background="#FF48515E" Margin="0,9,0,0"/>
             <TextBlock Text="SORT BY" Foreground="#FF56B8F4" FontWeight="SemiBold" FontSize="10" Margin="0,9,0,3"/>
-            <RadioButton x:Name="SortNative" Content="Following Playnite" GroupName="NavigatorSort" Tag="0" ToolTip="Use the current Playnite library order"/>
-            <UniformGrid Columns="2"><RadioButton x:Name="SortName" Content="Name" GroupName="NavigatorSort" Tag="1"/><RadioButton x:Name="SortLastPlayed" Content="Last Played" GroupName="NavigatorSort" Tag="2"/><RadioButton x:Name="SortPlaytime" Content="Playtime" GroupName="NavigatorSort" Tag="3"/><RadioButton x:Name="SortReleaseDate" Content="Release Date" GroupName="NavigatorSort" Tag="4"/></UniformGrid>
-            <Border Height="1" Background="#FF48515E" Margin="0,9,0,0"/>
-            <TextBlock Text="ORDER" Foreground="#FF56B8F4" FontWeight="SemiBold" FontSize="10" Margin="0,9,0,3"/>
-            <UniformGrid Columns="2"><RadioButton x:Name="OrderAscending" Content="↑ Ascending" GroupName="NavigatorOrder"/><RadioButton x:Name="OrderDescending" Content="↓ Descending" GroupName="NavigatorOrder"/></UniformGrid>
+            <ComboBox x:Name="SortOptions" Height="32" MaxDropDownHeight="245" IsEditable="False" AutomationProperties.Name="Sort by">
+              <ComboBox.GroupStyle><StaticResource ResourceKey="OrganizationMenuGroup"/></ComboBox.GroupStyle>
+            </ComboBox>
+            <StackPanel x:Name="OrderSection" Visibility="Collapsed">
+              <Border Height="1" Background="#FF48515E" Margin="0,9,0,0"/>
+              <TextBlock Text="ORDER" Foreground="#FF56B8F4" FontWeight="SemiBold" FontSize="10" Margin="0,9,0,3"/>
+              <UniformGrid Columns="2" Height="30">
+                <RadioButton x:Name="OrderAscending" Content="↑ Ascending" GroupName="NavigatorOrder"/>
+                <RadioButton x:Name="OrderDescending" Content="↓ Descending" GroupName="NavigatorOrder"/>
+              </UniformGrid>
+            </StackPanel>
             <Button x:Name="SortDone" Content="Done" HorizontalAlignment="Right" Margin="0,10,0,0" Padding="14,4" Background="#FF405773" Foreground="#FFE5EAF1" BorderThickness="0"/>
           </StackPanel>
         </Border>
       </Popup>
-      <ComboBox x:Name="Grouping" Visibility="Collapsed" SelectedIndex="0">
-        <ComboBoxItem Content="Native / alphabetical"/><ComboBoxItem Content="Series"/>
-        <ComboBoxItem Content="Category / collection"/><ComboBoxItem Content="Platform"/>
-        <ComboBoxItem Content="Recent Activity"/>
-      </ComboBox>
+      <ComboBox x:Name="Grouping" Visibility="Collapsed"/>
       <TextBlock x:Name="Count" Foreground="{StaticResource SteamMutedBrush}" FontSize="11" Margin="7,0,0,3"/>
     </StackPanel>
     <TextBlock x:Name="Status" DockPanel.Dock="Bottom" Foreground="#FFC5CED8" TextWrapping="Wrap" FontSize="11"/>
@@ -164,10 +202,12 @@
       <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate></ListBox.ItemsPanel>
       <ListBox.ItemContainerStyle>
         <Style TargetType="ListBoxItem">
-          <Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="4,3"/>
+          <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+          <Setter Property="Padding" Value="4,0"/>
+          <Setter Property="MinHeight" Value="26"/>
           <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
             <Border x:Name="RowBorder" Background="Transparent" Padding="{TemplateBinding Padding}">
-              <ContentPresenter HorizontalAlignment="Stretch"/>
+              <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="RowBorder" Property="Background" Value="#FF303E4D"/></Trigger>
@@ -177,8 +217,13 @@
         </Style>
       </ListBox.ItemContainerStyle>
       <ListBox.ItemTemplate><DataTemplate>
-        <Grid ToolTip="{Binding Name}"><Grid.ColumnDefinitions><ColumnDefinition Width="22"/><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/></Grid.ColumnDefinitions>
-          <Image Source="{Binding Icon}" Width="16" Height="16" Stretch="Uniform"/>
+        <Grid ToolTip="{Binding Name}"><Grid.ColumnDefinitions><ColumnDefinition Width="28"/><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/></Grid.ColumnDefinitions>
+          <Image Source="{Binding Icon}" Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Image.Style><Style TargetType="Image">
+              <Setter Property="Width" Value="20"/>
+              <Setter Property="Height" Value="20"/>
+            </Style></Image.Style>
+          </Image>
           <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontSize="12">
             <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#FFA3AAB9"/><Style.Triggers>
               <DataTrigger Binding="{Binding IsInstalled}" Value="True"><Setter Property="Foreground" Value="#FFF1F7FF"/></DataTrigger>
@@ -195,7 +240,7 @@
         <GroupStyle.ContainerStyle><Style TargetType="GroupItem">
           <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="GroupItem">
             <local:NavigatorGroupExpander IsExpanded="True" Foreground="#FFADBAC8" Margin="0,5,0,1">
-              <Expander.Header><StackPanel Orientation="Horizontal"><TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+              <Expander.Header><StackPanel Orientation="Horizontal"><TextBlock Text="{Binding Name.Label}" FontWeight="SemiBold"/>
                 <TextBlock Text="{Binding ItemCount, StringFormat=' ({0})'}" Opacity="0.6"/></StackPanel></Expander.Header>
               <ItemsPresenter/>
             </local:NavigatorGroupExpander>

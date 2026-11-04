@@ -10,7 +10,7 @@ namespace HeliumHybrid
     {
         private NavigatorGroupState state;
         private int mode;
-        private string groupName;
+        private NavigatorGroupIdentity groupName;
         private bool applying;
 
         public NavigatorGroupExpander()
@@ -26,7 +26,7 @@ namespace HeliumHybrid
             var parent = VisualTreeHelper.GetParent(this);
             while (parent != null && !(parent is ListBox)) parent = VisualTreeHelper.GetParent(parent);
             state = (parent as ListBox)?.Tag as NavigatorGroupState;
-            groupName = (DataContext as CollectionViewGroup)?.Name?.ToString();
+            groupName = (DataContext as CollectionViewGroup)?.Name as NavigatorGroupIdentity;
             if (state == null || groupName == null) return;
             mode = state.Mode;
             applying = true;
