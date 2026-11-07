@@ -8,9 +8,9 @@ Helium (charlo fork) is a modified [Helium](https://github.com/darklinkpower/Hel
 
 It brings Steam-style sidebar navigation to Playnite, combining a searchable game list with the Grid and Details views.
 
-**Latest release: v0.3.0 — Navigator Experience**
+**Latest release: v0.3.1 — Navigator Organization & Customization**
 
-[**Download**](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.3.0) · [Changelog](docs/CHANGELOG.md) · [Report an Issue](https://github.com/nocharlo/helium-charlo-fork/issues)
+[**Download**](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.3.1) · [Changelog](docs/CHANGELOG.md) · [Report an Issue](https://github.com/nocharlo/helium-charlo-fork/issues)
 
 ---
 
@@ -36,7 +36,8 @@ This project is the result of that experiment. I'm sharing it in case anyone els
 - **Library indicators:** Favorite stars and distinct styling for installed and uninstalled games.
 - **Improved stability:** Better preservation of scroll position, group expansion, and selection during library updates.
 - **Recent Activity:** Browse games by last played date, with Hybrid and Detailed grouping modes and independent group expansion states.
-- **Independent organization:** Group and sort the Navigator without changing the native Playnite Grid organization.
+- **Independent organization:** Group and sort the Navigator without changing the native Playnite Grid organization. Choose which organization modes appear and customize their order.
+- **Organization controls:** Compact Sort & Group dropdowns and reorganized, responsive Navigator settings.
 - **Advanced Filters:** Combine Playnite library metadata filters with local Navigator search, plus a Ready to Play shortcut.
 
 The Navigator uses Playnite's existing library data. It doesn't maintain a separate database or modify your game metadata.
@@ -57,10 +58,10 @@ Click any screenshot to view it at full resolution.
 
 Download both components:
 
-- [**Helium Theme (.pthm)**](https://github.com/nocharlo/helium-charlo-fork/releases/download/v0.3.0/Helium-charlo-fork-v0.3.0.pthm)
-- [**Helium Navigator (.pext)**](https://github.com/nocharlo/helium-charlo-fork/releases/download/v0.3.0/Helium-Navigator-v0.3.0.pext)
+- [**Helium Theme (.pthm)**](https://github.com/nocharlo/helium-charlo-fork/releases/download/v0.3.1/Helium-charlo-fork-v0.3.1.pthm)
+- [**Helium Navigator (.pext)**](https://github.com/nocharlo/helium-charlo-fork/releases/download/v0.3.1/Helium-Navigator-v0.3.1.pext)
 
-Install both packages, restart Playnite, and select **Helium (charlo fork) v0.3.0** in Desktop theme settings.
+Install both packages, restart Playnite, and select **Helium (charlo fork) v0.3.1** in Desktop theme settings.
 
 **Always use matching theme and extension versions.** Back up your existing configuration before updating.
 
@@ -93,7 +94,7 @@ I don't consider this a substitute for programming expertise. It's an experiment
 
 ## Roadmap
 
-- **v0.3.1 — Navigator Organization & Customization (In Development):** Expands the grouping and sorting catalog, introduces a redesigned Sort & Group interface, and allows users to customize which organization modes appear. Also includes reorganized plugin settings, UX refinements, targeted refactoring, performance improvements, and reliability fixes.
+- **v0.3.1 — Navigator Organization & Customization (Released):** Expanded grouping and sorting, customizable organization modes, redesigned Sort & Group controls, reorganized settings, and stability and usability improvements.
 
 - **v0.3.2 — Intelligent Filters (Planned):** Redesigns Advanced Filters around a more compact, searchable, and intuitive interface. Planned improvements include easier metadata selection, clearer active-filter states, better navigation through large option lists, and performance refinements.
 
@@ -106,10 +107,10 @@ I don't consider this a substitute for programming expertise. It's an experiment
 
 **This roadmap represents the project's current direction, not a commitment to specific features or release dates.** Priorities and scope may change as development progresses.
 
-These are ideas, not promises or release dates.
 
 ## Known Limitations
 
+- After a selected game moves to another category or group, the Navigator may not automatically scroll to its new position.
 - Some unusual mouse interactions remain insufficiently tested.
 - Uninstalled game names can appear too bright on hover.
 - Narrow windows may feel cramped.
