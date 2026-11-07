@@ -46,11 +46,11 @@ The Navigator uses Playnite's existing library data. It doesn't maintain a separ
 
 Click any screenshot to view it at full resolution.
 
-| Hybrid Grid & Details | Full Details View |
+| Hybrid Grid & Details | Sort & Group |
 |:---:|:---:|
-| [![Navigator, Grid and game details](docs/images/hybrid-layout.webp)](docs/images/hybrid-layout.webp) | [![Navigator alongside the Full Details view](docs/images/full-details.webp)](docs/images/full-details.webp) |
-| **Recent Activity** | **Sort & Group** |
-| [![Navigator showing chronological recent activity groups](docs/images/recent-activity.webp)](docs/images/recent-activity.webp) | [![Navigator independent Sort and Group popup](docs/images/sort-and-group.webp)](docs/images/sort-and-group.webp) |
+| [![Navigator beside the Grid and EarthBound details](docs/images/hybrid-layout.webp)](docs/images/hybrid-layout.webp) | [![Navigator Sort and Group controls with sorting options](docs/images/sort-and-group.webp)](docs/images/sort-and-group.webp) |
+| **Recent Activity + Details** | **Native Full Details View** |
+| [![Navigator recent activity groups alongside Silksong details](docs/images/recent-activity.webp)](docs/images/recent-activity.webp) | [![Playnite native Full Details View showing DOOM Eternal](docs/images/full-details.webp)](docs/images/full-details.webp) |
 
 ## Installation
 
