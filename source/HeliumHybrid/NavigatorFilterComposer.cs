@@ -11,6 +11,8 @@ namespace HeliumHybrid
     // Copies the entire SDK filter state before changing one field. Saved presets are never edited.
     internal static class NavigatorFilterComposer
     {
+        internal static bool OptionVisible(string label, string query, bool selected) => selected ||
+            (label ?? "").IndexOf(query ?? "", StringComparison.CurrentCultureIgnoreCase) >= 0;
         internal static FilterPresetSettings Copy(FilterPresetSettings source)
         {
             if (source == null) source = new FilterPresetSettings();
@@ -58,6 +60,26 @@ namespace HeliumHybrid
 
         internal static FilterPresetSettings Clear(FilterPresetSettings source) =>
             new FilterPresetSettings { UseAndFilteringStyle = source?.UseAndFilteringStyle ?? false };
+
+        internal static FilterPresetSettings ClearManaged(FilterPresetSettings source)
+        {
+            var next = Copy(source);
+            next.IsInstalled = next.IsUnInstalled = next.Favorite = false;
+            foreach (NavigatorFilterField field in Enum.GetValues(typeof(NavigatorFilterField)))
+                SetIdField(next, field, ClearIds(IdField(next, field)));
+            return next;
+        }
+
+        internal static FilterPresetSettings ClearSection(FilterPresetSettings source, NavigatorFilterField field)
+        {
+            var next = Copy(source);
+            SetIdField(next, field, ClearIds(IdField(next, field)));
+            return next;
+        }
+
+        private static IdItemFilterItemProperties ClearIds(IdItemFilterItemProperties value) =>
+            value == null || string.IsNullOrWhiteSpace(value.Text) ? null :
+                new IdItemFilterItemProperties { Text = value.Text };
 
         internal static FilterPreset TemporaryPreset(FilterPresetSettings settings) => new FilterPreset {
             Id = Guid.Empty,
