@@ -12,5 +12,14 @@ namespace HeliumHybrid
         internal bool IsExpanded(int mode, string name) =>
             !expanded.TryGetValue(Key(mode, name), out var value) || value;
         internal void SetExpanded(int mode, string name, bool value) => expanded[Key(mode, name)] = value;
+        internal bool IsExpanded(int mode, NavigatorGroupIdentity group)
+        {
+            if (group == null) return true;
+            if (expanded.TryGetValue(Key(mode, "id:" + group.Key), out var value)) return value;
+            // Legacy state was in-memory and label-based. Preserve unrelated groups on transition.
+            return IsExpanded(mode, group.LegacyLabel);
+        }
+        internal void SetExpanded(int mode, NavigatorGroupIdentity group, bool value)
+        { if (group != null) expanded[Key(mode, "id:" + group.Key)] = value; }
     }
 }

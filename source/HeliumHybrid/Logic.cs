@@ -18,7 +18,7 @@ namespace HeliumHybrid
         {
             var values = (names ?? Enumerable.Empty<string>()).Where(n => !string.IsNullOrWhiteSpace(n))
                 .Distinct(StringComparer.CurrentCultureIgnoreCase).OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase).ToArray();
-            return values.Length == 0 ? new[] { "No group" } : values;
+            return values; // Missing metadata is represented explicitly by NavigatorProjection.
         }
         public static int RecentActivityStyle(int grouping, int storedStyle, bool specified)
         {
@@ -26,7 +26,7 @@ namespace HeliumHybrid
             return storedStyle == 1 ? 1 : 0;
         }
         public static int ToggleRecentGrouping(int current, int previous) =>
-            current == 4 ? (previous >= 0 && previous < 4 ? previous : 0) : 4;
+            current == 4 ? (previous >= 0 && previous != 4 ? previous : 0) : 4;
         public static int? ShortcutGroupingOverride(int saved, int selected) =>
             saved == selected ? (int?)null : selected;
         public static bool ShouldRestoreSelection(Guid desired, IEnumerable<Guid> current) =>

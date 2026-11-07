@@ -30,6 +30,7 @@ namespace HeliumHybrid
                 var oldRow = oldRows[i]; var newRow = newRows[i];
                 if (oldRow.Id != newRow.Id || oldRow.Name != newRow.Name ||
                     oldRow.Key != newRow.Key || oldRow.Group != newRow.Group ||
+                    !Equals(oldRow.GroupIdentity, newRow.GroupIdentity) || oldRow.SortText != newRow.SortText ||
                     oldRow.IconPath != newRow.IconPath ||
                     oldRow.ActivityTicks != newRow.ActivityTicks || oldRow.GroupOrder != newRow.GroupOrder ||
                     oldRow.SortValue != newRow.SortValue) return NavigatorRowChange.Structural;
@@ -41,12 +42,22 @@ namespace HeliumHybrid
         internal static int EffectiveGrouping(int navigatorGrouping, string nativeGrouping, int recentActivityGroupingStyle = 0)
         {
             if (navigatorGrouping == 4) return recentActivityGroupingStyle == 1 ? 9 : 8;
-            if (navigatorGrouping != 0) return navigatorGrouping;
+            if (navigatorGrouping != 0) return (int)NavigatorOrganization.Group(navigatorGrouping).GroupPolicy;
             switch (nativeGrouping) {
                 case "CompletionStatus": return 4;
                 case "Series": return 5;
                 case "Category": return 6;
                 case "Platform": return 7;
+                case "Genre": return (int)NavigatorGroupPolicy.Genre;
+                case "Tag": return (int)NavigatorGroupPolicy.Tags;
+                case "Developer": return (int)NavigatorGroupPolicy.Developer;
+                case "Publisher": return (int)NavigatorGroupPolicy.Publisher;
+                case "Feature": return (int)NavigatorGroupPolicy.Features;
+                case "Library": return (int)NavigatorGroupPolicy.Library;
+                case "Source": return (int)NavigatorGroupPolicy.Source;
+                case "Region": return (int)NavigatorGroupPolicy.Region;
+                case "AgeRating": return (int)NavigatorGroupPolicy.AgeRating;
+                case "ReleaseYear": return (int)NavigatorGroupPolicy.ReleaseYear;
                 default: return 0;
             }
         }

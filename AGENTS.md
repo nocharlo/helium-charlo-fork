@@ -113,6 +113,8 @@ Use `nocharlo@users.noreply.github.com` for both Git author and committer email.
 
 ## 7. Documentation & Release Policy
 
+Follow [Navigator UX conventions](docs/NAVIGATOR-UX.md) when changing user-facing controls or copy.
+
 - Keep documentation accurate, concise, and consistent with the implemented behavior.
 - Update relevant documentation when functionality, compatibility, configuration, or testing expectations change.
 - Record material limitations and unverified behaviors rather than presenting them as completed work.
