@@ -224,6 +224,34 @@ class NavigatorProjectionTests
                 descending.Select(row => row.GroupIdentity).SequenceEqual(inherited.Select(row => row.GroupIdentity)),
                 "Changing direction preserves chronological group identities, counts, and missing-last placement");
         }
+        PerformanceCampaign();
         Console.WriteLine("PASS: " + checks + " NavigatorProjection checks.");
+    }
+
+    static void PerformanceCampaign()
+    {
+        var clock = new DateTime(2026, 10, 20, 12, 0, 0);
+        foreach (var size in new[] { 100, 1000, 5000 }) {
+            var games = Enumerable.Range(1, size).Select(i => new NavigatorSource {
+                Id = new Guid(i, 0, 0, new byte[8]), Name = "Synthetic " + i,
+                SortingName = "Sort " + (size - i), GroupNames = new[] { "A", "B", "C" }
+            }).ToArray();
+            NavigatorProjection.Build(games, 1, x => x, clock, NavigatorSortMode.Name);
+            var times = new double[9]; var allocations = new long[9];
+            for (int run = 0; run < times.Length; run++) {
+                long start = GC.GetAllocatedBytesForCurrentThread();
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                var rows = NavigatorProjection.Build(games, 1, x => x, clock, NavigatorSortMode.Name, run % 2 != 0);
+                watch.Stop();
+                allocations[run] = GC.GetAllocatedBytesForCurrentThread() - start;
+                times[run] = watch.Elapsed.TotalMilliseconds;
+                Check(rows.Count == size * 3 && NavigatorProjection.DistinctGameCount(rows.Select(row => row.Id)) == size,
+                    "Repeated reorganization retains synthetic membership");
+            }
+            Array.Sort(times); Array.Sort(allocations);
+            Console.WriteLine("PERF synthetic n=" + size + " runs=9 medianMs=" + times[4].ToString("F2", CultureInfo.InvariantCulture) +
+                " p95Ms=" + times[8].ToString("F2", CultureInfo.InvariantCulture) + " medianBytes=" + allocations[4] +
+                " p95Bytes=" + allocations[8] + " WPF_NOT_MEASURED");
+        }
     }
 }

@@ -1,5 +1,7 @@
 /tests/bin/
 /tests/obj/
+__pycache__/
+*.pyc
 /source/HeliumHybrid/bin/
 /source/HeliumHybrid/obj/
 /source/*-build-check/
