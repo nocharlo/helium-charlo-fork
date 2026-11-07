@@ -23,8 +23,47 @@ internal static class NavigatorOrganizationTests
     [STAThread]
     private static void Main()
     {
-        CatalogAndGroups(); Sorting(); Settings(); OrganizationControls(); Presentation(); Benchmarks();
+        CatalogAndGroups(); Sorting(); Settings(); OrganizationControls(); Presentation(); Campaign(); Benchmarks();
         Console.WriteLine("PASS: " + checks + " Navigator organization, settings and WPF model checks.");
+    }
+    private static void Campaign()
+    {
+        var serializer = new XmlSerializer(typeof(Preferences));
+        Preferences Read(string xml) { var p = (Preferences)serializer.Deserialize(new StringReader(xml)); p.MigrateNavigation(); return p; }
+        var absent = Read("<Preferences />");
+        var empty = Read("<Preferences><VisibleGroupingModes /><VisibleSortingModes /></Preferences>");
+        Check(absent.VisibleGroupingModes.Count > 1 && absent.VisibleSortingModes.Count > 1, "Missing lists receive catalog defaults");
+        Check(empty.VisibleGroupingModes.SequenceEqual(new[] { 0 }) && empty.VisibleSortingModes.SequenceEqual(new[] { 0 }), "Explicit empty lists retain minimum safe choice");
+        var obsolete = Read("<Preferences><NavigatorListDensity>0</NavigatorListDensity><Grouping>2</Grouping></Preferences>");
+        Check(obsolete.Grouping == 2, "Obsolete density field does not prevent migration");
+
+        var a = Game(301, "A Synthetic Room"); a.SortingName = "Dark Room";
+        var b = Game(302, "The Synthetic Beginning"); b.SortingName = "Beginning";
+        var c = Game(303, "Synthetic Finale"); c.SortingName = "Finale";
+        var games = new[] { c, a, b };
+        var before = Build(games, 0);
+        Check(before.Select(x => x.Id).SequenceEqual(new[] { b.Id, a.Id, c.Id }), "Stored sorting names order titles independently");
+        a.SortingName = "ZZZ";
+        var after = Build(games, 0);
+        Check(after.Select(x => x.Id).SequenceEqual(new[] { b.Id, c.Id, a.Id }), "Only sorting name changes relative order");
+        Check(NavigatorRefreshDecision.ClassifyRows(before.Where(x => x.Id == a.Id), after.Where(x => x.Id == a.Id)) == NavigatorRowChange.Structural,
+            "Sorting name update requests structural refresh");
+        Check(after.Single(x => x.Id == a.Id).Name == "A Synthetic Room", "Sorting key does not change visible title");
+
+        var prefs = new Preferences(); prefs.MigrateNavigation();
+        var editor = (GroupBox)NavigatorOrganizationControls.VisibilityEditor(prefs, true);
+        var panel = (StackPanel)editor.Content;
+        var search = ((Grid)panel.Children[0]).Children.OfType<TextBox>().Single();
+        var list = panel.Children.OfType<ListBox>().Single();
+        var buttons = panel.Children.OfType<WrapPanel>().Single().Children.OfType<Button>().ToArray();
+        var initial = prefs.VisibleGroupingModes.ToArray();
+        search.Text = "Category";
+        list.SelectedIndex = 0;
+        buttons[2].RaiseEvent(new System.Windows.RoutedEventArgs(Button.ClickEvent));
+        search.Text = "";
+        Check(prefs.VisibleGroupingModes.SequenceEqual(NavigatorOrganization.Move(initial, 2, -1)), "Filtered reorder updates canonical order");
+        Check(prefs.VisibleGroupingModes.Distinct().Count() == initial.Length && list.Items.Count == NavigatorOrganization.Groups.Length,
+            "Clearing search keeps every choice without duplicates");
     }
     private static void OrganizationControls()
     {
