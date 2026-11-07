@@ -94,8 +94,6 @@ I don't consider this a substitute for programming expertise. It's an experiment
 
 ## Roadmap
 
-- **v0.3.1 — Navigator Organization & Customization (Released):** Expanded grouping and sorting, customizable organization modes, redesigned Sort & Group controls, reorganized settings, and stability and usability improvements.
-
 - **v0.3.2 — Intelligent Filters (Planned):** Redesigns Advanced Filters around a more compact, searchable, and intuitive interface. Planned improvements include easier metadata selection, clearer active-filter states, better navigation through large option lists, and performance refinements.
 
 - **v0.3.3 — Contextual Actions (Planned):** Expands the Navigator's game context menu with useful actions such as Play/Install, Edit, Set Category, and Set Completion Status. Additional integrations, including Friendly Set Playtime, may be explored depending on compatibility and available public Playnite APIs.
