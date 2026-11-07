@@ -2,13 +2,30 @@
 
 A history of changes to Helium (charlo fork), from the original Navigator prototype to the current release.
 
-## v0.3.1 — In development
+## v0.3.1 — Navigator Organization & Customization
 
-- Sort & Group uses categorized dropdowns with keyboard type-ahead. Order appears for Navigator sorting modes and retains the selected direction when switching to and from Following Playnite.
-- Name sorting uses each game's Playnite Sorting Name when set. The Navigator continues to display the game title.
-- Navigator uses a fixed compact list with clearer icons and unchanged text size.
-- Recent Activity keeps chronological groups and supports independent sorting within each group. Hybrid and Detailed now explain how they organize older activity.
-- Navigator settings separate Navigation, Appearance, and Organization. The Organization tab uses balanced searchable mode panels that stack in narrow windows, compact activity cards, and quieter row selection.
+Expanded the Navigator's independent library organization and made its controls and settings easier to customize.
+
+### New features
+
+- Expanded grouping and sorting options without changing Playnite's native Grid organization.
+- Added searchable settings for choosing which grouping and sorting modes are visible and arranging their order.
+- Redesigned Sort & Group with compact dropdowns, keyboard type-ahead, and contextual sort direction controls.
+- Reorganized Navigator settings into Navigation, Appearance, and Organization, with responsive organization panels.
+
+### Improvements and fixes
+
+- Name sorting now respects Playnite's `SortingName` while displaying the original game title.
+- Improved group ordering and handling of games with missing metadata.
+- Made game rows more compact with clearer icons, without reducing text size.
+- Refined Recent Activity's existing Hybrid and Detailed modes, including their descriptions and independent sorting within chronological groups.
+- Improved settings persistence, migration compatibility, and list projection reliability.
+
+### Known limitation
+
+- Moving a selected game to another category or group updates its position in the list, but the Navigator may not automatically scroll to reveal it.
+
+---
 
 ## v0.3.0 — Navigator Experience
 
