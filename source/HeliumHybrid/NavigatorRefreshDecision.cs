@@ -19,6 +19,15 @@ namespace HeliumHybrid
 
     internal static class NavigatorRefreshDecision
     {
+        internal static bool SelectedGroupMoved(Guid selectedId, NavigatorGroupIdentity prior,
+            IEnumerable<NavigatorProjectedRow> projected)
+        {
+            if (selectedId == Guid.Empty || prior == null) return false;
+            var occurrences = (projected ?? Enumerable.Empty<NavigatorProjectedRow>())
+                .Where(row => row.Id == selectedId).ToArray();
+            return occurrences.Length != 0 &&
+                !occurrences.Any(row => Equals(row.GroupIdentity, prior));
+        }
         internal static NavigatorRowChange ClassifyRows(IEnumerable<NavigatorProjectedRow> before,
             IEnumerable<NavigatorProjectedRow> after)
         {

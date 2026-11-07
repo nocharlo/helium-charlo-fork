@@ -47,7 +47,8 @@ for name in ('GroupOptions', 'SortOptions'):
     assert selector.tag.endswith('}ComboBox') and selector.attrib.get('IsEditable') == 'False'
 contract = {'RecentButton':'Button', 'ReadyButton':'Button', 'FiltersButton':'Button',
             'CloseFilters':'Button', 'ClearAllFilters':'Button', 'FilterIndicator':'TextBlock',
-            'AdvancedPanel':'ScrollViewer', 'FilterSections':'StackPanel'}
+            'FiltersPopup':'Popup', 'FilterOptionSearch':'TextBox', 'ActiveFilters':'WrapPanel',
+            'FilterSearchEmpty':'TextBlock', 'FilterSections':'StackPanel'}
 for name, kind in contract.items():
     matches = [n for n in nav.iter() if n.attrib.get(xname) == name]
     assert len(matches) == 1 and matches[0].tag.endswith('}' + kind), (name, kind)

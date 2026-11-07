@@ -44,7 +44,8 @@ namespace HeliumHybrid
         private readonly Button recentButton, readyButton, filtersButton;
         private readonly Button closeFilters, clearAllFilters;
         private readonly TextBlock filterIndicator;
-        private readonly ScrollViewer advancedPanel;
+        private readonly Popup filtersPopup;
+        private readonly TextBox filterOptionSearch;
         private readonly NavigatorFilterPanel filterPanel;
         private readonly ReadyToPlayState readyState = new ReadyToPlayState();
         private bool filtersOpen, shortcutGroupingChange;
@@ -125,8 +126,11 @@ namespace HeliumHybrid
             closeFilters = (Button)root.FindName("CloseFilters");
             clearAllFilters = (Button)root.FindName("ClearAllFilters");
             filterIndicator = (TextBlock)root.FindName("FilterIndicator");
-            advancedPanel = (ScrollViewer)root.FindName("AdvancedPanel");
+            filtersPopup = (Popup)root.FindName("FiltersPopup");
+            filterOptionSearch = (TextBox)root.FindName("FilterOptionSearch");
             filterPanel = new NavigatorFilterPanel(api, (StackPanel)root.FindName("FilterSections"),
+                (WrapPanel)root.FindName("ActiveFilters"), filterOptionSearch,
+                (TextBlock)root.FindName("FilterSearchEmpty"),
                 change => Safe(() => ApplyGlobalFilterChange(change)));
             grouping.ItemsSource = NavigatorOrganization.Groups;
             SelectedGrouping = prefs.Grouping;
@@ -162,7 +166,7 @@ namespace HeliumHybrid
                 UpdateSortGroupUi();
                 if (!shortcutGroupingChange) Save();
             };
-            sortGroupButton.Click += (s, e) => { UpdateSortGroupUi(); sortGroupPopup.IsOpen = !sortGroupPopup.IsOpen; };
+            sortGroupButton.Click += (s, e) => { filtersPopup.IsOpen = false; UpdateSortGroupUi(); sortGroupPopup.IsOpen = !sortGroupPopup.IsOpen; };
             NavigatorOrganizationControls.ConfigureSelector(groupOptions, mode => {
                 if (updatingSortGroupUi || mode.Id == SelectedGrouping) return;
                 RequestRevealAfterExplicitReorganization();
@@ -188,9 +192,12 @@ namespace HeliumHybrid
                 finally { shortcutGroupingChange = false; }
             });
             readyButton.Click += (sender, args) => Safe(() => ApplyGlobalFilterChange(state => readyState.Toggle(state)));
-            filtersButton.Click += (sender, args) => Safe(() => { sortGroupPopup.IsOpen = false; filtersOpen = !filtersOpen; ShowFilterPanel(); });
-            closeFilters.Click += (sender, args) => { filtersOpen = false; ShowFilterPanel(); };
-            clearAllFilters.Click += (sender, args) => Safe(() => ApplyGlobalFilterChange(NavigatorFilterComposer.Clear));
+            filtersButton.Click += (sender, args) => Safe(() => { sortGroupPopup.IsOpen = false; filtersPopup.IsOpen = !filtersPopup.IsOpen; });
+            filtersPopup.Opened += (s, e) => { filtersOpen = true; ShowFilterPanel(); filterOptionSearch.Focus(); };
+            filtersPopup.Closed += (s, e) => { filtersOpen = false; RefreshGlobalFilterUi(); if (active && !IsCollapsed()) filtersButton.Focus(); };
+            filtersPopup.PreviewKeyDown += (s, e) => { if (e.Key == Key.Escape) { filtersPopup.IsOpen = false; e.Handled = true; } };
+            closeFilters.Click += (sender, args) => filtersPopup.IsOpen = false;
+            clearAllFilters.Click += (sender, args) => Safe(() => ApplyGlobalFilterChange(NavigatorFilterComposer.ClearManaged));
             toggle.Click += (sender, args) => {
                 sortGroupPopup.IsOpen = false;
                 prefs.Collapsed = !prefs.Collapsed;
@@ -397,6 +404,7 @@ namespace HeliumHybrid
         private void OnUnloaded(object sender, RoutedEventArgs args)
         {
             sortGroupPopup.IsOpen = false;
+            filtersPopup.IsOpen = false;
             if (!active) return; active = false; timer.Stop(); searchTimer.Stop(); coverClickTimer.Stop(); sidebarClickTimer.Stop(); sidebarDownItem = null; panelRequested = false; UnbindGridClicks();
             plugin.SelectionChanged -= SelectionChanged;
             plugin.SettingsChanged -= SettingsUpdated;
@@ -504,6 +512,8 @@ namespace HeliumHybrid
                 var projectionStart = diagnostics.Enabled ? Stopwatch.GetTimestamp() : 0;
                 var projected = NavigatorProjection.Build(library.Sources(games, effectiveGrouping), effectiveGrouping,
                     library.ResolveIcon, sortMode: SortMode, descending: prefs.SortDescending);
+                var movedSelected = selectedRow != null && library.IsSelected(selectedRow.Id) &&
+                    NavigatorRefreshDecision.SelectedGroupMoved(selectedRow.Id, selectedRow.GroupIdentity, projected);
                 rows = projected.Select(row => new GameRow {
                     Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group, GroupIdentity = row.GroupIdentity, IconPath = row.IconPath, ActivityTicks = row.ActivityTicks, GroupOrder = row.GroupOrder,
                     IsInstalled = row.IsInstalled, Favorite = row.Favorite, SortValue = row.SortValue, SortText = row.SortText
@@ -533,6 +543,13 @@ namespace HeliumHybrid
                         selected.IntersectWith(revealRequest);
                         if (selected.Count != 0 && currentView.Cast<GameRow>().Any(row => selected.Contains(row.Id))) {
                             RevealSelected(selected);
+                            return;
+                        }
+                    }
+                    if (movedSelected) {
+                        var selected = library.SelectedIds();
+                        if (selected.Contains(selectedRow.Id) && currentView.Cast<GameRow>().Any(row => row.Id == selectedRow.Id)) {
+                            RevealSelected(new HashSet<Guid> { selectedRow.Id });
                             return;
                         }
                     }
@@ -706,6 +723,7 @@ namespace HeliumHybrid
             filtersButton.Foreground = (Brush)root.Resources[filtersOpen ? "SteamActiveBrush" : "SteamIconBrush"];
             if (filtersOpen) {
                 filterPanel.Refresh(current, filterOptionsDirty);
+                clearAllFilters.IsEnabled = filterPanel.HasManagedSelection;
                 filterOptionsDirty = false;
             }
             UpdateShortcutState();
@@ -717,8 +735,6 @@ namespace HeliumHybrid
         }
         private void ShowFilterPanel()
         {
-            list.Visibility = filtersOpen ? Visibility.Collapsed : Visibility.Visible;
-            advancedPanel.Visibility = filtersOpen ? Visibility.Visible : Visibility.Collapsed;
             if (filtersOpen) filterPanel.Refresh(api.MainView.GetCurrentFilterSettings() ?? new FilterPresetSettings(), true);
             RefreshGlobalFilterUi();
         }
@@ -775,6 +791,7 @@ namespace HeliumHybrid
             if (active && (library.ActiveDesktopView == DesktopView.List ||
                 (library.ActiveDesktopView == DesktopView.Details && !navigatedDetails))) {
                 sortGroupPopup.IsOpen = false;
+                filtersPopup.IsOpen = false;
                 Visibility = Visibility.Collapsed;
                 Width = 0;
                 if (reopenButton != null) reopenButton.Visibility = Visibility.Collapsed;
@@ -782,11 +799,10 @@ namespace HeliumHybrid
             }
             Visibility = Visibility.Visible;
             bool collapsed = IsCollapsed();
-            if (collapsed) sortGroupPopup.IsOpen = false;
+            if (collapsed) { sortGroupPopup.IsOpen = false; filtersPopup.IsOpen = false; }
             Width = collapsed ? 0 : prefs.Width;
             tools.Visibility = status.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
-            list.Visibility = collapsed || filtersOpen ? Visibility.Collapsed : Visibility.Visible;
-            advancedPanel.Visibility = collapsed || !filtersOpen ? Visibility.Collapsed : Visibility.Visible;
+            list.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
             grip.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
             toggle.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
             if (reopenButton != null) reopenButton.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;

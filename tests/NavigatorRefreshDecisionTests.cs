@@ -89,6 +89,18 @@ class NavigatorRefreshDecisionTests
         }).ToArray();
         Check(NavigatorRefreshDecision.ClassifyRows(oldRows, oldRows) == NavigatorRowChange.None,
             "Unrelated update skips rebuild");
+        var oldGroup = new NavigatorGroupIdentity("category:old", "Old");
+        var newGroup = new NavigatorGroupIdentity("category:new", "New");
+        Check(NavigatorRefreshDecision.SelectedGroupMoved(first, oldGroup,
+            new[] { new NavigatorProjectedRow { Id = first, GroupIdentity = newGroup } }),
+            "Selected game moving to another group requests reveal");
+        Check(!NavigatorRefreshDecision.SelectedGroupMoved(first, oldGroup,
+            new[] { new NavigatorProjectedRow { Id = first, GroupIdentity = oldGroup },
+                new NavigatorProjectedRow { Id = first, GroupIdentity = newGroup } }),
+            "Existing selected occurrence prevents an unnecessary jump");
+        Check(!NavigatorRefreshDecision.SelectedGroupMoved(first, oldGroup,
+            new[] { new NavigatorProjectedRow { Id = second, GroupIdentity = newGroup } }),
+            "Filtered-out game is not revealed");
         Check(NavigatorRefreshDecision.ClassifyRows(oldRows, visualRows) == NavigatorRowChange.Visual,
             "Indicator changes are visual across duplicate group rows");
         visualRows[0].Name = "Renamed";

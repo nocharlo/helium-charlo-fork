@@ -62,6 +62,19 @@ internal static class NavigatorFilterComposerTests
         var cleared = NavigatorFilterComposer.Clear(original);
         Check(cleared.UseAndFilteringStyle && !cleared.Favorite && !NavigatorFilterComposer.HasActiveFilters(cleared), "clear keeps AND/OR");
         Check(!NavigatorFilterComposer.Same(original, cleared), "clear refresh detected");
+        var sectionCleared = NavigatorFilterComposer.ClearSection(original, NavigatorFilterField.Genre);
+        Check(sectionCleared.Genre.Ids == null && sectionCleared.Genre.Text == "extra" &&
+              sectionCleared.Platform.Ids[0] == platform && sectionCleared.Favorite && sectionCleared.UseAndFilteringStyle,
+              "clear section preserves text, other categories and AND style");
+        var managedCleared = NavigatorFilterComposer.ClearManaged(original);
+        Check(!managedCleared.Favorite && !managedCleared.IsUnInstalled && managedCleared.Genre.Ids == null &&
+              managedCleared.Genre.Text == "extra" && managedCleared.Platform == null &&
+              managedCleared.Name == "kept" && managedCleared.LastActivity.Values[0] == 1 &&
+              managedCleared.ReleaseYear.Values[0] == "2025" && managedCleared.UseAndFilteringStyle,
+              "clear managed preserves native text, date and AND style");
+        Check(NavigatorFilterComposer.OptionVisible("Role Playing", "PLAY", false) &&
+              NavigatorFilterComposer.OptionVisible("Selected", "absent", true) &&
+              !NavigatorFilterComposer.OptionVisible("Action", "role", false), "search and selected visibility");
         Check(NavigatorFilterComposer.HasActiveFilters(original), "active state");
         Check(Logic.ToggleRecentGrouping(2, 1) == 4 && Logic.ToggleRecentGrouping(4, 2) == 2 &&
               Logic.ToggleRecentGrouping(4, -1) == 0, "Recent Activity toggle");
