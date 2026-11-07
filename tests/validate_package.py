@@ -29,7 +29,7 @@ nav = ET.parse(root / 'source/HeliumHybrid/Navigator.xaml')
 names = {n.attrib[xname] for n in nav.iter() if xname in n.attrib}
 assert {'CollapseButton','Search','Grouping','Count','Status','Games','ResizeGrip',
         'HomeButton','SortGroupButton','SortGroupPopup','SortSummary',
-        'SortNative','SortName','SortLastPlayed','SortPlaytime','SortReleaseDate'} <= names
+        'GroupOptions','SortOptions','OrderSection'} <= names
 assert 'BackButton' not in names and 'HomeSurface' not in names
 home = next(n for n in nav.iter() if n.attrib.get(xname) == 'HomeButton')
 assert home.tag.endswith('}Button')
@@ -37,8 +37,14 @@ assert len(home) == 1 and home[0].tag.endswith('}Grid')
 assert not any(n.tag.endswith('}Button') for n in home.iter() if n is not home)
 assert any(n.tag.endswith('}TextBlock') and n.attrib.get('Text') == 'Home' for n in home.iter())
 assert sum(1 for n in home.iter() if n.tag.endswith('}Rectangle')) == 4
-assert all(name in names for name in ('GroupNative','GroupSeries','GroupCategory',
-                                     'GroupPlatform','OrderAscending','OrderDescending','SortClose','SortDone'))
+assert all(name in names for name in ('OrderAscending','OrderDescending','SortClose','SortDone'))
+order = next(n for n in nav.iter() if n.attrib.get(xname) == 'OrderSection')
+assert order.attrib.get('Visibility') == 'Collapsed'
+assert {'OrderAscending','OrderDescending'} <= {n.attrib.get(xname) for n in order.iter()}
+assert any(n.attrib.get('Text') == 'ORDER' for n in order)
+for name in ('GroupOptions', 'SortOptions'):
+    selector = next(n for n in nav.iter() if n.attrib.get(xname) == name)
+    assert selector.tag.endswith('}ComboBox') and selector.attrib.get('IsEditable') == 'False'
 contract = {'RecentButton':'Button', 'ReadyButton':'Button', 'FiltersButton':'Button',
             'CloseFilters':'Button', 'ClearAllFilters':'Button', 'FilterIndicator':'TextBlock',
             'AdvancedPanel':'ScrollViewer', 'FilterSections':'StackPanel'}

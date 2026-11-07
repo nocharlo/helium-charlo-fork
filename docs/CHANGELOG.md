@@ -2,6 +2,14 @@
 
 A history of changes to Helium (charlo fork), from the original Navigator prototype to the current release.
 
+## v0.3.1 — In development
+
+- Sort & Group uses categorized dropdowns with keyboard type-ahead. Order appears for Navigator sorting modes and retains the selected direction when switching to and from Following Playnite.
+- Name sorting uses each game's Playnite Sorting Name when set. The Navigator continues to display the game title.
+- Navigator uses a fixed compact list with clearer icons and unchanged text size.
+- Recent Activity keeps chronological groups and supports independent sorting within each group. Hybrid and Detailed now explain how they organize older activity.
+- Navigator settings separate Navigation, Appearance, and Organization. The Organization tab uses balanced searchable mode panels that stack in narrow windows, compact activity cards, and quieter row selection.
+
 ## v0.3.0 — Navigator Experience
 
 This update brings together the major Navigator improvements developed since v0.2.7. The focus is on making library navigation more flexible, with better organization controls, easier access to filters, and tighter integration with Playnite's native views.

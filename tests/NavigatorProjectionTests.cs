@@ -45,10 +45,10 @@ class NavigatorProjectionTests
         Check(!NavigatorProjection.Matches(plain[0].Key, NavigatorProjection.SearchKey("cafe")), "Search excludes unrelated rows");
         var grouped = NavigatorProjection.Build(games, 1, icon => { iconCalls++; return "full/" + icon; });
         Check(grouped.Count == 4, "Multi-group rows plus fallback group");
-        Check(grouped.Select(row => row.Group).SequenceEqual(new[]{"No group","Series A","Series A","Series B"}), "Group ordering and fallback");
-        Check(grouped.Select(row => row.Id).SequenceEqual(new[]{gamma,beta,alpha,beta}), "Preserve native order within independent groups");
+        Check(grouped.Select(row => row.Group).SequenceEqual(new[]{"Series A","Series A","Series B","None"}), "Unassigned group follows assigned groups");
+        Check(grouped.Select(row => row.Id).SequenceEqual(new[]{beta,alpha,beta,gamma}), "Preserve native order within independent groups");
         var groupedReverse = NavigatorProjection.Build(games.Reverse(), 1, icon => icon);
-        Check(groupedReverse.Select(row => row.Id).SequenceEqual(new[]{gamma,alpha,beta,beta}),
+        Check(groupedReverse.Select(row => row.Id).SequenceEqual(new[]{alpha,beta,beta,gamma}),
             "Independent group headings stay sorted while members follow native order");
         Check(grouped.Count(row => row.Id == beta) == 2 && iconCalls == 2, "Duplicate memberships removed; icon resolved once per game");
         var ratingCategories = NavigatorProjection.Build(new[] {
@@ -158,6 +158,29 @@ class NavigatorProjectionTests
         Check(Sorted(NavigatorSortMode.Name).SequenceEqual(new[]{beta,alpha,gamma,delta}) &&
             Sorted(NavigatorSortMode.Name, true).SequenceEqual(new[]{gamma,alpha,beta,delta}),
             "Name ascending and descending keep missing title last");
+        var titleFixture = new[] {
+            new NavigatorSource { Id = alpha, Name = "The Lantern", SortingName = "Lantern" },
+            new NavigatorSource { Id = beta, Name = "A Voyage", SortingName = "" },
+            new NavigatorSource { Id = gamma, Name = "An Orchard", SortingName = "  " },
+            new NavigatorSource { Id = delta, Name = "Chronicles: Dawn", SortingName = "Chronicles 02" },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "Chronicles: Midnight", SortingName = "Chronicles 01" },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = "The Lantern", SortingName = "Lantern" },
+            new NavigatorSource { Id = Guid.NewGuid(), Name = null, SortingName = " " }
+        };
+        var duplicates = new[] { titleFixture[0].Id, titleFixture[5].Id }.OrderBy(id => id).ToArray();
+        var nameAsc = NavigatorProjection.Build(titleFixture.Reverse(), 0, icon => icon, sortingClock, NavigatorSortMode.Name);
+        var nameDesc = NavigatorProjection.Build(titleFixture, 0, icon => icon, sortingClock, NavigatorSortMode.Name, true);
+        Check(nameAsc.Select(row => row.Name).SequenceEqual(new[] {
+            "A Voyage", "An Orchard", "Chronicles: Midnight", "Chronicles: Dawn", "The Lantern", "The Lantern", "Untitled"
+        }), "Name uses stored sort keys, with unmodified displayed title and no manual article stripping");
+        Check(nameDesc.Select(row => row.Name).SequenceEqual(new[] {
+            "The Lantern", "The Lantern", "Chronicles: Dawn", "Chronicles: Midnight", "An Orchard", "A Voyage", "Untitled"
+        }), "Descending reverses the primary key and keeps missing keys last");
+        Check(nameAsc.Skip(4).Take(2).Select(row => row.Id).SequenceEqual(duplicates) &&
+            nameDesc.Take(2).Select(row => row.Id).SequenceEqual(duplicates),
+            "Duplicate titles and sort keys tie by stable ID in either direction");
+        Check(NavigatorProjection.Build(titleFixture, 0, icon => icon, sortingClock, NavigatorSortMode.FollowingPlaynite, true)
+            .Select(row => row.Id).SequenceEqual(titleFixture.Select(game => game.Id)), "Native sequence ignores Navigator sort keys");
         Check(Sorted(NavigatorSortMode.LastPlayed).SequenceEqual(new[]{alpha,beta,gamma,delta}) &&
             Sorted(NavigatorSortMode.LastPlayed, true).SequenceEqual(new[]{beta,alpha,gamma,delta}),
             "Last Played dates sort both directions and missing activity stays last");
@@ -188,11 +211,47 @@ class NavigatorProjectionTests
         Check(NavigatorSortPolicy.ValidMode(-1) == NavigatorSortMode.FollowingPlaynite &&
             NavigatorSortPolicy.ValidMode(99) == NavigatorSortMode.FollowingPlaynite,
             "Unknown saved sort modes migrate to native ordering");
-        var recentUnchanged = NavigatorProjection.Build(sortable, 8, icon => icon, sortingClock,
-            NavigatorSortMode.Playtime, false);
-        Check(recentUnchanged.Select(row => row.Id).SequenceEqual(
-            NavigatorProjection.Build(sortable, 8, icon => icon, sortingClock).Select(row => row.Id)),
-            "Recent Activity buckets ignore normal sorting preferences");
+        foreach (var grouping in new[] { 8, 9 }) {
+            var inherited = NavigatorProjection.Build(sortable, grouping, icon => icon, sortingClock);
+            var ascending = NavigatorProjection.Build(sortable, grouping, icon => icon, sortingClock, NavigatorSortMode.Playtime);
+            var descending = NavigatorProjection.Build(sortable, grouping, icon => icon, sortingClock, NavigatorSortMode.Playtime, true);
+            Check(inherited.Take(2).Select(row => row.Id).SequenceEqual(new[] { beta, alpha }),
+                "Recent Activity defaults to newest first within each group");
+            Check(ascending.Take(2).Select(row => row.Id).SequenceEqual(new[] { alpha, beta }) &&
+                descending.Take(2).Select(row => row.Id).SequenceEqual(new[] { beta, alpha }),
+                "Recent Activity applies independent direction within each group");
+            Check(ascending.Select(row => row.GroupIdentity).SequenceEqual(inherited.Select(row => row.GroupIdentity)) &&
+                descending.Select(row => row.GroupIdentity).SequenceEqual(inherited.Select(row => row.GroupIdentity)),
+                "Changing direction preserves chronological group identities, counts, and missing-last placement");
+        }
+        PerformanceCampaign();
         Console.WriteLine("PASS: " + checks + " NavigatorProjection checks.");
+    }
+
+    static void PerformanceCampaign()
+    {
+        var clock = new DateTime(2026, 10, 20, 12, 0, 0);
+        foreach (var size in new[] { 100, 1000, 5000 }) {
+            var games = Enumerable.Range(1, size).Select(i => new NavigatorSource {
+                Id = new Guid(i, 0, 0, new byte[8]), Name = "Synthetic " + i,
+                SortingName = "Sort " + (size - i), GroupNames = new[] { "A", "B", "C" }
+            }).ToArray();
+            NavigatorProjection.Build(games, 1, x => x, clock, NavigatorSortMode.Name);
+            var times = new double[9]; var allocations = new long[9];
+            for (int run = 0; run < times.Length; run++) {
+                long start = GC.GetAllocatedBytesForCurrentThread();
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                var rows = NavigatorProjection.Build(games, 1, x => x, clock, NavigatorSortMode.Name, run % 2 != 0);
+                watch.Stop();
+                allocations[run] = GC.GetAllocatedBytesForCurrentThread() - start;
+                times[run] = watch.Elapsed.TotalMilliseconds;
+                Check(rows.Count == size * 3 && NavigatorProjection.DistinctGameCount(rows.Select(row => row.Id)) == size,
+                    "Repeated reorganization retains synthetic membership");
+            }
+            Array.Sort(times); Array.Sort(allocations);
+            Console.WriteLine("PERF synthetic n=" + size + " runs=9 medianMs=" + times[4].ToString("F2", CultureInfo.InvariantCulture) +
+                " p95Ms=" + times[8].ToString("F2", CultureInfo.InvariantCulture) + " medianBytes=" + allocations[4] +
+                " p95Bytes=" + allocations[8] + " WPF_NOT_MEASURED");
+        }
     }
 }
