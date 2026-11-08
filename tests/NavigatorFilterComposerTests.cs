@@ -75,6 +75,9 @@ internal static class NavigatorFilterComposerTests
         Check(NavigatorFilterComposer.OptionVisible("Role Playing", "PLAY", false) &&
               NavigatorFilterComposer.OptionVisible("Selected", "absent", true) &&
               !NavigatorFilterComposer.OptionVisible("Action", "role", false), "search and selected visibility");
+        Check(!NavigatorFilterComposer.OptionMatches("Selected", "absent") &&
+              NavigatorFilterComposer.OptionVisible("Selected", "absent", true),
+              "Selected option remains visible without hiding empty search feedback");
         Check(NavigatorFilterComposer.HasActiveFilters(original), "active state");
         Check(Logic.ToggleRecentGrouping(2, 1) == 4 && Logic.ToggleRecentGrouping(4, 2) == 2 &&
               Logic.ToggleRecentGrouping(4, -1) == 0, "Recent Activity toggle");

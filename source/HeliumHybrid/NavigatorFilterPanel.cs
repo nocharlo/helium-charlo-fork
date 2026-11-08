@@ -143,9 +143,10 @@ namespace HeliumHybrid
                 foreach (var box in entry.Item2) {
                     var visible = NavigatorFilterComposer.OptionVisible(box.Content as string, query, box.IsChecked == true);
                     box.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-                    matches |= visible;
+                    // Selected options stay accessible, but they are not search hits.
+                    matches |= NavigatorFilterComposer.OptionMatches(box.Content as string, query);
                 }
-                entry.Item1.Visibility = matches || query.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+                entry.Item1.Visibility = matches || entry.Item2.Any(box => box.IsChecked == true) || query.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
                 if (query.Length > 0 && matches) entry.Item1.IsExpanded = true;
                 else if (query.Length == 0 && expanded.TryGetValue((string)entry.Item1.Tag, out var prior)) entry.Item1.IsExpanded = prior;
                 found |= matches;

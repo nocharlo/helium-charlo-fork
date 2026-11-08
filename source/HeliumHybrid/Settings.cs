@@ -17,6 +17,7 @@ namespace HeliumHybrid
         // 0 follows Playnite; other values sort Navigator rows within each group.
         public int SortMode { get; set; }
         public bool SortDescending { get; set; }
+        public bool ApplySortGroupToPlaynite { get; set; } = true;
         // Null means an older file: use catalog defaults. Lists are ordered visibility selections.
         public List<int> VisibleGroupingModes { get; set; }
         public List<int> VisibleSortingModes { get; set; }
@@ -81,7 +82,7 @@ namespace HeliumHybrid
             return errors.Count == 0;
         }
         private Preferences Copy() => new Preferences { Width = Width, Collapsed = Collapsed, Grouping = Grouping,
-            SortMode = SortMode, SortDescending = SortDescending,
+            SortMode = SortMode, SortDescending = SortDescending, ApplySortGroupToPlaynite = ApplySortGroupToPlaynite,
             VisibleGroupingModes = VisibleGroupingModes == null ? null : new List<int>(VisibleGroupingModes),
             VisibleSortingModes = VisibleSortingModes == null ? null : new List<int>(VisibleSortingModes),
             VisibleGroupingModesSpecified = VisibleGroupingModesSpecified, VisibleSortingModesSpecified = VisibleSortingModesSpecified,
@@ -95,6 +96,7 @@ namespace HeliumHybrid
         {
             Width = value.Width; Collapsed = value.Collapsed; Grouping = value.Grouping;
             SortMode = value.SortMode; SortDescending = value.SortDescending;
+            ApplySortGroupToPlaynite = value.ApplySortGroupToPlaynite;
             VisibleGroupingModes = value.VisibleGroupingModes == null ? null : new List<int>(value.VisibleGroupingModes);
             VisibleSortingModes = value.VisibleSortingModes == null ? null : new List<int>(value.VisibleSortingModes);
             VisibleGroupingModesSpecified = value.VisibleGroupingModesSpecified;
@@ -126,6 +128,8 @@ namespace HeliumHybrid
             width.SetBinding(TextBox.TextProperty, new Binding("Width") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
 
             var activity = Section("Recent Activity", ActivityStyle());
+            var nativeOrganization = BoundCheck("Apply Sort & Group changes to Playnite", nameof(Preferences.ApplySortGroupToPlaynite));
+            nativeOrganization.Margin = new Thickness(4, 0, 0, 12);
             var organization = new Grid();
             Action populate = () => {
                 organization.Children.Clear();
@@ -143,7 +147,7 @@ namespace HeliumHybrid
             tabs.Items.Add(Page("Appearance", Section("Grid details panel",
                 Choice("Display mode", "LayoutMode", "Automatic", "Always hidden", "Always visible")),
                 Section("Sidebar width", width)));
-            tabs.Items.Add(Page("Organization", activity, organization));
+            tabs.Items.Add(Page("Organization", activity, nativeOrganization, organization));
             Content = tabs;
         }
 

@@ -27,6 +27,27 @@ namespace HeliumHybrid
         internal string SortOrder => api.MainView.SortOrder.ToString();
         internal string SortDirection => api.MainView.SortOrderDirection.ToString();
         internal string Grouping => api.MainView.Grouping.ToString();
+        internal void ApplyGrouping(int mode)
+        {
+            var native = NavigatorNativeOrganization.Group(mode);
+            if (native.HasValue && api.MainView.Grouping != native.Value)
+                api.MainView.Grouping = native.Value;
+        }
+        internal void ApplySorting(NavigatorSortMode mode, bool descending)
+        {
+            var native = NavigatorNativeOrganization.Sort(mode);
+            if (!native.HasValue) return;
+            var direction = NavigatorNativeOrganization.Direction(descending);
+            if (api.MainView.SortOrder != native.Value) {
+                // SortOrder has no public setter in SDK 6.11.0. Retain every native
+                // filter condition and the current grouping in an unsaved preset.
+                var current = api.MainView.GetCurrentFilterSettings();
+                api.MainView.ApplyFilterPreset(NavigatorNativeOrganization.SortPreset(
+                    current, native.Value, direction, api.MainView.Grouping));
+            } else if (api.MainView.SortOrderDirection != direction) {
+                api.MainView.SortOrderDirection = direction;
+            }
+        }
         internal string ResolveIcon(string icon) => api.Database.GetFullFilePath(icon);
 
         internal NavigatorViewSnapshot ViewState(int navigatorGrouping)
