@@ -10,7 +10,7 @@ namespace HeliumHybrid
         FollowingPlaynite = 0, Series = 1, Category = 2, Platform = 3, RecentActivity = 4,
         None = 5, Genre = 6, Tags = 7, Developer = 8, Publisher = 9, Features = 10,
         Library = 11, Source = 12, Region = 13, AgeRating = 14, CompletionStatus = 15,
-        InstallationStatus = 16, Favorites = 17, ReleaseYear = 18, AddedYear = 19, Default = 20
+        InstallationStatus = 16, Favorites = 17, ReleaseYear = 18, AddedYear = 19
     }
     internal enum NavigatorGroupPolicy
     {
@@ -42,7 +42,6 @@ namespace HeliumHybrid
         private static OrganizationMode S(NavigatorSortMode id, string label, string category, bool visible = false) =>
             new OrganizationMode((int)id, label, category, false, visible);
         internal static readonly OrganizationMode[] Groups = {
-            G(NavigatorGroupingMode.Default, "Default", "Basic", NavigatorGroupPolicy.None, true),
             G(NavigatorGroupingMode.FollowingPlaynite, "Following Playnite", "Basic", NavigatorGroupPolicy.None, true),
             G(NavigatorGroupingMode.Series, "Series", "Metadata", NavigatorGroupPolicy.Series, true),
             G(NavigatorGroupingMode.Category, "Category", "Metadata", NavigatorGroupPolicy.Category, true),
@@ -65,7 +64,6 @@ namespace HeliumHybrid
             G(NavigatorGroupingMode.AddedYear, "Date Added (Year)", "Dates", NavigatorGroupPolicy.AddedYear)
         };
         internal static readonly OrganizationMode[] Sorts = {
-            S(NavigatorSortMode.Default, "Default", "Basic", true),
             S(NavigatorSortMode.FollowingPlaynite, "Following Playnite", "Basic", true),
             S(NavigatorSortMode.Name, "Name", "Basic", true),
             S(NavigatorSortMode.LastPlayed, "Last Played", "Activity", true),
@@ -83,8 +81,8 @@ namespace HeliumHybrid
             S(NavigatorSortMode.InstallationSize, "Installation Size", "Storage"),
             S(NavigatorSortMode.SortingName, "Sorting Name", "Basic")
         };
-        internal static OrganizationMode Group(int id) => Groups.FirstOrDefault(m => m.Id == id) ?? Groups.First(m => m.Id == 0);
-        internal static OrganizationMode Sort(int id) => Sorts.FirstOrDefault(m => m.Id == id) ?? Sorts.First(m => m.Id == 0);
+        internal static OrganizationMode Group(int id) => Groups.FirstOrDefault(m => m.Id == id) ?? Groups[0];
+        internal static OrganizationMode Sort(int id) => Sorts.FirstOrDefault(m => m.Id == id) ?? Sorts[0];
         internal static List<int> Normalize(IEnumerable<int> ids, bool grouping)
         {
             var catalog = grouping ? Groups : Sorts;

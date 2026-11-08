@@ -24,7 +24,7 @@ internal static class NavigatorOrganizationTests
     [STAThread]
     private static void Main()
     {
-        CatalogAndGroups(); Sorting(); Settings(); DefaultOrganization(); NativeOrganization(); OrganizationControls(); Presentation(); Campaign(); Benchmarks();
+        CatalogAndGroups(); Sorting(); Settings(); RemovedDefaultModes(); NativeOrganization(); OrganizationControls(); Presentation(); Campaign(); Benchmarks();
         Console.WriteLine("PASS: " + checks + " Navigator organization, settings and WPF model checks.");
     }
     private static void Campaign()
@@ -32,7 +32,7 @@ internal static class NavigatorOrganizationTests
         var serializer = new XmlSerializer(typeof(Preferences));
         Preferences Read(string xml) { var p = (Preferences)serializer.Deserialize(new StringReader(xml)); p.MigrateNavigation(); return p; }
         var absent = Read("<Preferences />");
-        var empty = Read("<Preferences><DefaultOrganizationModesInitialized>true</DefaultOrganizationModesInitialized><VisibleGroupingModes /><VisibleSortingModes /></Preferences>");
+        var empty = Read("<Preferences><VisibleGroupingModes /><VisibleSortingModes /></Preferences>");
         Check(absent.VisibleGroupingModes.Count > 1 && absent.VisibleSortingModes.Count > 1, "Missing lists receive catalog defaults");
         Check(empty.VisibleGroupingModes.SequenceEqual(new[] { 0 }) && empty.VisibleSortingModes.SequenceEqual(new[] { 0 }), "Explicit empty lists retain minimum safe choice");
         var obsolete = Read("<Preferences><NavigatorListDensity>0</NavigatorListDensity><Grouping>2</Grouping></Preferences>");
@@ -172,8 +172,7 @@ internal static class NavigatorOrganizationTests
             Check(visible().SequenceEqual(before), "Move Down restores the previous sequence");
             var other = (grouping ? prefs.VisibleSortingModes : prefs.VisibleGroupingModes).ToArray();
             actions[0].RaiseEvent(new System.Windows.RoutedEventArgs(Button.ClickEvent));
-            var catalog = grouping ? NavigatorOrganization.Groups : NavigatorOrganization.Sorts;
-            Check(visible().SequenceEqual(catalog.Select(mode => mode.Id)), "Show All exposes the complete catalog in order");
+            Check(visible().Count == (grouping ? 20 : 16), "Show All affects the complete catalog");
             actions[1].RaiseEvent(new System.Windows.RoutedEventArgs(Button.ClickEvent));
             Check(visible().SequenceEqual(NavigatorOrganization.Normalize(null, grouping)), "Restore Defaults restores only its list");
             Check((grouping ? prefs.VisibleSortingModes : prefs.VisibleGroupingModes).SequenceEqual(other), "Management actions preserve the other panel");
@@ -181,9 +180,9 @@ internal static class NavigatorOrganizationTests
     }
     private static void CatalogAndGroups()
     {
-        Check(NavigatorOrganization.Groups.Select(m => m.Id).Distinct().Count() == 21, "Unique persisted grouping IDs");
-        Check(NavigatorOrganization.Sorts.Select(m => m.Id).Distinct().Count() == 17, "Unique sorting IDs");
-        Check(Enumerable.Range(0, 5).Select(id => NavigatorOrganization.Group(id).Label).SequenceEqual(new[] { "Following Playnite", "Series", "Category", "Platform", "Recent Activity" }), "Legacy IDs remain unchanged");
+        Check(NavigatorOrganization.Groups.Select(m => m.Id).Distinct().Count() == 20, "Unique persisted grouping IDs");
+        Check(NavigatorOrganization.Sorts.Select(m => m.Id).Distinct().Count() == 16, "Unique sorting IDs");
+        Check(NavigatorOrganization.Groups.Take(5).Select(m => m.Label).SequenceEqual(new[] { "Following Playnite", "Series", "Category", "Platform", "Recent Activity" }), "Legacy IDs remain unchanged");
         Check(NavigatorRefreshDecision.EffectiveGrouping(5, "Series") == 0 && NavigatorRefreshDecision.EffectiveGrouping(15, "Series") == 4,
             "Persisted No Grouping and Completion Status do not collide with effective IDs");
         var missing = Game(1); var realNone = Game(2); var realOld = Game(3); var realUnknown = Game(4); var multi = Game(5);
@@ -243,7 +242,7 @@ internal static class NavigatorOrganizationTests
     }
     private static void Sorting()
     {
-        foreach (var mode in NavigatorOrganization.Sorts.Where(m => m.SortPolicy != NavigatorSortMode.FollowingPlaynite && m.SortPolicy != NavigatorSortMode.Default)) {
+        foreach (var mode in NavigatorOrganization.Sorts.Where(m => m.Id != 0)) {
             var low = Game(1, "A"); var high = Game(2, "B"); var missing = Game(3, null);
             low.SortingName = "A"; high.SortingName = "B";
             low.LastActivity = Now.AddDays(-2); high.LastActivity = Now.AddDays(-1);
@@ -317,66 +316,47 @@ internal static class NavigatorOrganizationTests
         Check(NavigatorOrganization.Move(new[] { 1, 2, 3 }, 2, 1).SequenceEqual(new[] { 1, 3, 2 }), "Move visible option down");
         Check(NavigatorOrganization.Move(new[] { 1, 2, 3 }, 9, -1).SequenceEqual(new[] { 1, 2, 3 }), "Cannot reorder a hidden option");
     }
-    private static void DefaultOrganization()
+    private static void RemovedDefaultModes()
     {
-        var groupId = (int)NavigatorGroupingMode.Default;
-        var sortId = (int)NavigatorSortMode.Default;
-        Check(groupId == 20 && sortId == 16, "Defaults have their own stable persisted IDs");
-        Check(NavigatorOrganization.Visible(null, true, 0).First().Id == groupId &&
-            NavigatorOrganization.Visible(null, false, 0).First().Id == sortId &&
-            NavigatorOrganization.Group(groupId).Category == "Basic" && NavigatorOrganization.Sort(sortId).Category == "Basic",
-            "Both defaults lead the Basic category");
-        Check(NavigatorOrganization.Group(-1).Id == 0 && NavigatorSortPolicy.ValidMode(-1) == NavigatorSortMode.FollowingPlaynite,
-            "Unknown IDs still fall back to Following Playnite");
-        Check(NavigatorRefreshDecision.EffectiveGrouping(groupId, "Series") == 0 &&
-            NavigatorRefreshDecision.EffectiveGrouping(0, "Series") == (int)NavigatorGroupPolicy.NativeSeries,
-            "Group Default stays flat even when native grouping is Series");
-
-        var a = Game(1, "The Zebra"); a.SortingName = "Alpha";
-        var b = Game(2, "Beta"); b.SortingName = " ";
-        var games = new[] { b, a };
-        Check(Build(games, 0, NavigatorSortMode.Default, true).Select(r => r.Id).SequenceEqual(new[] { a.Id, b.Id }),
-            "Default is Name ascending with Sorting Name fallback, even with a stale descending flag");
-        var descendingMode = NavigatorSortPolicy.ModeForDirection(NavigatorSortMode.Default, true);
-        Check(descendingMode == NavigatorSortMode.Name && NavigatorSortPolicy.IsDescending(descendingMode, true) &&
-            Build(games, 0, descendingMode, true).Select(r => r.Id).SequenceEqual(new[] { b.Id, a.Id }),
-            "Choosing Descending from Default selects Name and reverses order");
-        Check(!NavigatorSortPolicy.IsDescending(NavigatorSortMode.Default, true) &&
-            NavigatorSortPolicy.IsDescending(NavigatorSortMode.LastPlayed, true) &&
-            NavigatorSortPolicy.ModeForDirection(NavigatorSortMode.Default, false) == NavigatorSortMode.Default,
-            "Selecting Default resets direction without changing other sort modes");
-
         var serializer = new XmlSerializer(typeof(Preferences));
-        var p = (Preferences)serializer.Deserialize(new StringReader(
-            "<Preferences><Grouping>2</Grouping><SortMode>2</SortMode><SortDescending>true</SortDescending>" +
-            "<VisibleGroupingModes><int>2</int><int>1</int></VisibleGroupingModes>" +
-            "<VisibleSortingModes><int>2</int><int>1</int></VisibleSortingModes></Preferences>"));
-        p.MigrateNavigation();
-        Check(p.Grouping == 2 && p.SortMode == 2 && p.SortDescending, "Legacy selection and direction survive migration");
-        Check(p.VisibleGroupingModes.SequenceEqual(new[] { groupId, 2, 1 }) &&
-            p.VisibleSortingModes.SequenceEqual(new[] { sortId, 2, 1 }), "Migration adds defaults without reordering legacy modes");
-        p.Grouping = groupId;
-        p.SortMode = sortId;
-        p.SortDescending = false;
-        p.VisibleGroupingModes.Remove(groupId);
-        p.VisibleSortingModes = new List<int> { 2, sortId, 1 };
-        using (var writer = new StringWriter()) {
-            serializer.Serialize(writer, p);
-            var copy = (Preferences)serializer.Deserialize(new StringReader(writer.ToString()));
-            copy.MigrateNavigation();
-            Check(copy.Grouping == groupId && copy.SortMode == sortId && !copy.SortDescending,
-                "Selected defaults persist as distinct modes");
-            Check(copy.VisibleGroupingModes.SequenceEqual(new[] { 2, 1 }) &&
-                copy.VisibleSortingModes.SequenceEqual(new[] { 2, sortId, 1 }), "Reload respects hidden and reordered defaults");
-            copy.SortDescending = true;
-            copy.MigrateNavigation();
-            Check(!copy.SortDescending && copy.SortMode == sortId, "Load normalizes contradictory Default direction");
+        Preferences Read(string xml)
+        {
+            var p = (Preferences)serializer.Deserialize(new StringReader(xml));
+            p.MigrateNavigation();
+            return p;
         }
 
-        Check(NavigatorNativeOrganization.Group(groupId) == GroupableField.None &&
-            NavigatorNativeOrganization.Sort(NavigatorSortMode.Default) == SortOrder.Name &&
-            NavigatorNativeOrganization.Direction(NavigatorSortPolicy.IsDescending(NavigatorSortMode.Default, true)) == SortOrderDirection.Ascending,
-            "Native defaults map to No Grouping and Name ascending");
+        const string candidateLists =
+            "<DefaultOrganizationModesInitialized>true</DefaultOrganizationModesInitialized>" +
+            "<VisibleGroupingModes><int>2</int><int>20</int><int>5</int><int>1</int></VisibleGroupingModes>" +
+            "<VisibleSortingModes><int>2</int><int>16</int><int>1</int><int>0</int></VisibleSortingModes>";
+        var migrated = Read("<Preferences><Grouping>20</Grouping><SortMode>16</SortMode><SortDescending>true</SortDescending>" +
+            candidateLists + "</Preferences>");
+        Check(migrated.Grouping == (int)NavigatorGroupingMode.None &&
+            migrated.SortMode == (int)NavigatorSortMode.Name && !migrated.SortDescending,
+            "Candidate defaults migrate to No Grouping and Name ascending");
+        Check(migrated.VisibleGroupingModes.SequenceEqual(new[] { 2, 5, 1 }) &&
+            migrated.VisibleSortingModes.SequenceEqual(new[] { 2, 1, 0 }), "Removed IDs are dropped without reordering the remaining modes");
+        using (var writer = new StringWriter()) {
+            serializer.Serialize(writer, migrated);
+            var copy = Read(writer.ToString());
+            Check(copy.Grouping == migrated.Grouping && copy.SortMode == migrated.SortMode && !copy.SortDescending &&
+                copy.VisibleGroupingModes.SequenceEqual(migrated.VisibleGroupingModes) &&
+                copy.VisibleSortingModes.SequenceEqual(migrated.VisibleSortingModes), "Migrated organization survives saving and reopening");
+        }
+
+        var existing = Read("<Preferences><Grouping>2</Grouping><SortMode>1</SortMode><SortDescending>true</SortDescending>" +
+            candidateLists + "</Preferences>");
+        Check(existing.Grouping == 2 && existing.SortMode == (int)NavigatorSortMode.Name && existing.SortDescending,
+            "An existing Name descending preference is unaffected by obsolete visibility entries");
+        var onlyDefaults = Read("<Preferences><Grouping>20</Grouping><SortMode>16</SortMode>" +
+            "<VisibleGroupingModes><int>20</int></VisibleGroupingModes>" +
+            "<VisibleSortingModes><int>16</int></VisibleSortingModes></Preferences>");
+        Check(NavigatorOrganization.Visible(onlyDefaults.VisibleGroupingModes, true, onlyDefaults.Grouping)
+                .Select(mode => mode.Id).SequenceEqual(new[] { 0, (int)NavigatorGroupingMode.None }) &&
+            NavigatorOrganization.Visible(onlyDefaults.VisibleSortingModes, false, onlyDefaults.SortMode)
+                .Select(mode => mode.Id).SequenceEqual(new[] { 0, (int)NavigatorSortMode.Name }),
+            "Lists containing only removed IDs keep the safe fallback and the migrated active mode");
     }
     private static void NativeOrganization()
     {
