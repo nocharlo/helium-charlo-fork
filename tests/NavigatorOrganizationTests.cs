@@ -10,6 +10,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Xml.Serialization;
 using HeliumHybrid;
+using Playnite.SDK.Models;
 
 internal static class NavigatorOrganizationTests
 {
@@ -23,7 +24,7 @@ internal static class NavigatorOrganizationTests
     [STAThread]
     private static void Main()
     {
-        CatalogAndGroups(); Sorting(); Settings(); OrganizationControls(); Presentation(); Campaign(); Benchmarks();
+        CatalogAndGroups(); Sorting(); Settings(); NativeOrganization(); OrganizationControls(); Presentation(); Campaign(); Benchmarks();
         Console.WriteLine("PASS: " + checks + " Navigator organization, settings and WPF model checks.");
     }
     private static void Campaign()
@@ -98,9 +99,12 @@ internal static class NavigatorOrganizationTests
             "Activity selection is bound to the existing persisted setting");
         Check(style.Items.Cast<ListBoxItem>().Select(item => ((TextBlock)((StackPanel)item.Content).Children[0]).Text)
             .SequenceEqual(new[] { "Hybrid", "Detailed" }), "Activity cards preserve the stored index order");
-        var editors = ((Grid)page.Children[1]).Children.Cast<GroupBox>().ToArray();
+        var nativeCheck = (CheckBox)page.Children[1];
+        Check(BindingOperations.GetBinding(nativeCheck, CheckBox.IsCheckedProperty).Path.Path ==
+            nameof(Preferences.ApplySortGroupToPlaynite), "Native organization setting bound in Organization tab");
+        var editors = ((Grid)page.Children[2]).Children.Cast<GroupBox>().ToArray();
         Check(editors.Length == 2, "Organization has separate visibility cards");
-        var layout = (Grid)page.Children[1];
+        var layout = (Grid)page.Children[2];
         NavigatorOrganizationControls.ArrangeEditors(layout, 700);
         Check(layout.ColumnDefinitions.Count == 2 && Grid.GetColumn(editors[1]) == 1, "Wide editors use balanced columns");
         NavigatorOrganizationControls.ArrangeEditors(layout, 420);
@@ -255,8 +259,13 @@ internal static class NavigatorOrganizationTests
             Check(prefs.Grouping == id && prefs.SortMode == 3 && prefs.Width == 270 && prefs.SidebarClickAction == 0, "Legacy navigation and mode preserved " + id);
             Check(prefs.RecentActivityGroupingStyle == (id == 4 ? 1 : 0), "Legacy activity style " + id);
             Check(prefs.VisibleGroupingModes.Count > 1 && prefs.VisibleSortingModes.Count > 1, "Older file receives catalog visibility defaults");
+            Check(prefs.ApplySortGroupToPlaynite, "Older settings default to native organization synchronization");
         }
         var p = new Preferences { Grouping = 15, SortMode = 8 }; p.MigrateNavigation();
+        p.BeginEdit(); p.ApplySortGroupToPlaynite = false; p.CancelEdit();
+        Check(p.ApplySortGroupToPlaynite, "Cancel restores native synchronization preference");
+        p.BeginEdit(); p.ApplySortGroupToPlaynite = false; p.EndEdit();
+        Check(!p.ApplySortGroupToPlaynite, "Save keeps native synchronization disabled");
         var original = p.VisibleGroupingModes.ToArray(); var originalSort = p.VisibleSortingModes.ToArray();
         p.BeginEdit(); p.VisibleGroupingModes.Clear(); p.VisibleSortingModes.Clear(); p.Width = 300;
         p.CancelEdit();
@@ -271,6 +280,7 @@ internal static class NavigatorOrganizationTests
             serializer.Serialize(writer, p);
             var copy = (Preferences)serializer.Deserialize(new StringReader(writer.ToString())); copy.MigrateNavigation();
             Check(copy.Grouping == 15 && copy.SortMode == 8 && copy.VisibleGroupingModes.SequenceEqual(new[] { 1 }) && copy.VisibleSortingModes.SequenceEqual(new[] { 1 }), "New settings roundtrip");
+            Check(!copy.ApplySortGroupToPlaynite, "Native synchronization preference persists");
         }
         p.BeginEdit(); p.VisibleGroupingModes.Clear(); p.VisibleSortingModes = new List<int> { -1, 999 }; p.EndEdit();
         Check(p.VisibleGroupingModes.SequenceEqual(new[] { 0 }) && p.VisibleSortingModes.SequenceEqual(new[] { 0 }), "At least one valid selectable option");
@@ -282,6 +292,43 @@ internal static class NavigatorOrganizationTests
         Check(NavigatorOrganization.Move(new[] { 1, 2, 3 }, 2, -1).SequenceEqual(new[] { 2, 1, 3 }), "Move visible option up");
         Check(NavigatorOrganization.Move(new[] { 1, 2, 3 }, 2, 1).SequenceEqual(new[] { 1, 3, 2 }), "Move visible option down");
         Check(NavigatorOrganization.Move(new[] { 1, 2, 3 }, 9, -1).SequenceEqual(new[] { 1, 2, 3 }), "Cannot reorder a hidden option");
+    }
+    private static void NativeOrganization()
+    {
+        Check(NavigatorNativeOrganization.Group(1) == GroupableField.Series &&
+            NavigatorNativeOrganization.Group(2) == GroupableField.Category &&
+            NavigatorNativeOrganization.Group(3) == GroupableField.Platform &&
+            NavigatorNativeOrganization.Group(5) == GroupableField.None, "Native core grouping mappings");
+        Check(NavigatorNativeOrganization.Group(6) == GroupableField.Genre &&
+            NavigatorNativeOrganization.Group(7) == GroupableField.Tag &&
+            NavigatorNativeOrganization.Group(15) == GroupableField.CompletionStatus &&
+            NavigatorNativeOrganization.Group(16) == GroupableField.InstallationStatus &&
+            NavigatorNativeOrganization.Group(18) == GroupableField.ReleaseYear, "Native metadata and status grouping mappings");
+        Check(!NavigatorNativeOrganization.Group(0).HasValue &&
+            !NavigatorNativeOrganization.Group(4).HasValue &&
+            !NavigatorNativeOrganization.Group(17).HasValue &&
+            !NavigatorNativeOrganization.Group(19).HasValue, "Following Playnite and custom groups leave native grouping alone");
+        Check(NavigatorNativeOrganization.Sort(NavigatorSortMode.Name) == SortOrder.Name &&
+            NavigatorNativeOrganization.Sort(NavigatorSortMode.LastPlayed) == SortOrder.LastActivity &&
+            NavigatorNativeOrganization.Sort(NavigatorSortMode.PlayCount) == SortOrder.PlayCount &&
+            NavigatorNativeOrganization.Sort(NavigatorSortMode.InstallationStatus) == SortOrder.IsInstalled,
+            "Native sorting mappings");
+        Check(!NavigatorNativeOrganization.Sort(NavigatorSortMode.FollowingPlaynite).HasValue &&
+            !NavigatorNativeOrganization.Sort(NavigatorSortMode.SortingName).HasValue,
+            "Following Playnite and distinct Sorting Name do not force native sort");
+        Check(NavigatorNativeOrganization.Direction(false) == SortOrderDirection.Ascending &&
+            NavigatorNativeOrganization.Direction(true) == SortOrderDirection.Descending, "Native direction mapping");
+        var filters = new FilterPresetSettings { UseAndFilteringStyle = true, Name = "synthetic",
+            Genre = new IdItemFilterItemProperties { Ids = new List<Guid> { Guid.NewGuid() }, Text = "retained" } };
+        var preset = NavigatorNativeOrganization.SortPreset(filters, SortOrder.Name, SortOrderDirection.Descending, GroupableField.Series);
+        Check(preset.Id == Guid.Empty && preset.SortingOrder == SortOrder.Name &&
+            preset.SortingOrderDirection == SortOrderDirection.Descending && preset.GroupingOrder == GroupableField.Series,
+            "Native sort preset changes only requested view fields");
+        Check(preset.Settings.UseAndFilteringStyle && preset.Settings.Name == "synthetic" &&
+            preset.Settings.Genre.Text == "retained" && preset.Settings.Genre.Ids.SequenceEqual(filters.Genre.Ids),
+            "Native sort preset copies filter conditions");
+        preset.Settings.Genre.Ids.Clear();
+        Check(filters.Genre.Ids.Count == 1, "Native sort preset cannot mutate source filters");
     }
     private static void Presentation()
     {

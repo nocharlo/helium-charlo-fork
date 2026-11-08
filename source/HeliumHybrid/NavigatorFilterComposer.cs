@@ -11,8 +11,9 @@ namespace HeliumHybrid
     // Copies the entire SDK filter state before changing one field. Saved presets are never edited.
     internal static class NavigatorFilterComposer
     {
-        internal static bool OptionVisible(string label, string query, bool selected) => selected ||
+        internal static bool OptionMatches(string label, string query) =>
             (label ?? "").IndexOf(query ?? "", StringComparison.CurrentCultureIgnoreCase) >= 0;
+        internal static bool OptionVisible(string label, string query, bool selected) => selected || OptionMatches(label, query);
         internal static FilterPresetSettings Copy(FilterPresetSettings source)
         {
             if (source == null) source = new FilterPresetSettings();

@@ -171,6 +171,7 @@ namespace HeliumHybrid
                 if (updatingSortGroupUi || mode.Id == SelectedGrouping) return;
                 RequestRevealAfterExplicitReorganization();
                 SelectedGrouping = mode.Id;
+                if (prefs.ApplySortGroupToPlaynite) Safe(() => library.ApplyGrouping(mode.Id));
             });
             NavigatorOrganizationControls.ConfigureSelector(sortOptions, mode => {
                 if (!updatingSortGroupUi && mode.Id != (int)SortMode) SetSortMode(mode.SortPolicy);
@@ -665,6 +666,7 @@ namespace HeliumHybrid
             Safe(() => {
                 RequestRevealAfterExplicitReorganization();
                 prefs.SortMode = (int)mode;
+                if (prefs.ApplySortGroupToPlaynite) library.ApplySorting(mode, prefs.SortDescending);
                 Interlocked.Exchange(ref dirty, 1); Refresh(); Save();
                 UpdateSortGroupUi();
             });
@@ -675,6 +677,7 @@ namespace HeliumHybrid
             Safe(() => {
                 RequestRevealAfterExplicitReorganization();
                 prefs.SortDescending = descending;
+                if (prefs.ApplySortGroupToPlaynite) library.ApplySorting(SortMode, descending);
                 Interlocked.Exchange(ref dirty, 1); Refresh(); Save();
                 UpdateSortGroupUi();
             });
