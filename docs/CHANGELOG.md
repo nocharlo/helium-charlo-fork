@@ -8,6 +8,7 @@ A history of changes to Helium (charlo fork), from the original Navigator protot
 - Search metadata options, remove individual active selections, and clear a section or all filters managed by the panel.
 - Native filter conditions outside the panel and Playnite's AND/OR style remain in the applied settings.
 - A selected game that moves to a new group is revealed after the current list rebuild.
+- Added independent Default choices for grouping and sorting. Group Default removes grouping, and Sort Default restores Name in ascending order.
 - Runtime popup behavior and saved-preset identity still require portable Playnite validation before release.
 
 ## v0.3.1 — Navigator Organization & Customization

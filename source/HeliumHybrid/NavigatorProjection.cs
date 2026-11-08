@@ -47,16 +47,24 @@ namespace HeliumHybrid
 
     internal enum NavigatorSortMode { FollowingPlaynite = 0, Name = 1, LastPlayed = 2, Playtime = 3, ReleaseDate = 4,
         DateAdded = 5, DateModified = 6, PlayCount = 7, UserScore = 8, CommunityScore = 9, CriticScore = 10,
-        FavoriteStatus = 11, InstallationStatus = 12, CompletionStatus = 13, InstallationSize = 14, SortingName = 15 }
+        FavoriteStatus = 11, InstallationStatus = 12, CompletionStatus = 13, InstallationSize = 14, SortingName = 15,
+        Default = 16 }
 
     internal static class NavigatorSortPolicy
     {
         internal static NavigatorSortMode ValidMode(int value) =>
             NavigatorOrganization.Sort(value).SortPolicy;
 
+        internal static bool IsDescending(NavigatorSortMode mode, bool descending) =>
+            mode != NavigatorSortMode.Default && descending;
+
+        internal static NavigatorSortMode ModeForDirection(NavigatorSortMode mode, bool descending) =>
+            mode == NavigatorSortMode.Default && descending ? NavigatorSortMode.Name : mode;
+
         internal static string Text(NavigatorSource game, NavigatorSortMode mode)
         {
             switch (mode) {
+                case NavigatorSortMode.Default:
                 case NavigatorSortMode.Name:
                 case NavigatorSortMode.SortingName:
                     return string.IsNullOrWhiteSpace(game.SortingName) ? game.Name : game.SortingName;
@@ -97,6 +105,8 @@ namespace HeliumHybrid
         {
             var source = games ?? Enumerable.Empty<NavigatorSource>();
             if (mode == NavigatorSortMode.FollowingPlaynite) return source;
+            descending = IsDescending(mode, descending);
+            if (mode == NavigatorSortMode.Default) mode = NavigatorSortMode.Name;
             if (mode == NavigatorSortMode.Name || mode == NavigatorSortMode.SortingName || mode == NavigatorSortMode.CompletionStatus) {
                 var keyed = source.Select(game => new { Game = game, Text = Text(game, mode) });
                 return (descending

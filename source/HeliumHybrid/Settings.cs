@@ -23,6 +23,7 @@ namespace HeliumHybrid
         public List<int> VisibleSortingModes { get; set; }
         [XmlIgnore] public bool VisibleGroupingModesSpecified { get; set; }
         [XmlIgnore] public bool VisibleSortingModesSpecified { get; set; }
+        public bool DefaultOrganizationModesInitialized { get; set; }
         public int RecentActivityGroupingStyle { get; set; } // 0: Hybrid, 1: Detailed.
         [XmlIgnore] public bool RecentActivityGroupingStyleSpecified { get; set; }
         // 0: Automatic, 1: Always hidden, 2: Always visible.
@@ -42,11 +43,20 @@ namespace HeliumHybrid
             RecentActivityGroupingStyle = Logic.RecentActivityStyle(Grouping, RecentActivityGroupingStyle,
                 RecentActivityGroupingStyleSpecified);
             RecentActivityGroupingStyleSpecified = true;
-            SortMode = (int)NavigatorSortPolicy.ValidMode(SortMode);
+            var sort = NavigatorSortPolicy.ValidMode(SortMode);
+            SortMode = (int)sort;
+            SortDescending = NavigatorSortPolicy.IsDescending(sort, SortDescending);
             Grouping = NavigatorOrganization.Group(Grouping).Id;
             VisibleGroupingModes = NavigatorOrganization.Normalize(VisibleGroupingModesSpecified ? VisibleGroupingModes : null, true);
             VisibleSortingModes = NavigatorOrganization.Normalize(VisibleSortingModesSpecified ? VisibleSortingModes : null, false);
             VisibleGroupingModesSpecified = VisibleSortingModesSpecified = true;
+            if (!DefaultOrganizationModesInitialized) {
+                var groupDefault = (int)NavigatorGroupingMode.Default;
+                var sortDefault = (int)NavigatorSortMode.Default;
+                if (!VisibleGroupingModes.Contains(groupDefault)) VisibleGroupingModes.Insert(0, groupDefault);
+                if (!VisibleSortingModes.Contains(sortDefault)) VisibleSortingModes.Insert(0, sortDefault);
+                DefaultOrganizationModesInitialized = true;
+            }
         }
         public bool PreserveGridScroll { get; set; } = true;
         public bool AutomaticallyRevealSelectedGame { get; set; } = true;
