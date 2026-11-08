@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Markup;
@@ -24,7 +25,7 @@ internal static class NavigatorOrganizationTests
     [STAThread]
     private static void Main()
     {
-        CatalogAndGroups(); Sorting(); Settings(); RemovedDefaultModes(); NativeOrganization(); OrganizationControls(); Presentation(); Campaign(); Benchmarks();
+        CatalogAndGroups(); Sorting(); Settings(); RemovedDefaultModes(); NativeOrganization(); OrganizationControls(); FilterWorkspace(); Presentation(); Campaign(); Benchmarks();
         Console.WriteLine("PASS: " + checks + " Navigator organization, settings and WPF model checks.");
     }
     private static void Campaign()
@@ -77,17 +78,21 @@ internal static class NavigatorOrganizationTests
             var filterLayout = (Grid)filterBorder.Child;
             var filterScroll = (ScrollViewer)root.FindName("FilterSectionsScroll");
             Check(filterBorder.Height > 0 && filterBorder.Height <= filterBorder.MaxHeight &&
-                filterLayout.RowDefinitions.Count == 4 && filterLayout.RowDefinitions[2].Height.IsStar,
+                filterLayout.RowDefinitions.Count == 5 && filterLayout.RowDefinitions[3].Height.IsStar,
                 "Filter popup gives metadata sections a bounded star row");
-            Check(Grid.GetRow(filterScroll) == 2 && !filterScroll.CanContentScroll &&
+            Check(Grid.GetRow(filterScroll) == 3 && !filterScroll.CanContentScroll &&
                 filterScroll.VerticalScrollBarVisibility == ScrollBarVisibility.Auto && filterScroll.Focusable &&
                 Grid.GetRow((TextBox)root.FindName("FilterOptionSearch")) == 1 &&
-                Grid.GetRow((Button)root.FindName("ClearAllFilters")) == 3,
+                Grid.GetRow((ScrollViewer)root.FindName("ActiveFilterScroll")) == 2 &&
+                Grid.GetRow((Button)root.FindName("ClearAllFilters")) == 4,
                 "Filter header and search stay above a keyboard-focusable scroll area; Clear stays below");
-            var filterSections = (StackPanel)root.FindName("FilterSections");
+            var filterSections = (WrapPanel)root.FindName("FilterSections");
+            filterSections.ItemWidth = 275;
             for (var i = 0; i < 12; i++)
                 filterSections.Children.Add(new Expander { Header = "Synthetic section", IsExpanded = true,
                     Content = new TextBlock { Text = new string('x', 70), TextWrapping = System.Windows.TextWrapping.Wrap } });
+            filterBorder.Width = 310;
+            filterBorder.Height = 460;
             filterBorder.Measure(new System.Windows.Size(310, 460));
             filterBorder.Arrange(new System.Windows.Rect(0, 0, 310, 460));
             filterBorder.UpdateLayout();
@@ -113,7 +118,7 @@ internal static class NavigatorOrganizationTests
         var settings = new NavigatorSettingsView { DataContext = prefs };
         var tabs = (TabControl)settings.Content;
         Check(tabs.Items.Cast<TabItem>().Select(tab => tab.Header.ToString())
-            .SequenceEqual(new[] { "Navigation", "Appearance", "Organization" }), "Settings tab structure");
+            .SequenceEqual(new[] { "Navigation", "Appearance", "Organization", "Filters" }), "Settings tab structure");
         tabs.SelectedIndex = 2;
         var page = (StackPanel)((ScrollViewer)((TabItem)tabs.SelectedItem).Content).Content;
         var style = (ListBox)((GroupBox)page.Children[0]).Content;
@@ -395,6 +400,82 @@ internal static class NavigatorOrganizationTests
         preset.Settings.Genre.Ids.Clear();
         Check(filters.Genre.Ids.Count == 1, "Native sort preset cannot mutate source filters");
     }
+    private static void FilterWorkspace()
+    {
+        var preferences = new Preferences();
+        preferences.MigrateNavigation();
+        Check(preferences.FilterWorkspace.Select(group => group.Id).SequenceEqual(FilterWorkspaceCatalog.Groups.Select(group => group.Id)) &&
+            preferences.FilterWorkspace.All(group => !group.Hidden && group.HiddenFields.Count == 0), "Old settings show all native fields in default order");
+        var first = preferences.FilterWorkspace[0];
+        preferences.BeginEdit();
+        first.Hidden = true;
+        first.HiddenFields.Add("Platform");
+        preferences.CancelEdit();
+        Check(!preferences.FilterWorkspace[0].Hidden && preferences.FilterWorkspace[0].HiddenFields.Count == 0,
+            "Cancel restores a deep copy of workspace preferences");
+        preferences.BeginEdit();
+        first = preferences.FilterWorkspace[0];
+        first.FieldOrder.Insert(1, "future-field");
+        first.HiddenFields.Add("future-field");
+        FilterWorkspaceSettings.Move(first.FieldOrder, first.FieldOrder.Where(id => id != "future-field").ToList(), "Platform", 1);
+        FilterWorkspaceSettings.Move(preferences.FilterWorkspace, preferences.FilterWorkspace.ToList(), first, 1);
+        first.HiddenFields.Add("Platform");
+        preferences.EndEdit();
+        var serializer = new XmlSerializer(typeof(Preferences));
+        using (var writer = new StringWriter()) {
+            serializer.Serialize(writer, preferences);
+            preferences = (Preferences)serializer.Deserialize(new StringReader(writer.ToString()));
+            preferences.MigrateNavigation();
+        }
+        first = preferences.FilterWorkspace[1];
+        Check(first.Id == "ownership" && first.FieldOrder.Take(3).SequenceEqual(new[] { "Library", "future-field", "Platform" }) &&
+            first.HiddenFields.SequenceEqual(new[] { "future-field", "Platform" }), "Save/reload preserves order, hidden fields and unknown IDs");
+        Check(FilterWorkspaceCatalog.Columns(790) == 3 && FilterWorkspaceCatalog.Columns(565) == 2 &&
+            FilterWorkspaceCatalog.Columns(320) == 1, "Measured width chooses three, two or one column");
+
+        var host = new WrapPanel();
+        var chips = new WrapPanel();
+        var search = new TextBox();
+        var empty = new TextBlock();
+        var platform = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        var state = new FilterPresetSettings { Hidden = true, UseAndFilteringStyle = true,
+            Platform = new IdItemFilterItemProperties { Ids = new List<Guid> { platform, other } } };
+        NavigatorFilterPanel workspace = null;
+        workspace = new NavigatorFilterPanel(preferences, new Border(), host, chips, search, empty,
+            field => field.Id == "Platform" ? new[] { new FilterWorkspaceChoice(platform, "Test PC"),
+                new FilterWorkspaceChoice(other, "Test Console") } : new FilterWorkspaceChoice[0],
+            edit => { state = edit(state); workspace.Refresh(state); });
+        workspace.Refresh(state);
+        Check(chips.Children.Count == 2 && workspace.HasManagedSelection, "Hidden active field still supplies removable chips");
+        var groupView = (Expander)host.Children[1];
+        var fieldsPanel = (StackPanel)groupView.Content;
+        Check(!fieldsPanel.Children.Cast<Expander>().Any(field => field.Header.ToString().StartsWith("Platform")),
+            "Presentation hides the configured field without clearing its condition");
+        ((Button)chips.Children[0]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Check(state.Platform.Ids.SequenceEqual(new[] { other }) && chips.Children.Count == 1,
+            "Removing one hidden chip preserves the other selected value");
+        first.HiddenFields.Remove("Platform");
+        workspace.InvalidateLayout();
+        workspace.Refresh(state);
+        var platformView = fieldsPanel.Children.Cast<Expander>().Single(field => field.Header.ToString().StartsWith("Platform"));
+        platformView.IsExpanded = true;
+        var platformChoices = ((StackPanel)platformView.Content).Children.OfType<StackPanel>().Single();
+        var selected = platformChoices.Children.Cast<CheckBox>().Single(box => box.IsChecked == true);
+        search.Text = "absent";
+        workspace.Refresh(state, true);
+        Check(empty.Visibility == Visibility.Visible && chips.Children.Count == 1 &&
+            platformChoices.Children.Contains(selected) && selected.IsChecked == true &&
+            host.Children.Count == 1 && ReferenceEquals(host.Children[0], groupView),
+            "No matches preserves the selected value and packs its existing group without blank columns");
+        first.Hidden = true;
+        workspace.InvalidateLayout();
+        workspace.Refresh(state);
+        workspace.ClearAll();
+        Check(!host.Children.Contains(groupView) && state.Platform == null && chips.Children.Count == 0 &&
+            state.Hidden && state.UseAndFilteringStyle, "Clear filters covers hidden groups and preserves unmanaged native state");
+    }
+
     private static void Presentation()
     {
         var directory = Path.Combine(Path.GetTempPath(), "helium-icon-tests-" + Guid.NewGuid()); Directory.CreateDirectory(directory);
