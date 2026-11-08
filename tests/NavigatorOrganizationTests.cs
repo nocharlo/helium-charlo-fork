@@ -72,6 +72,29 @@ internal static class NavigatorOrganizationTests
         using (var stream = assembly.GetManifestResourceStream("Navigator.xaml"))
         using (var reader = new StreamReader(stream)) {
             var root = (Grid)XamlReader.Parse(reader.ReadToEnd().Replace("assembly=HeliumCharlo", "assembly=" + assembly.GetName().Name));
+            var filterPopup = (System.Windows.Controls.Primitives.Popup)root.FindName("FiltersPopup");
+            var filterBorder = (Border)filterPopup.Child;
+            var filterLayout = (Grid)filterBorder.Child;
+            var filterScroll = (ScrollViewer)root.FindName("FilterSectionsScroll");
+            Check(filterBorder.Height > 0 && filterBorder.Height <= filterBorder.MaxHeight &&
+                filterLayout.RowDefinitions.Count == 4 && filterLayout.RowDefinitions[2].Height.IsStar,
+                "Filter popup gives metadata sections a bounded star row");
+            Check(Grid.GetRow(filterScroll) == 2 && !filterScroll.CanContentScroll &&
+                filterScroll.VerticalScrollBarVisibility == ScrollBarVisibility.Auto && filterScroll.Focusable &&
+                Grid.GetRow((TextBox)root.FindName("FilterOptionSearch")) == 1 &&
+                Grid.GetRow((Button)root.FindName("ClearAllFilters")) == 3,
+                "Filter header and search stay above a keyboard-focusable scroll area; Clear stays below");
+            var filterSections = (StackPanel)root.FindName("FilterSections");
+            for (var i = 0; i < 12; i++)
+                filterSections.Children.Add(new Expander { Header = "Synthetic section", IsExpanded = true,
+                    Content = new TextBlock { Text = new string('x', 70), TextWrapping = System.Windows.TextWrapping.Wrap } });
+            filterBorder.Measure(new System.Windows.Size(310, 460));
+            filterBorder.Arrange(new System.Windows.Rect(0, 0, 310, 460));
+            filterBorder.UpdateLayout();
+            Check(filterScroll.ScrollableHeight > 0 && filterScroll.ViewportHeight > 0,
+                "Expanded metadata sections exceed the finite scroll viewport");
+            filterScroll.ScrollToBottom(); filterBorder.UpdateLayout();
+            Check(filterScroll.VerticalOffset > 0, "Metadata scroll reaches lower sections");
             foreach (var grouping in new[] { true, false }) {
                 var combo = (ComboBox)root.FindName(grouping ? "GroupOptions" : "SortOptions");
                 int selected = -1;
