@@ -170,8 +170,8 @@ namespace HeliumHybrid
             NavigatorOrganizationControls.ConfigureSelector(groupOptions, mode => {
                 if (updatingSortGroupUi || mode.Id == SelectedGrouping) return;
                 RequestRevealAfterExplicitReorganization();
-                SelectedGrouping = mode.Id;
                 if (prefs.ApplySortGroupToPlaynite) Safe(() => library.ApplyGrouping(mode.Id));
+                SelectedGrouping = mode.Id;
             });
             NavigatorOrganizationControls.ConfigureSelector(sortOptions, mode => {
                 if (!updatingSortGroupUi && mode.Id != (int)SortMode) SetSortMode(mode.SortPolicy);
