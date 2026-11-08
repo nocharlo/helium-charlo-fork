@@ -6,7 +6,11 @@ using Playnite.SDK.Models;
 
 namespace HeliumHybrid
 {
-    internal enum NavigatorFilterField { Library, Source, Platform, Genre, Category, Tag, CompletionStatus }
+    internal enum NavigatorFilterField
+    {
+        Library, Source, Platform, Genre, Category, Tag, CompletionStatus, Feature,
+        Series, Region, AgeRating, Developer, Publisher
+    }
 
     // Copies the entire SDK filter state before changing one field. Saved presets are never edited.
     internal static class NavigatorFilterComposer
@@ -51,12 +55,17 @@ namespace HeliumHybrid
         internal static FilterPresetSettings ToggleId(FilterPresetSettings source, NavigatorFilterField field, Guid id)
         {
             var next = Copy(source);
+            SetId(next, field, id, IdField(next, field)?.Ids?.Contains(id) != true);
+            return next;
+        }
+
+        internal static void SetId(FilterPresetSettings next, NavigatorFilterField field, Guid id, bool selected)
+        {
             var current = IdField(next, field) ?? new IdItemFilterItemProperties();
             current.Ids = current.Ids ?? new List<Guid>();
-            if (current.Ids.Contains(id)) current.Ids.Remove(id);
-            else current.Ids.Add(id);
+            if (selected && !current.Ids.Contains(id)) current.Ids.Add(id);
+            else if (!selected) current.Ids.RemoveAll(value => value == id);
             SetIdField(next, field, current.Ids.Count == 0 && string.IsNullOrWhiteSpace(current.Text) ? null : current);
-            return next;
         }
 
         internal static FilterPresetSettings Clear(FilterPresetSettings source) =>
@@ -65,18 +74,20 @@ namespace HeliumHybrid
         internal static FilterPresetSettings ClearManaged(FilterPresetSettings source)
         {
             var next = Copy(source);
-            next.IsInstalled = next.IsUnInstalled = next.Favorite = false;
-            foreach (NavigatorFilterField field in Enum.GetValues(typeof(NavigatorFilterField)))
-                SetIdField(next, field, ClearIds(IdField(next, field)));
+            foreach (var field in FilterWorkspaceCatalog.Groups.SelectMany(group => group.Fields))
+                field.Clear(next);
             return next;
         }
 
         internal static FilterPresetSettings ClearSection(FilterPresetSettings source, NavigatorFilterField field)
         {
             var next = Copy(source);
-            SetIdField(next, field, ClearIds(IdField(next, field)));
+            ClearIdField(next, field);
             return next;
         }
+
+        internal static void ClearIdField(FilterPresetSettings settings, NavigatorFilterField field) =>
+            SetIdField(settings, field, ClearIds(IdField(settings, field)));
 
         private static IdItemFilterItemProperties ClearIds(IdItemFilterItemProperties value) =>
             value == null || string.IsNullOrWhiteSpace(value.Text) ? null :
@@ -98,6 +109,12 @@ namespace HeliumHybrid
                 case NavigatorFilterField.Category: return settings.Category;
                 case NavigatorFilterField.Tag: return settings.Tag;
                 case NavigatorFilterField.CompletionStatus: return settings.CompletionStatuses;
+                case NavigatorFilterField.Feature: return settings.Feature;
+                case NavigatorFilterField.Series: return settings.Series;
+                case NavigatorFilterField.Region: return settings.Region;
+                case NavigatorFilterField.AgeRating: return settings.AgeRating;
+                case NavigatorFilterField.Developer: return settings.Developer;
+                case NavigatorFilterField.Publisher: return settings.Publisher;
                 default: throw new ArgumentOutOfRangeException(nameof(field));
             }
         }
@@ -112,6 +129,12 @@ namespace HeliumHybrid
                 case NavigatorFilterField.Category: settings.Category = value; break;
                 case NavigatorFilterField.Tag: settings.Tag = value; break;
                 case NavigatorFilterField.CompletionStatus: settings.CompletionStatuses = value; break;
+                case NavigatorFilterField.Feature: settings.Feature = value; break;
+                case NavigatorFilterField.Series: settings.Series = value; break;
+                case NavigatorFilterField.Region: settings.Region = value; break;
+                case NavigatorFilterField.AgeRating: settings.AgeRating = value; break;
+                case NavigatorFilterField.Developer: settings.Developer = value; break;
+                case NavigatorFilterField.Publisher: settings.Publisher = value; break;
                 default: throw new ArgumentOutOfRangeException(nameof(field));
             }
         }

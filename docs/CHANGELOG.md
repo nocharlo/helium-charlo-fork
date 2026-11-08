@@ -4,8 +4,9 @@ A history of changes to Helium (charlo fork), from the original Navigator protot
 
 ## v0.3.2 — Intelligent Filters (local development candidate)
 
-- Advanced Filters opens beside the Navigator while the game list remains visible.
-- Search metadata options, remove individual active selections, and clear a section or all filters managed by the panel.
+- Library Filters groups 27 native Playnite fields in a floating workspace with up to three columns.
+- Search fields and values, remove individual active selections, and clear a field or all managed filters.
+- The Navigator's Filters settings control which groups and fields appear and in what order. Hidden active filters remain removable from the workspace.
 - Native filter conditions outside the panel and Playnite's AND/OR style remain in the applied settings.
 - A selected game that moves to a new group is revealed after the current list rebuild.
 - Runtime popup behavior and saved-preset identity still require portable Playnite validation before release.

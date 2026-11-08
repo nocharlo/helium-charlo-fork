@@ -130,9 +130,11 @@ namespace HeliumHybrid
             filterIndicator = (TextBlock)root.FindName("FilterIndicator");
             filtersPopup = (Popup)root.FindName("FiltersPopup");
             filterOptionSearch = (TextBox)root.FindName("FilterOptionSearch");
-            filterPanel = new NavigatorFilterPanel(api, (StackPanel)root.FindName("FilterSections"),
+            filterPanel = new NavigatorFilterPanel(prefs, (Border)root.FindName("FilterWorkspaceFrame"),
+                (WrapPanel)root.FindName("FilterSections"),
                 (WrapPanel)root.FindName("ActiveFilters"), filterOptionSearch,
                 (TextBlock)root.FindName("FilterSearchEmpty"),
+                field => field.Choices(api),
                 change => Safe(() => ApplyGlobalFilterChange(change)));
             grouping.ItemsSource = NavigatorOrganization.Groups;
             SelectedGrouping = prefs.Grouping;
@@ -195,12 +197,27 @@ namespace HeliumHybrid
                 finally { shortcutGroupingChange = false; }
             });
             readyButton.Click += (sender, args) => Safe(() => ApplyGlobalFilterChange(state => readyState.Toggle(state)));
-            filtersButton.Click += (sender, args) => Safe(() => { sortGroupPopup.IsOpen = false; filtersPopup.IsOpen = !filtersPopup.IsOpen; });
-            filtersPopup.Opened += (s, e) => { filtersOpen = true; ShowFilterPanel(); filterOptionSearch.Focus(); };
-            filtersPopup.Closed += (s, e) => { filtersOpen = false; RefreshGlobalFilterUi(); if (active && !IsCollapsed()) filtersButton.Focus(); };
+            filtersPopup.CustomPopupPlacementCallback = NavigatorFilterPanel.Center;
+            filtersButton.Click += (sender, args) => Safe(() => {
+                sortGroupPopup.IsOpen = false;
+                if (!filtersPopup.IsOpen) filterPanel.Position(filtersPopup, window);
+                filtersPopup.IsOpen = !filtersPopup.IsOpen;
+            });
+            filtersPopup.Opened += (s, e) => {
+                filtersOpen = true;
+                filterOptionsDirty = true;
+                Safe(RefreshGlobalFilterUi);
+                filterOptionSearch.Focus();
+            };
+            filtersPopup.Closed += (s, e) => {
+                filtersOpen = false;
+                filterPanel.FlushText();
+                Safe(RefreshGlobalFilterUi);
+                if (active && !IsCollapsed()) filtersButton.Focus();
+            };
             filtersPopup.PreviewKeyDown += (s, e) => { if (e.Key == Key.Escape) { filtersPopup.IsOpen = false; e.Handled = true; } };
             closeFilters.Click += (sender, args) => filtersPopup.IsOpen = false;
-            clearAllFilters.Click += (sender, args) => Safe(() => ApplyGlobalFilterChange(NavigatorFilterComposer.ClearManaged));
+            clearAllFilters.Click += (sender, args) => filterPanel.ClearAll();
             toggle.Click += (sender, args) => {
                 sortGroupPopup.IsOpen = false;
                 prefs.Collapsed = !prefs.Collapsed;
@@ -441,6 +458,8 @@ namespace HeliumHybrid
             prefs.Width = Logic.ClampWidth(prefs.Width);
             ApplySize(); RecomputeLayout();
             PopulateOrganizationChoices();
+            filterPanel.InvalidateLayout();
+            Safe(RefreshGlobalFilterUi);
             if (groupState.Mode != EffectiveGrouping) {
                 groupState.Mode = EffectiveGrouping;
                 Interlocked.Exchange(ref dirty, 1);
@@ -451,9 +470,16 @@ namespace HeliumHybrid
         private void MetadataChanged<T>(object sender, ItemCollectionChangedEventArgs<T> args) where T : DatabaseObject { filterOptionsDirty = true; Interlocked.Exchange(ref dirty, 1); }
         private void GamesUpdated(object sender, ItemUpdatedEventArgs<Game> args)
         {
-            lock (updateGate) foreach (var update in args.UpdatedItems) pendingGameIds.Add(update.NewData.Id);
+            lock (updateGate) foreach (var update in args.UpdatedItems) {
+                pendingGameIds.Add(update.NewData.Id);
+                if (update.OldData.ReleaseYear != update.NewData.ReleaseYear) filterOptionsDirty = true;
+            }
         }
-        private void GamesChanged(object sender, ItemCollectionChangedEventArgs<Game> args) { Interlocked.Exchange(ref dirty, 1); }
+        private void GamesChanged(object sender, ItemCollectionChangedEventArgs<Game> args)
+        {
+            filterOptionsDirty = true;
+            Interlocked.Exchange(ref dirty, 1);
+        }
         private void NativeSelectionChanged(OnGameSelectedEventArgs args)
         {
             if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(() => NativeSelectionChanged(args))); return; }
@@ -741,11 +767,11 @@ namespace HeliumHybrid
             readyState.Observe(current);
             var hasFilters = NavigatorFilterComposer.HasActiveFilters(current);
             filterIndicator.Text = hasFilters ? "•" : "";
-            filtersButton.ToolTip = hasFilters ? "Global filters active — edit in Advanced Filters" : "Advanced Filters";
+            filtersButton.ToolTip = hasFilters ? "Library Filters (active)" : "Library Filters";
             readyButton.Foreground = (Brush)root.Resources[readyState.IsActive(current) ? "SteamActiveBrush" : "SteamIconBrush"];
             readyButton.IsEnabled = !readyState.IsActive(current) || readyState.OwnsRestriction;
             readyButton.ToolTip = readyButton.IsEnabled ? "Ready to Play: installed games" :
-                "Installed filter is managed by Playnite; edit it in Advanced Filters";
+                "Installed filter is managed by Playnite; edit it in Library Filters";
             filtersButton.Foreground = (Brush)root.Resources[filtersOpen ? "SteamActiveBrush" : "SteamIconBrush"];
             if (filtersOpen) {
                 filterPanel.Refresh(current, filterOptionsDirty);
@@ -758,11 +784,6 @@ namespace HeliumHybrid
         {
             recentButton.Foreground = (Brush)root.Resources[SelectedGrouping == 4 ? "SteamActiveBrush" : "SteamIconBrush"];
             homeButton.Foreground = (Brush)root.Resources[active && library.ActiveDesktopView == DesktopView.Grid ? "SteamActiveBrush" : "SteamIconBrush"];
-        }
-        private void ShowFilterPanel()
-        {
-            if (filtersOpen) filterPanel.Refresh(api.MainView.GetCurrentFilterSettings() ?? new FilterPresetSettings(), true);
-            RefreshGlobalFilterUi();
         }
         private void RevealSelected(HashSet<Guid> selected)
         {
@@ -849,7 +870,11 @@ namespace HeliumHybrid
             if (reopenButton != null) reopenButton.Click += ReopenClicked;
         }
         private bool IsCollapsed() => prefs.Collapsed;
-        private void WindowSizeChanged(object sender, SizeChangedEventArgs args) { RecomputeLayout(); }
+        private void WindowSizeChanged(object sender, SizeChangedEventArgs args)
+        {
+            RecomputeLayout();
+            if (filtersOpen) filterPanel.Position(filtersPopup, window);
+        }
         [DllImport("user32.dll")]
         private static extern uint GetDoubleClickTime();
         private void BindGridClicks(Control gridView)

@@ -6,6 +6,25 @@
     <SolidColorBrush x:Key="SteamActiveBrush" Color="#FFB7CBE0"/>
     <SolidColorBrush x:Key="SteamTextBrush" Color="#FFC0C2C5"/>
     <SolidColorBrush x:Key="SteamMutedBrush" Color="#FF92969D"/>
+    <Style x:Key="FilterInputStyle" TargetType="TextBox">
+      <Setter Property="Background" Value="#FF25272C"/>
+      <Setter Property="Foreground" Value="{DynamicResource SteamTextBrush}"/>
+      <Setter Property="CaretBrush" Value="{DynamicResource SteamTextBrush}"/>
+      <Setter Property="Padding" Value="7,4"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TextBox">
+        <Border x:Name="InputBorder" Background="{TemplateBinding Background}" BorderBrush="{DynamicResource PopupBorderBrush}" BorderThickness="1" CornerRadius="3">
+          <ScrollViewer x:Name="PART_ContentHost" Focusable="False"
+                        VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}"
+                        HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}"/>
+        </Border>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsKeyboardFocusWithin" Value="True">
+            <Setter TargetName="InputBorder" Property="BorderBrush" Value="{DynamicResource SteamActiveBrush}"/>
+          </Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
     <Style x:Key="ToolbarButtonStyle" TargetType="Button">
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="Foreground" Value="{StaticResource SteamIconBrush}"/>
@@ -112,29 +131,39 @@
           <TextBlock Grid.Column="1" Text="Search by name" Foreground="{StaticResource SteamMutedBrush}" VerticalAlignment="Center" IsHitTestVisible="False">
             <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=Search}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
           </TextBlock>
-          <Button x:Name="FiltersButton" Grid.Column="2" Style="{StaticResource ToolbarButtonStyle}" Width="31" Height="32" ToolTip="Advanced Filters">
+          <Button x:Name="FiltersButton" Grid.Column="2" Style="{StaticResource ToolbarButtonStyle}" Width="31" Height="32" ToolTip="Library Filters" AutomationProperties.Name="Library Filters">
             <Viewbox Width="20" Height="20"><Canvas Width="24" Height="24"><Path Data="M2.5,6.5 L21.5,6.5 M5.5,12 L18.5,12 M8.5,17.5 L15.5,17.5" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2.5" StrokeStartLineCap="Flat" StrokeEndLineCap="Flat"/></Canvas></Viewbox>
           </Button>
           <TextBlock x:Name="FilterIndicator" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,1,1,0" Foreground="#FF78B9E7" FontSize="9" IsHitTestVisible="False"/>
         </Grid>
       </Border>
-      <Popup x:Name="FiltersPopup" Placement="Right" PlacementTarget="{Binding ElementName=FiltersButton}" HorizontalOffset="5" StaysOpen="False" AllowsTransparency="True" Focusable="False">
-        <Border Width="310" Height="460" MaxHeight="520" Background="#FF292F38" BorderBrush="#FF485766" BorderThickness="1" CornerRadius="7" Padding="11">
-          <Grid>
-            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <Popup x:Name="FiltersPopup" Placement="Custom" StaysOpen="False" AllowsTransparency="True" Focusable="False">
+        <Border x:Name="FilterWorkspaceFrame" Width="820" Height="610" MaxWidth="820" MaxHeight="610" Background="{DynamicResource PopupBackgroundBrush}" BorderBrush="{DynamicResource PopupBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="14">
+          <Grid TextElement.Foreground="{DynamicResource TextBrush}">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
             <DockPanel Grid.Row="0" Margin="0,0,0,7">
-              <Button x:Name="CloseFilters" DockPanel.Dock="Right" Content="×" Width="24" Height="23" Background="Transparent" BorderThickness="0" Foreground="#FFE5EAF1" AutomationProperties.Name="Close filters"/>
-              <TextBlock Text="Filters" Foreground="#FFE5EAF1" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center"/>
+              <Button x:Name="CloseFilters" DockPanel.Dock="Right" Content="×" Width="24" Height="23" Style="{StaticResource ToolbarButtonStyle}" AutomationProperties.Name="Close filters"/>
+              <TextBlock Text="Library Filters" FontWeight="SemiBold" FontSize="17" VerticalAlignment="Center"/>
             </DockPanel>
-            <TextBox x:Name="FilterOptionSearch" Grid.Row="1" Height="29" Margin="0,0,0,7" Padding="6,4" Background="#FF25272C" Foreground="#FFE5EAF1" CaretBrush="#FFE5EAF1" ToolTip="Search filter options" AutomationProperties.Name="Search filter options"/>
-            <ScrollViewer x:Name="FilterSectionsScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="False" Focusable="True" AutomationProperties.Name="Filter sections">
+            <TextBox x:Name="FilterOptionSearch" Grid.Row="1" Height="29" Margin="0,0,0,8" Style="{StaticResource FilterInputStyle}" AutomationProperties.Name="Search filter fields and values"/>
+            <TextBlock Grid.Row="1" Text="Search fields and values…" Foreground="{DynamicResource SteamMutedBrush}" Margin="8,0,0,8" VerticalAlignment="Center" IsHitTestVisible="False">
+              <TextBlock.Style><Style TargetType="TextBlock">
+                <Setter Property="Visibility" Value="Collapsed"/>
+                <Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=FilterOptionSearch}" Value="">
+                  <Setter Property="Visibility" Value="Visible"/>
+                </DataTrigger></Style.Triggers>
+              </Style></TextBlock.Style>
+            </TextBlock>
+            <ScrollViewer x:Name="ActiveFilterScroll" Grid.Row="2" MaxHeight="72" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <WrapPanel x:Name="ActiveFilters" Visibility="Collapsed"/>
+            </ScrollViewer>
+            <ScrollViewer x:Name="FilterSectionsScroll" Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="False" Focusable="True" AutomationProperties.Name="Filter sections">
               <StackPanel>
-                <WrapPanel x:Name="ActiveFilters" Margin="0,0,0,4"/>
-                <TextBlock x:Name="FilterSearchEmpty" Text="No matching options" Visibility="Collapsed" Foreground="#FFA5B0BD" Margin="3,3,0,7"/>
-                <StackPanel x:Name="FilterSections"/>
+                <TextBlock x:Name="FilterSearchEmpty" Text="No matching options" Visibility="Collapsed" Foreground="{DynamicResource SteamMutedBrush}" Margin="3,3,0,7"/>
+                <WrapPanel x:Name="FilterSections"/>
               </StackPanel>
             </ScrollViewer>
-            <Button x:Name="ClearAllFilters" Grid.Row="3" Content="Clear filters" HorizontalAlignment="Right" Padding="8,4" Margin="7,7,0,0"/>
+            <Button x:Name="ClearAllFilters" Grid.Row="4" Content="Clear filters" HorizontalAlignment="Right" Padding="8,4" Margin="7,8,0,0"/>
           </Grid>
         </Border>
       </Popup>

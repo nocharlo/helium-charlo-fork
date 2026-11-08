@@ -12,6 +12,9 @@
     <Compile Include="../source/HeliumHybrid/NavigatorOrganization.cs"/>
     <Compile Include="../source/HeliumHybrid/NavigatorNativeOrganization.cs"/>
     <Compile Include="../source/HeliumHybrid/NavigatorFilterComposer.cs"/>
+    <Compile Include="../source/HeliumHybrid/FilterWorkspaceCatalog.cs"/>
+    <Compile Include="../source/HeliumHybrid/FilterWorkspaceSettings.cs"/>
+    <Compile Include="../source/HeliumHybrid/NavigatorFilterPanel.cs"/>
     <Compile Include="../source/HeliumHybrid/NavigatorOrganizationControls.cs"/>
     <Compile Include="../source/HeliumHybrid/NavigatorProjection.cs"/>
     <Compile Include="../source/HeliumHybrid/NavigatorPresentation.cs"/>

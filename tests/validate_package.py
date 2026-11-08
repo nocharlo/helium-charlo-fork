@@ -48,7 +48,7 @@ for name in ('GroupOptions', 'SortOptions'):
 contract = {'RecentButton':'Button', 'ReadyButton':'Button', 'FiltersButton':'Button',
             'CloseFilters':'Button', 'ClearAllFilters':'Button', 'FilterIndicator':'TextBlock',
             'FiltersPopup':'Popup', 'FilterOptionSearch':'TextBox', 'ActiveFilters':'WrapPanel',
-            'FilterSearchEmpty':'TextBlock', 'FilterSections':'StackPanel'}
+            'FilterSearchEmpty':'TextBlock', 'FilterSections':'WrapPanel', 'FilterWorkspaceFrame':'Border'}
 for name, kind in contract.items():
     matches = [n for n in nav.iter() if n.attrib.get(xname) == name]
     assert len(matches) == 1 and matches[0].tag.endswith('}' + kind), (name, kind)
