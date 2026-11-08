@@ -176,7 +176,7 @@ namespace HeliumHybrid
                 SelectedGrouping = mode.Id;
             });
             NavigatorOrganizationControls.ConfigureSelector(sortOptions, mode => {
-                if (!updatingSortGroupUi && mode.Id != (int)SortMode) SetSortMode(mode.SortPolicy, prefs.SortDescending);
+                if (!updatingSortGroupUi && mode.Id != (int)SortMode) SetSortMode(mode.SortPolicy);
             });
             PopulateOrganizationChoices();
             sortGroupPopup.Opened += (s, e) => { PopulateOrganizationChoices(); groupOptions.Focus(); };
@@ -677,24 +677,18 @@ namespace HeliumHybrid
                 var group = NavigatorOrganization.Group(SelectedGrouping);
                 if (!groupOptions.IsKeyboardFocusWithin && !groupOptions.Items.Contains(group)) NavigatorOrganizationControls.Choices(groupOptions, prefs.VisibleGroupingModes, true, SelectedGrouping);
                 if (!groupOptions.IsKeyboardFocusWithin) groupOptions.SelectedItem = group;
-                if (!sortOptions.IsKeyboardFocusWithin) {
-                    var sortChoice = NavigatorOrganization.Sort((int)mode);
-                    if (!sortOptions.Items.Contains(sortChoice))
-                        NavigatorOrganizationControls.Choices(sortOptions, prefs.VisibleSortingModes, false, (int)mode);
-                    sortOptions.SelectedItem = sortChoice;
-                }
+                if (!sortOptions.IsKeyboardFocusWithin) sortOptions.SelectedItem = NavigatorOrganization.Sort((int)mode);
                 orderSection.Visibility = inherited ? Visibility.Collapsed : Visibility.Visible;
                 orderAscending.IsChecked = !prefs.SortDescending;
                 orderDescending.IsChecked = prefs.SortDescending;
             } finally { updatingSortGroupUi = false; }
         }
-        private void SetSortMode(NavigatorSortMode mode, bool descending)
+        private void SetSortMode(NavigatorSortMode mode)
         {
             if (updatingSortGroupUi) return;
             Safe(() => {
                 RequestRevealAfterExplicitReorganization();
                 prefs.SortMode = (int)mode;
-                prefs.SortDescending = NavigatorSortPolicy.IsDescending(mode, descending);
                 if (prefs.ApplySortGroupToPlaynite) library.ApplySorting(mode, prefs.SortDescending);
                 Interlocked.Exchange(ref dirty, 1); Refresh(); Save();
                 UpdateSortGroupUi();
@@ -702,9 +696,14 @@ namespace HeliumHybrid
         }
         private void SetSortDirection(bool descending)
         {
-            var mode = SortMode;
-            if (mode == NavigatorSortMode.FollowingPlaynite) return;
-            SetSortMode(NavigatorSortPolicy.ModeForDirection(mode, descending), descending);
+            if (updatingSortGroupUi || SortMode == NavigatorSortMode.FollowingPlaynite) return;
+            Safe(() => {
+                RequestRevealAfterExplicitReorganization();
+                prefs.SortDescending = descending;
+                if (prefs.ApplySortGroupToPlaynite) library.ApplySorting(SortMode, descending);
+                Interlocked.Exchange(ref dirty, 1); Refresh(); Save();
+                UpdateSortGroupUi();
+            });
         }
         private void RequestRevealAfterExplicitReorganization()
         {

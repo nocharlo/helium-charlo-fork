@@ -8,7 +8,6 @@ namespace HeliumHybrid
         internal static GroupableField? Group(int mode)
         {
             switch ((NavigatorGroupingMode)mode) {
-                case NavigatorGroupingMode.Default:
                 case NavigatorGroupingMode.None: return GroupableField.None;
                 case NavigatorGroupingMode.Series: return GroupableField.Series;
                 case NavigatorGroupingMode.Category: return GroupableField.Category;
@@ -32,7 +31,6 @@ namespace HeliumHybrid
         internal static SortOrder? Sort(NavigatorSortMode mode)
         {
             switch (mode) {
-                case NavigatorSortMode.Default:
                 case NavigatorSortMode.Name: return SortOrder.Name;
                 case NavigatorSortMode.LastPlayed: return SortOrder.LastActivity;
                 case NavigatorSortMode.Playtime: return SortOrder.Playtime;
