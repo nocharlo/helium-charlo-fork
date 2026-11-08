@@ -37,7 +37,7 @@ namespace HeliumHybrid
         {
             var native = NavigatorNativeOrganization.Sort(mode);
             if (!native.HasValue) return;
-            var direction = NavigatorNativeOrganization.Direction(descending);
+            var direction = NavigatorNativeOrganization.Direction(NavigatorSortPolicy.IsDescending(mode, descending));
             if (api.MainView.SortOrder != native.Value) {
                 // SortOrder has no public setter in SDK 6.11.0. Retain every native
                 // filter condition and the current grouping in an unsaved preset.
