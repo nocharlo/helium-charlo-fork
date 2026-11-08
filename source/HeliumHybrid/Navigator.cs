@@ -16,6 +16,7 @@ using System.Xml.Serialization;
 using System.Runtime.InteropServices;
 using Playnite.SDK;
 using Playnite.SDK.Controls;
+using Playnite.SDK.Events;
 using Playnite.SDK.Models;
 namespace HeliumHybrid
 {
@@ -82,6 +83,7 @@ namespace HeliumHybrid
         private string gridSort, gridSortDirection, gridGrouping;
         private Window window;
         private DesktopView lastDesktopView;
+        private DispatcherOperation pendingViewSelection;
         private int dirty = 1;
         private Guid[] lastIds = new Guid[0];
         private readonly object updateGate = new object();
@@ -285,20 +287,11 @@ namespace HeliumHybrid
                 !library.IsSelected(id)) return;
             var switchButton = FindNamed(window, "HeliumCharlo_SwitchDetails") as Button;
             if (switchButton?.Command == null || !switchButton.Command.CanExecute(null)) return;
-            CaptureGridScroll();
+            if (prefs.PreserveGridScroll) CaptureGridScroll();
             navigatedDetails = true;
             panelRequested = false;
             switchButton.Command.Execute(null);
             RecomputeLayout();
-            // Playnite can clear its selection while changing the native view.
-            // Restore the explicitly chosen game after the Details view is loaded.
-            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
-                if (!active || !navigatedDetails || library.ActiveDesktopView != DesktopView.Details) return;
-                var selected = library.SelectedIds();
-                if (selected.Count != 0 && !selected.Contains(id)) return;
-                SelectGame(id);
-                RecomputeLayout();
-            }));
         }
         private void OpenGridPanel(Guid id)
         {
@@ -319,26 +312,21 @@ namespace HeliumHybrid
             if (!active || IsCollapsed() || library.ActiveDesktopView != DesktopView.Details) return;
             var switchButton = FindNamed(window, "HeliumCharlo_SwitchGrid") as Button;
             if (switchButton?.Command == null || !switchButton.Command.CanExecute(null)) return;
-            var selectedId = (list.SelectedItem as GameRow)?.Id ?? library.SelectedIds().FirstOrDefault();
             switchButton.Command.Execute(null);
             navigatedDetails = false;
             RecomputeLayout();
-            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
-                if (!active || library.ActiveDesktopView != DesktopView.Grid) return;
-                if (Logic.ShouldRestoreSelection(selectedId, library.SelectedIds())) SelectGame(selectedId);
-                SyncSelection(false);
-                if (prefs.PreserveGridScroll) RestoreGridScroll();
-            }));
         }
         private void CaptureGridScroll()
         {
-            gridIds = library.SortedFilteredIds();
+            var grid = FindNamed(window, "PART_ViewGrid") as Control;
+            var games = grid?.Template?.FindName("PART_ListGames", grid) as DependencyObject;
+            var scroll = FindScroll(games);
+            gridIds = scroll == null ? null : library.SortedFilteredIds();
+            if (gridIds == null) return;
             gridSort = library.SortOrder;
             gridSortDirection = library.SortDirection;
             gridGrouping = library.Grouping;
-            var grid = FindNamed(window, "PART_ViewGrid") as Control;
-            var games = grid?.Template?.FindName("PART_ListGames", grid) as DependencyObject;
-            gridOffset = FindScroll(games)?.VerticalOffset ?? 0;
+            gridOffset = scroll.VerticalOffset;
         }
         private void RestoreGridScroll()
         {
@@ -367,7 +355,7 @@ namespace HeliumHybrid
         private void OnLoaded(object sender, RoutedEventArgs args)
         {
             if (active) return; active = true;
-            plugin.SelectionChanged += SelectionChanged;
+            plugin.SelectionChanged += NativeSelectionChanged;
             plugin.SettingsChanged += SettingsUpdated;
             api.Database.Games.ItemUpdated += GamesUpdated;
             api.Database.Games.ItemCollectionChanged += GamesChanged;
@@ -407,7 +395,10 @@ namespace HeliumHybrid
             sortGroupPopup.IsOpen = false;
             filtersPopup.IsOpen = false;
             if (!active) return; active = false; timer.Stop(); searchTimer.Stop(); coverClickTimer.Stop(); sidebarClickTimer.Stop(); sidebarDownItem = null; panelRequested = false; UnbindGridClicks();
-            plugin.SelectionChanged -= SelectionChanged;
+            plugin.SelectionChanged -= NativeSelectionChanged;
+            pendingViewSelection?.Abort();
+            pendingViewSelection = null;
+            gridIds = null;
             plugin.SettingsChanged -= SettingsUpdated;
             api.Database.Games.ItemUpdated -= GamesUpdated;
             api.Database.Games.ItemCollectionChanged -= GamesChanged;
@@ -463,6 +454,38 @@ namespace HeliumHybrid
             lock (updateGate) foreach (var update in args.UpdatedItems) pendingGameIds.Add(update.NewData.Id);
         }
         private void GamesChanged(object sender, ItemCollectionChangedEventArgs<Game> args) { Interlocked.Exchange(ref dirty, 1); }
+        private void NativeSelectionChanged(OnGameSelectedEventArgs args)
+        {
+            if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(() => NativeSelectionChanged(args))); return; }
+            if (!active) return;
+            Safe(() => {
+                var target = library.ActiveDesktopView;
+                bool enteringDetails = lastDesktopView == DesktopView.Grid && target == DesktopView.Details;
+                bool returningToGrid = lastDesktopView == DesktopView.Details && target == DesktopView.Grid;
+                var previousId = args.OldValue?.Count == 1 ? args.OldValue[0].Id : Guid.Empty;
+                if ((enteringDetails || returningToGrid) && previousId != Guid.Empty && !(args.NewValue?.Count > 0)) {
+                    if (enteringDetails && !navigatedDetails && prefs.PreserveGridScroll) CaptureGridScroll();
+                    pendingViewSelection?.Abort();
+                    // Playnite clears selection while changing GamesViewType. Apply the previous
+                    // selection once the new view has processed its bindings and layout.
+                    pendingViewSelection = Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
+                        pendingViewSelection = null;
+                        if (!active || library.ActiveDesktopView != target) return;
+                        Safe(() => {
+                            RecomputeLayout();
+                            if (Logic.ShouldRestoreSelection(previousId, library.SelectedIds(),
+                                () => library.FilteredGames.Any(game => game.Id == previousId))) {
+                                SelectGame(previousId);
+                            }
+                            SyncSelection(false);
+                            if (returningToGrid && prefs.PreserveGridScroll) RestoreGridScroll();
+                        });
+                    }));
+                    return;
+                }
+                SelectionChanged();
+            });
+        }
         private void SelectionChanged()
         {
             if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(SelectionChanged)); return; }
@@ -916,6 +939,7 @@ namespace HeliumHybrid
                 sidebarDownItem = null;
                 if (lastDesktopView == DesktopView.Details)
                     navigatedDetails = false;
+                if (library.ActiveDesktopView == DesktopView.List) gridIds = null;
                 lastDesktopView = library.ActiveDesktopView;
             }
             var host = window ?? Window.GetWindow(this);

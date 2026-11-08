@@ -13,7 +13,7 @@ namespace HeliumHybrid
     public sealed class HybridPlugin : GenericPlugin
     {
         public override Guid Id { get; } = new Guid("b59e3c9f-9c52-4582-a332-0716b56cf023");
-        internal event Action SelectionChanged;
+        internal event Action<OnGameSelectedEventArgs> SelectionChanged;
         internal event Action SettingsChanged;
         internal string DataDirectory => GetPluginUserDataPath();
         internal Preferences Settings { get; }
@@ -49,6 +49,6 @@ namespace HeliumHybrid
             try { return new Navigator(PlayniteApi, this); }
             catch (Exception e) { LogManager.GetLogger().Error(e, "Helium Charlo: could not create the navigator."); return null; }
         }
-        public override void OnGameSelected(OnGameSelectedEventArgs args) { SelectionChanged?.Invoke(); }
+        public override void OnGameSelected(OnGameSelectedEventArgs args) { SelectionChanged?.Invoke(args); }
     }
 }

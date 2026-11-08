@@ -33,10 +33,12 @@ class LogicTests
             "Activity style defaults to Hybrid but migrates existing activity users to Detailed");
         var gameA = Guid.NewGuid();
         var gameB = Guid.NewGuid();
-        Check(Logic.ShouldRestoreSelection(gameA, new Guid[0]), "Restore selection cleared by native view switch");
-        Check(!Logic.ShouldRestoreSelection(gameA, new[] { gameA }), "Keep selection already restored by Playnite");
-        Check(!Logic.ShouldRestoreSelection(gameA, new[] { gameB }), "Do not override a newer selection");
-        Check(!Logic.ShouldRestoreSelection(Guid.Empty, new Guid[0]), "Do not select an unknown game");
+        Check(Logic.ShouldRestoreSelection(gameA, new Guid[0], () => true), "Restore selection cleared by native view switch");
+        Check(Logic.ShouldRestoreSelection(gameA, null, () => true), "Playnite can represent a cleared selection as null");
+        Check(!Logic.ShouldRestoreSelection(gameA, new Guid[0], () => false), "Do not restore a game excluded by native filters");
+        Check(!Logic.ShouldRestoreSelection(gameA, new[] { gameA }, () => true), "Keep selection already restored by Playnite");
+        Check(!Logic.ShouldRestoreSelection(gameA, new[] { gameB }, () => true), "Do not override a newer selection");
+        Check(!Logic.ShouldRestoreSelection(Guid.Empty, new Guid[0], () => true), "Do not select an unknown game");
         Console.WriteLine("PASS: " + assertions + " checks; 50,000-game scenario: " + watch.ElapsedMilliseconds + " ms.");
     }
 }
