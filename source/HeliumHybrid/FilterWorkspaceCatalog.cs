@@ -40,7 +40,7 @@ namespace HeliumHybrid
     internal static class FilterWorkspaceCatalog
     {
         internal static readonly FilterWorkspaceGroup[] Groups = {
-            new FilterWorkspaceGroup("ownership", "Library & Ownership",
+            new FilterWorkspaceGroup("ownership", "Library & Status",
                 Ids("Platform", NavigatorFilterField.Platform, api => api.Database.Platforms),
                 Ids("Library", NavigatorFilterField.Library, api => api.Addons.Plugins.OfType<LibraryPlugin>()
                     .Select(plugin => new DatabaseObject { Id = plugin.Id, Name = plugin.Name })),
@@ -59,7 +59,7 @@ namespace HeliumHybrid
                 Ids("Series", NavigatorFilterField.Series, api => api.Database.Series),
                 Ids("Region", NavigatorFilterField.Region, api => api.Database.Regions),
                 Ids("Age Rating", NavigatorFilterField.AgeRating, api => api.Database.AgeRatings)),
-            new FilterWorkspaceGroup("identity", "Identity & Publishing",
+            new FilterWorkspaceGroup("identity", "Game Information",
                 Text("name", "Name", s => s.Name, (s, v) => s.Name = v),
                 List("release-year", "Release Year", s => s.ReleaseYear?.Values,
                     (s, v) => s.ReleaseYear = v == null ? null : new StringFilterItemProperties { Values = v },
@@ -69,13 +69,13 @@ namespace HeliumHybrid
                 Ids("Developer", NavigatorFilterField.Developer, api => api.Database.Companies),
                 Ids("Publisher", NavigatorFilterField.Publisher, api => api.Database.Companies),
                 Text("version", "Version", s => s.Version, (s, v) => s.Version = v)),
-            new FilterWorkspaceGroup("activity", "Activity & Dates",
+            new FilterWorkspaceGroup("activity", "Activity & History",
                 EnumValues<PlaytimeCategory>("playtime", "Time Played", s => s.PlayTime, (s, v) => s.PlayTime = v),
                 EnumValues<PastTimeSegment>("last-played", "Last Played", s => s.LastActivity, (s, v) => s.LastActivity = v),
                 EnumValues<PastTimeSegment>("recent-activity", "Recent Activity", s => s.RecentActivity, (s, v) => s.RecentActivity = v),
                 EnumValues<PastTimeSegment>("date-added", "Date Added", s => s.Added, (s, v) => s.Added = v),
                 EnumValues<PastTimeSegment>("date-modified", "Date Modified", s => s.Modified, (s, v) => s.Modified = v)),
-            new FilterWorkspaceGroup("ratings", "Ratings & Scores",
+            new FilterWorkspaceGroup("ratings", "Ratings",
                 EnumValues<ScoreGroup>("user-score", "User Score", s => s.UserScore, (s, v) => s.UserScore = v),
                 EnumValues<ScoreGroup>("community-score", "Community Score", s => s.CommunityScore, (s, v) => s.CommunityScore = v),
                 EnumValues<ScoreGroup>("critic-score", "Critic Score", s => s.CriticScore, (s, v) => s.CriticScore = v))
