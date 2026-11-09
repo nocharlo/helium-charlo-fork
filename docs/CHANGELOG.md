@@ -4,7 +4,7 @@ A history of changes to Helium (charlo fork), from the original Navigator protot
 
 ## v0.3.2 — Intelligent Filters (local development candidate)
 
-- Library Filters groups 27 native Playnite fields in a floating workspace with up to three columns.
+- Library Filters groups 27 native Playnite fields in a floating workspace that grows with expanded sections and scrolls at its height limit. Columns stack independently, and group headers stand out from field controls.
 - Search fields and values, remove individual active selections, and clear a field or all managed filters.
 - The Navigator's Filters settings control which groups and fields appear and in what order. Hidden active filters remain removable from the workspace.
 - Native filter conditions outside the panel and Playnite's AND/OR style remain in the applied settings.

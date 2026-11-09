@@ -10,6 +10,49 @@ using Playnite.SDK.Models;
 
 namespace HeliumHybrid
 {
+    public sealed class FilterWorkspaceColumns : Panel
+    {
+        private int? preferredColumns;
+        private int columns;
+
+        internal void SetWorkspaceWidth(double width)
+        {
+            var count = FilterWorkspaceCatalog.Columns(width);
+            if (preferredColumns == count) return;
+            preferredColumns = count;
+            InvalidateMeasure();
+        }
+
+        protected override Size MeasureOverride(Size availableSize)
+        {
+            var width = double.IsInfinity(availableSize.Width) ? 790 : availableSize.Width;
+            columns = preferredColumns ?? FilterWorkspaceCatalog.Columns(width);
+            var heights = new double[columns];
+            var constraint = new Size(width / columns, double.PositiveInfinity);
+            for (int index = 0; index < InternalChildren.Count; index++) {
+                var child = InternalChildren[index];
+                child.Measure(constraint);
+                heights[index % columns] += child.DesiredSize.Height;
+            }
+            return new Size(width, heights.Max());
+        }
+
+        protected override Size ArrangeOverride(Size finalSize)
+        {
+            var offsets = new double[columns];
+            var width = finalSize.Width / columns;
+            // Fill across columns in the saved order, then stack each column independently.
+            for (int index = 0; index < InternalChildren.Count; index++) {
+                var child = InternalChildren[index];
+                var column = index % columns;
+                var height = child.DesiredSize.Height;
+                child.Arrange(new Rect(column * width, offsets[column], width, height));
+                offsets[column] += height;
+            }
+            return finalSize;
+        }
+    }
+
     // Keeps the filter controls alive across native state changes and responsive reflow.
     internal sealed class NavigatorFilterPanel
     {
@@ -17,7 +60,8 @@ namespace HeliumHybrid
         private readonly Func<FilterWorkspaceField, IEnumerable<FilterWorkspaceChoice>> loadChoices;
         private readonly Preferences preferences;
         private readonly Border frame;
-        private readonly WrapPanel host, active;
+        private readonly FilterWorkspaceColumns host;
+        private readonly WrapPanel active;
         private readonly TextBox search;
         private readonly TextBlock empty;
         private readonly Action<Func<FilterPresetSettings, FilterPresetSettings>> apply;
@@ -29,7 +73,7 @@ namespace HeliumHybrid
         internal bool HasManagedSelection => active.Children.Count > 0;
 
         internal NavigatorFilterPanel(Preferences preferences, Border frame,
-            WrapPanel host, WrapPanel active, TextBox search, TextBlock empty,
+            FilterWorkspaceColumns host, WrapPanel active, TextBox search, TextBlock empty,
             Func<FilterWorkspaceField, IEnumerable<FilterWorkspaceChoice>> loadChoices,
             Action<Func<FilterPresetSettings, FilterPresetSettings>> apply)
         {
@@ -46,10 +90,6 @@ namespace HeliumHybrid
             search.TextChanged += (s, e) => { searchTimer.Stop(); searchTimer.Start(); };
             textTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
             textTimer.Tick += (s, e) => FlushText();
-            host.SizeChanged += (s, e) => {
-                var width = e.NewSize.Width;
-                if (width > 0) host.ItemWidth = Math.Floor(width / FilterWorkspaceCatalog.Columns(width));
-            };
         }
 
         internal void Position(Popup popup, Window window)
@@ -57,12 +97,15 @@ namespace HeliumHybrid
             if (window == null) return;
             popup.PlacementTarget = window;
             frame.Width = Math.Max(1, Math.Min(820, window.ActualWidth - 20));
-            frame.Height = Math.Max(1, Math.Min(610, window.ActualHeight - 32));
+            frame.MaxHeight = Math.Max(1, Math.Min(610, window.ActualHeight - 32));
+            // The vertical scrollbar must not change the number of columns when a field opens.
+            host.SetWorkspaceWidth(frame.Width - frame.Padding.Left - frame.Padding.Right
+                - frame.BorderThickness.Left - frame.BorderThickness.Right);
         }
 
-        internal static CustomPopupPlacement[] Center(Size popup, Size target, Point offset) =>
+        internal CustomPopupPlacement[] Place(Size popup, Size target, Point offset) =>
             new[] { new CustomPopupPlacement(new Point(Math.Max(0, (target.Width - popup.Width) / 2),
-                Math.Max(0, (target.Height - popup.Height) / 2)), PopupPrimaryAxis.None) };
+                Math.Max(0, (target.Height - frame.MaxHeight) / 2)), PopupPrimaryAxis.None) };
 
         internal void InvalidateLayout() => layoutDirty = true;
 
@@ -253,15 +296,13 @@ namespace HeliumHybrid
         private sealed class GroupView
         {
             internal readonly SectionExpander Section;
-            internal readonly StackPanel Panel = new StackPanel { Margin = new Thickness(4, 4, 0, 0) };
+            internal readonly StackPanel Panel = new StackPanel { Margin = new Thickness(12, 2, 0, 0) };
             internal readonly Dictionary<string, FieldView> Fields = new Dictionary<string, FieldView>();
 
             internal GroupView(FilterWorkspaceGroup group)
             {
-                Section = new SectionExpander { Content = Panel, IsExpanded = true, Margin = new Thickness(0, 0, 14, 10) };
-                var heading = new TextBlock { Text = group.Label, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
-                heading.SetResourceReference(TextBlock.ForegroundProperty, "SteamActiveBrush");
-                Section.Header = heading;
+                Section = new SectionExpander { Header = group.Label, Content = Panel, IsExpanded = true, Margin = new Thickness(0, 0, 8, 5) };
+                Section.SetResourceReference(FrameworkElement.StyleProperty, "FilterGroupDisclosureStyle");
                 AutomationProperties.SetName(Section, group.Label);
             }
         }
@@ -289,8 +330,8 @@ namespace HeliumHybrid
                 Model = model;
                 this.edit = edit;
                 var panel = new StackPanel { Margin = new Thickness(13, 2, 0, 4) };
-                Section = new SectionExpander { Header = model.Label, Content = panel, Margin = new Thickness(0, 0, 0, 4) };
-                Section.SetResourceReference(Control.ForegroundProperty, "SteamTextBrush");
+                Section = new SectionExpander { Header = model.Label, Content = panel };
+                Section.SetResourceReference(FrameworkElement.StyleProperty, "FilterFieldDisclosureStyle");
                 Clear = new Button { Content = "Clear", HorizontalAlignment = HorizontalAlignment.Right, Padding = new Thickness(4, 1, 4, 1) };
                 AutomationProperties.SetName(Clear, "Clear " + model.Label);
                 Clear.Click += (s, e) => clear();

@@ -25,6 +25,54 @@
         </ControlTemplate.Triggers>
       </ControlTemplate></Setter.Value></Setter>
     </Style>
+    <Style x:Key="FilterDisclosureHeaderStyle" TargetType="ToggleButton">
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton">
+        <Border x:Name="DisclosureFace" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="3" Padding="4,3">
+          <DockPanel>
+            <Path x:Name="Chevron" Data="M0,0 L4,4 L8,0" Stretch="Uniform" Width="{TemplateBinding FontSize}" Height="8"
+                  Stroke="{TemplateBinding Foreground}" StrokeThickness="1.5" Margin="0,0,6,0"
+                  VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+              <Path.RenderTransform><RotateTransform Angle="-90"/></Path.RenderTransform>
+            </Path>
+            <TextBlock Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+          </DockPanel>
+        </Border>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsChecked" Value="True">
+            <Setter TargetName="Chevron" Property="RenderTransform"><Setter.Value><RotateTransform Angle="0"/></Setter.Value></Setter>
+          </Trigger>
+          <Trigger Property="IsMouseOver" Value="True">
+            <Setter TargetName="DisclosureFace" Property="Background" Value="{DynamicResource TextBlockBackgroundBrush}"/>
+          </Trigger>
+          <Trigger Property="IsKeyboardFocused" Value="True">
+            <Setter TargetName="DisclosureFace" Property="BorderBrush" Value="{DynamicResource SteamActiveBrush}"/>
+          </Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style x:Key="FilterFieldDisclosureStyle" TargetType="Expander">
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Foreground" Value="{DynamicResource SteamTextBrush}"/>
+      <Setter Property="IsTabStop" Value="False"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Expander">
+        <StackPanel>
+          <ToggleButton x:Name="DisclosureHeader" Style="{StaticResource FilterDisclosureHeaderStyle}" Content="{TemplateBinding Header}"
+                        FontSize="{TemplateBinding FontSize}" FontWeight="{TemplateBinding FontWeight}" Foreground="{TemplateBinding Foreground}"
+                        IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"/>
+          <ContentPresenter x:Name="SectionContent" ContentSource="Content" Visibility="Collapsed"/>
+        </StackPanel>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsExpanded" Value="True">
+            <Setter TargetName="SectionContent" Property="Visibility" Value="Visible"/>
+          </Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style x:Key="FilterGroupDisclosureStyle" TargetType="Expander" BasedOn="{StaticResource FilterFieldDisclosureStyle}">
+      <Setter Property="FontSize" Value="15"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Foreground" Value="{DynamicResource SteamActiveBrush}"/>
+    </Style>
     <Style x:Key="ToolbarButtonStyle" TargetType="Button">
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="Foreground" Value="{StaticResource SteamIconBrush}"/>
@@ -138,7 +186,7 @@
         </Grid>
       </Border>
       <Popup x:Name="FiltersPopup" Placement="Custom" StaysOpen="False" AllowsTransparency="True" Focusable="False">
-        <Border x:Name="FilterWorkspaceFrame" Width="820" Height="610" MaxWidth="820" MaxHeight="610" Background="{DynamicResource PopupBackgroundBrush}" BorderBrush="{DynamicResource PopupBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="14">
+        <Border x:Name="FilterWorkspaceFrame" Width="820" MaxWidth="820" MaxHeight="610" Background="{DynamicResource PopupBackgroundBrush}" BorderBrush="{DynamicResource PopupBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="14">
           <Grid TextElement.Foreground="{DynamicResource TextBrush}">
             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
             <DockPanel Grid.Row="0" Margin="0,0,0,7">
@@ -160,7 +208,7 @@
             <ScrollViewer x:Name="FilterSectionsScroll" Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="False" Focusable="True" AutomationProperties.Name="Filter sections">
               <StackPanel>
                 <TextBlock x:Name="FilterSearchEmpty" Text="No matching options" Visibility="Collapsed" Foreground="{DynamicResource SteamMutedBrush}" Margin="3,3,0,7"/>
-                <WrapPanel x:Name="FilterSections"/>
+                <local:FilterWorkspaceColumns x:Name="FilterSections"/>
               </StackPanel>
             </ScrollViewer>
             <Button x:Name="ClearAllFilters" Grid.Row="4" Content="Clear filters" HorizontalAlignment="Right" Padding="8,4" Margin="7,8,0,0"/>

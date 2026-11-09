@@ -139,6 +139,6 @@ namespace HeliumHybrid
         internal static bool Matches(string field, string value, string query) =>
             NavigatorFilterComposer.OptionMatches(field, query) || NavigatorFilterComposer.OptionMatches(value, query);
 
-        internal static int Columns(double contentWidth) => contentWidth >= 720 ? 3 : contentWidth >= 480 ? 2 : 1;
+        internal static int Columns(double contentWidth) => contentWidth >= 720 ? 3 : contentWidth >= 600 ? 2 : 1;
     }
 }

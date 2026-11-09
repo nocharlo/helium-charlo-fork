@@ -77,7 +77,7 @@ internal static class NavigatorOrganizationTests
             var filterBorder = (Border)filterPopup.Child;
             var filterLayout = (Grid)filterBorder.Child;
             var filterScroll = (ScrollViewer)root.FindName("FilterSectionsScroll");
-            Check(filterBorder.Height > 0 && filterBorder.Height <= filterBorder.MaxHeight &&
+            Check(double.IsNaN(filterBorder.Height) && filterBorder.MaxHeight == 610 &&
                 filterLayout.RowDefinitions.Count == 5 && filterLayout.RowDefinitions[3].Height.IsStar,
                 "Filter popup gives metadata sections a bounded star row");
             Check(Grid.GetRow(filterScroll) == 3 && !filterScroll.CanContentScroll &&
@@ -86,20 +86,32 @@ internal static class NavigatorOrganizationTests
                 Grid.GetRow((ScrollViewer)root.FindName("ActiveFilterScroll")) == 2 &&
                 Grid.GetRow((Button)root.FindName("ClearAllFilters")) == 4,
                 "Filter header and search stay above a keyboard-focusable scroll area; Clear stays below");
-            var filterSections = (WrapPanel)root.FindName("FilterSections");
-            filterSections.ItemWidth = 275;
-            for (var i = 0; i < 12; i++)
-                filterSections.Children.Add(new Expander { Header = "Synthetic section", IsExpanded = true,
-                    Content = new TextBlock { Text = new string('x', 70), TextWrapping = System.Windows.TextWrapping.Wrap } });
-            filterBorder.Width = 310;
-            filterBorder.Height = 460;
-            filterBorder.Measure(new System.Windows.Size(310, 460));
-            filterBorder.Arrange(new System.Windows.Rect(0, 0, 310, 460));
-            filterBorder.UpdateLayout();
+            var filterSections = (FilterWorkspaceColumns)root.FindName("FilterSections");
+            var field = new Expander { Header = "Synthetic field", Style = (Style)root.Resources["FilterFieldDisclosureStyle"],
+                Content = new Border { Height = 600 } };
+            var group = new Expander { Header = "Synthetic group", Style = (Style)root.Resources["FilterGroupDisclosureStyle"],
+                Content = field };
+            filterSections.Children.Add(group);
+            filterBorder.MaxHeight = 460;
+            var collapsed = MeasureFilterWorkspace(filterBorder);
+            group.IsExpanded = true;
+            var expanded = MeasureFilterWorkspace(filterBorder);
+            field.IsExpanded = true;
+            var bounded = MeasureFilterWorkspace(filterBorder);
+            Check(group.FontSize > field.FontSize && group.FontWeight == FontWeights.SemiBold &&
+                !Equals(group.Foreground, field.Foreground) && group.Template == field.Template,
+                "Groups emphasize the same disclosure affordance with typography and color");
+            Check(collapsed < expanded && expanded < bounded && Math.Abs(bounded - filterBorder.MaxHeight) < 1,
+                "Groups and fields grow the popup only until its maximum height");
             Check(filterScroll.ScrollableHeight > 0 && filterScroll.ViewportHeight > 0,
                 "Expanded metadata sections exceed the finite scroll viewport");
             filterScroll.ScrollToBottom(); filterBorder.UpdateLayout();
-            Check(filterScroll.VerticalOffset > 0, "Metadata scroll reaches lower sections");
+            var clear = (Button)root.FindName("ClearAllFilters");
+            Check(filterScroll.VerticalOffset > 0 && clear.TranslatePoint(new Point(0, clear.ActualHeight), filterBorder).Y <= bounded + 1,
+                "Metadata scroll reaches lower sections while the footer fits");
+            group.IsExpanded = false;
+            Check(Math.Abs(MeasureFilterWorkspace(filterBorder) - collapsed) < 1 && filterScroll.ScrollableHeight == 0,
+                "Collapsing content restores compact height without a scrollbar");
             foreach (var grouping in new[] { true, false }) {
                 var combo = (ComboBox)root.FindName(grouping ? "GroupOptions" : "SortOptions");
                 int selected = -1;
@@ -430,10 +442,27 @@ internal static class NavigatorOrganizationTests
         first = preferences.FilterWorkspace[1];
         Check(first.Id == "ownership" && first.FieldOrder.Take(3).SequenceEqual(new[] { "Library", "future-field", "Platform" }) &&
             first.HiddenFields.SequenceEqual(new[] { "future-field", "Platform" }), "Save/reload preserves order, hidden fields and unknown IDs");
-        Check(FilterWorkspaceCatalog.Columns(790) == 3 && FilterWorkspaceCatalog.Columns(565) == 2 &&
-            FilterWorkspaceCatalog.Columns(320) == 1, "Measured width chooses three, two or one column");
+        Check(FilterWorkspaceCatalog.Columns(790) == 3 && FilterWorkspaceCatalog.Columns(650) == 2 &&
+            FilterWorkspaceCatalog.Columns(590) == 1, "Workspace width chooses three, two or one column");
 
-        var host = new WrapPanel();
+        var columns = new FilterWorkspaceColumns();
+        foreach (var height in new[] { 120, 30, 40, 25, 20 })
+            columns.Children.Add(new Border { Height = height });
+        foreach (var width in new[] { 790d, 650d, 590d }) {
+            columns.Measure(new Size(width, double.PositiveInfinity));
+            columns.Arrange(new Rect(columns.DesiredSize));
+            var count = FilterWorkspaceCatalog.Columns(width);
+            var last = (Border)columns.Children[4];
+            var expectedY = count == 3 ? 30 : count == 2 ? 160 : 215;
+            Check(last.TranslatePoint(new Point(), columns) == new Point((4 % count) * width / count, expectedY),
+                "Columns preserve group order and stack at each column's own height");
+        }
+        columns.SetWorkspaceWidth(725);
+        columns.Measure(new Size(708, double.PositiveInfinity));
+        columns.Arrange(new Rect(columns.DesiredSize));
+        Check(columns.Children[4].TranslatePoint(new Point(), columns).Y == 30,
+            "An appearing scrollbar does not move groups between columns");
+        var host = new FilterWorkspaceColumns();
         var chips = new WrapPanel();
         var search = new TextBox();
         var empty = new TextBlock();
@@ -462,6 +491,16 @@ internal static class NavigatorOrganizationTests
         platformView.IsExpanded = true;
         var platformChoices = ((StackPanel)platformView.Content).Children.OfType<StackPanel>().Single();
         var selected = platformChoices.Children.Cast<CheckBox>().Single(box => box.IsChecked == true);
+        var groupOrder = host.Children.Cast<Expander>().ToArray();
+        host.Measure(new Size(790, double.PositiveInfinity));
+        host.Arrange(new Rect(host.DesiredSize));
+        groupView.IsExpanded = false;
+        host.Measure(new Size(320, double.PositiveInfinity));
+        host.Arrange(new Rect(host.DesiredSize));
+        groupView.IsExpanded = true;
+        Check(host.Children.Cast<Expander>().SequenceEqual(groupOrder) && platformView.IsExpanded &&
+            selected.IsChecked == true && state.Platform.Ids.SequenceEqual(new[] { other }),
+            "Responsive layout and disclosure preserve customized order, expansion and selected filters");
         search.Text = "absent";
         workspace.Refresh(state, true);
         Check(empty.Visibility == Visibility.Visible && chips.Children.Count == 1 &&
@@ -474,6 +513,14 @@ internal static class NavigatorOrganizationTests
         workspace.ClearAll();
         Check(!host.Children.Contains(groupView) && state.Platform == null && chips.Children.Count == 0 &&
             state.Hidden && state.UseAndFilteringStyle, "Clear filters covers hidden groups and preserves unmanaged native state");
+    }
+
+    private static double MeasureFilterWorkspace(Border frame)
+    {
+        frame.Measure(new Size(frame.Width, double.PositiveInfinity));
+        frame.Arrange(new Rect(frame.DesiredSize));
+        frame.UpdateLayout();
+        return frame.ActualHeight;
     }
 
     private static void Presentation()
