@@ -414,6 +414,11 @@ internal static class NavigatorOrganizationTests
     }
     private static void FilterWorkspace()
     {
+        Check(FilterWorkspaceCatalog.Groups.Select(group => group.Id).SequenceEqual(
+                new[] { "ownership", "classification", "identity", "activity", "ratings" }) &&
+            FilterWorkspaceCatalog.Groups.Select(group => group.Label).SequenceEqual(
+                new[] { "Library & Status", "Classification", "Game Information", "Activity & History", "Ratings" }),
+            "Shared filter headings retain their persisted group IDs and order");
         var preferences = new Preferences();
         preferences.MigrateNavigation();
         Check(preferences.FilterWorkspace.Select(group => group.Id).SequenceEqual(FilterWorkspaceCatalog.Groups.Select(group => group.Id)) &&
