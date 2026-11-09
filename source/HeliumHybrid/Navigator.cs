@@ -131,7 +131,7 @@ namespace HeliumHybrid
             filtersPopup = (Popup)root.FindName("FiltersPopup");
             filterOptionSearch = (TextBox)root.FindName("FilterOptionSearch");
             filterPanel = new NavigatorFilterPanel(prefs, (Border)root.FindName("FilterWorkspaceFrame"),
-                (WrapPanel)root.FindName("FilterSections"),
+                (FilterWorkspaceColumns)root.FindName("FilterSections"),
                 (WrapPanel)root.FindName("ActiveFilters"), filterOptionSearch,
                 (TextBlock)root.FindName("FilterSearchEmpty"),
                 field => field.Choices(api),
@@ -197,7 +197,7 @@ namespace HeliumHybrid
                 finally { shortcutGroupingChange = false; }
             });
             readyButton.Click += (sender, args) => Safe(() => ApplyGlobalFilterChange(state => readyState.Toggle(state)));
-            filtersPopup.CustomPopupPlacementCallback = NavigatorFilterPanel.Center;
+            filtersPopup.CustomPopupPlacementCallback = filterPanel.Place;
             filtersButton.Click += (sender, args) => Safe(() => {
                 sortGroupPopup.IsOpen = false;
                 if (!filtersPopup.IsOpen) filterPanel.Position(filtersPopup, window);
