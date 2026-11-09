@@ -84,6 +84,8 @@ namespace HeliumHybrid
         private Window window;
         private DesktopView lastDesktopView;
         private DispatcherOperation pendingViewSelection;
+        private DispatcherOperation pendingOrganizationRestore;
+        private readonly NavigatorOrganizationSelection organizationSelection = new NavigatorOrganizationSelection();
         private int dirty = 1;
         private Guid[] lastIds = new Guid[0];
         private readonly object updateGate = new object();
@@ -174,7 +176,7 @@ namespace HeliumHybrid
             NavigatorOrganizationControls.ConfigureSelector(groupOptions, mode => {
                 if (updatingSortGroupUi || mode.Id == SelectedGrouping) return;
                 RequestRevealAfterExplicitReorganization();
-                if (prefs.ApplySortGroupToPlaynite) Safe(() => library.ApplyGrouping(mode.Id));
+                if (prefs.ApplySortGroupToPlaynite) Safe(() => ApplyNativeOrganization(() => library.ApplyGrouping(mode.Id)));
                 SelectedGrouping = mode.Id;
             });
             NavigatorOrganizationControls.ConfigureSelector(sortOptions, mode => {
@@ -399,6 +401,8 @@ namespace HeliumHybrid
             api.Database.Features.ItemCollectionChanged += MetadataChanged;
             api.Database.Companies.ItemCollectionChanged += MetadataChanged;
             lastDesktopView = library.ActiveDesktopView;
+            organizationSelection.ObserveOrganization(library.ViewState(NavigatorGrouping));
+            InputManager.Current.PreProcessInput += BeforeOrganizationInput;
             window = Window.GetWindow(this);
             if (window != null) {
                 window.SizeChanged += WindowSizeChanged;
@@ -413,6 +417,10 @@ namespace HeliumHybrid
             filtersPopup.IsOpen = false;
             if (!active) return; active = false; timer.Stop(); searchTimer.Stop(); coverClickTimer.Stop(); sidebarClickTimer.Stop(); sidebarDownItem = null; panelRequested = false; UnbindGridClicks();
             plugin.SelectionChanged -= NativeSelectionChanged;
+            InputManager.Current.PreProcessInput -= BeforeOrganizationInput;
+            organizationSelection.Cancel();
+            pendingOrganizationRestore?.Abort();
+            pendingOrganizationRestore = null;
             pendingViewSelection?.Abort();
             pendingViewSelection = null;
             gridIds = null;
@@ -489,6 +497,12 @@ namespace HeliumHybrid
                 bool enteringDetails = lastDesktopView == DesktopView.Grid && target == DesktopView.Details;
                 bool returningToGrid = lastDesktopView == DesktopView.Details && target == DesktopView.Grid;
                 var previousId = args.OldValue?.Count == 1 ? args.OldValue[0].Id : Guid.Empty;
+                var sameGrid = lastDesktopView == DesktopView.Grid && target == DesktopView.Grid;
+                if (organizationSelection.ObserveSelection(library.ViewState(NavigatorGrouping), sameGrid,
+                    previousId, args.NewValue?.Count > 0) && pendingOrganizationRestore == null) {
+                    pendingOrganizationRestore = Dispatcher.BeginInvoke(DispatcherPriority.Loaded,
+                        new Action(RestoreOrganizationSelection));
+                }
                 if ((enteringDetails || returningToGrid) && previousId != Guid.Empty && !(args.NewValue?.Count > 0)) {
                     if (enteringDetails && !navigatedDetails && prefs.PreserveGridScroll) CaptureGridScroll();
                     pendingViewSelection?.Abort();
@@ -511,6 +525,27 @@ namespace HeliumHybrid
                 }
                 SelectionChanged();
             });
+        }
+        private void RestoreOrganizationSelection()
+        {
+            pendingOrganizationRestore = null;
+            if (!active) return;
+            Safe(() => {
+                var id = organizationSelection.Take(library.ActiveDesktopView == DesktopView.Grid,
+                    library.SelectedIds(), candidate => library.FilteredGames.Any(game => game.Id == candidate));
+                if (id == Guid.Empty) return;
+                SelectGame(id);
+                Refresh();
+                if (prefs.AutomaticallyRevealSelectedGame) RevealSelected(library.SelectedIds());
+            });
+        }
+        private void BeforeOrganizationInput(object sender, PreProcessInputEventArgs args)
+        {
+            var input = args.StagingItem.Input.RoutedEvent;
+            if (input != Mouse.PreviewMouseDownEvent && input != Keyboard.PreviewKeyDownEvent) return;
+            // Native toolbar menus also run on this Dispatcher. A new gesture owns the selection.
+            organizationSelection.Cancel();
+            organizationSelection.ObserveOrganization(library.ViewState(NavigatorGrouping));
         }
         private void SelectionChanged()
         {
@@ -537,6 +572,7 @@ namespace HeliumHybrid
                 var changed = Interlocked.Exchange(ref dirty, 0) != 0;
                 var membershipChanged = NavigatorRefreshDecision.MembershipChanged(ids, lastIds);
                 var viewState = library.ViewState(NavigatorGrouping);
+                organizationSelection.ObserveOrganization(viewState);
                 var viewStateChanged = NavigatorRefreshDecision.ViewStateChanged(viewState, lastViewState);
                 if (!changed && !membershipChanged && !orderChanged && !viewStateChanged)
                     changed = UpdateGameRows(games);
@@ -665,6 +701,7 @@ namespace HeliumHybrid
             var current = api.MainView.GetCurrentFilterSettings() ?? new FilterPresetSettings();
             var next = change(current);
             if (NavigatorFilterComposer.Same(current, next)) return;
+            organizationSelection.Cancel();
             // A temporary, unsaved preset with null view options changes filters without changing native sort or grouping.
             api.MainView.ApplyFilterPreset(NavigatorFilterComposer.TemporaryPreset(next));
             Interlocked.Exchange(ref dirty, 1);
@@ -715,7 +752,7 @@ namespace HeliumHybrid
             Safe(() => {
                 RequestRevealAfterExplicitReorganization();
                 prefs.SortMode = (int)mode;
-                if (prefs.ApplySortGroupToPlaynite) library.ApplySorting(mode, prefs.SortDescending);
+                if (prefs.ApplySortGroupToPlaynite) ApplyNativeOrganization(() => library.ApplySorting(mode, prefs.SortDescending));
                 Interlocked.Exchange(ref dirty, 1); Refresh(); Save();
                 UpdateSortGroupUi();
             });
@@ -726,7 +763,7 @@ namespace HeliumHybrid
             Safe(() => {
                 RequestRevealAfterExplicitReorganization();
                 prefs.SortDescending = descending;
-                if (prefs.ApplySortGroupToPlaynite) library.ApplySorting(SortMode, descending);
+                if (prefs.ApplySortGroupToPlaynite) ApplyNativeOrganization(() => library.ApplySorting(SortMode, descending));
                 Interlocked.Exchange(ref dirty, 1); Refresh(); Save();
                 UpdateSortGroupUi();
             });
@@ -735,6 +772,11 @@ namespace HeliumHybrid
         {
             var selected = library.SelectedIds();
             revealAfterExplicitReorganization = selected.Count == 0 ? null : selected;
+        }
+        private void ApplyNativeOrganization(Action apply)
+        {
+            organizationSelection.ObserveOrganization(library.ViewState(NavigatorGrouping));
+            apply();
         }
         private void SortGroupPopupPreviewKeyDown(object sender, KeyEventArgs args)
         {
@@ -959,6 +1001,7 @@ namespace HeliumHybrid
         {
             if (!active) return;
             if (lastDesktopView != library.ActiveDesktopView) {
+                organizationSelection.Cancel();
                 sidebarClickTimer.Stop();
                 coverClickTimer.Stop();
                 sidebarDownItem = null;
