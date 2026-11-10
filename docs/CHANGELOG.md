@@ -2,14 +2,23 @@
 
 A history of changes to Helium (charlo fork), from the original Navigator prototype to the current release.
 
-## v0.3.2 — Intelligent Filters (local development candidate)
+## v0.3.2 — Library Filters & Native Organization
 
-- Library Filters groups 27 native Playnite fields in a floating workspace that grows with expanded sections and scrolls at its height limit. Columns stack independently, and group headers stand out from field controls.
-- Search fields and values, remove individual active selections, and clear a field or all managed filters.
-- The Navigator's Filters settings control which groups and fields appear and in what order. Hidden active filters remain removable from the workspace.
-- Native filter conditions outside the panel and Playnite's AND/OR style remain in the applied settings.
-- A selected game that moves to a new group is revealed after the current list rebuild.
-- Runtime popup behavior and saved-preset identity still require portable Playnite validation before release.
+### Added
+
+- Added optional synchronization from Sort & Group to Playnite for compatible sorting, sort direction, and grouping changes.
+- Added Navigator settings for hiding and reordering filter fields and groups. Active conditions on hidden fields remain accessible through their chips.
+
+### Changed
+
+- Replaced Advanced Filters with Library Filters, a floating workspace with 27 native Playnite filter fields. Search by field or value, select multiple metadata values, and load long lists in batches.
+- Organized the workspace into five groups across one, two, or three columns. The popup grows as sections expand and scrolls at its height limit.
+- Added removable chips for active filters. Clear filters clears conditions managed by the workspace while preserving unrelated native conditions and Playnite's AND/OR filter mode.
+
+### Fixed
+
+- Restore the selected game after supported native regrouping and sorting changes when it still matches the filters.
+- Preserve selection when switching between Grid and Full Details. Reveal the selected game after it moves to another Navigator group.
 
 ## v0.3.1 — Navigator Organization & Customization
 
