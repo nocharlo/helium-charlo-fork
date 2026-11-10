@@ -76,6 +76,7 @@ class NavigatorRefreshDecisionTests
         same.NavigatorGrouping = 1;
         Check(NavigatorRefreshDecision.ViewStateChanged(same, baseline),
             "Independent Navigator grouping change is detected");
+        OrganizationSelection(first, second);
 
         var oldRows = new[] { new NavigatorProjectedRow {
             Id = first, Name = "Item", Key = "item", Group = "A", IconPath = "icon",
@@ -89,6 +90,18 @@ class NavigatorRefreshDecisionTests
         }).ToArray();
         Check(NavigatorRefreshDecision.ClassifyRows(oldRows, oldRows) == NavigatorRowChange.None,
             "Unrelated update skips rebuild");
+        var oldGroup = new NavigatorGroupIdentity("category:old", "Old");
+        var newGroup = new NavigatorGroupIdentity("category:new", "New");
+        Check(NavigatorRefreshDecision.SelectedGroupMoved(first, oldGroup,
+            new[] { new NavigatorProjectedRow { Id = first, GroupIdentity = newGroup } }),
+            "Selected game moving to another group requests reveal");
+        Check(!NavigatorRefreshDecision.SelectedGroupMoved(first, oldGroup,
+            new[] { new NavigatorProjectedRow { Id = first, GroupIdentity = oldGroup },
+                new NavigatorProjectedRow { Id = first, GroupIdentity = newGroup } }),
+            "Existing selected occurrence prevents an unnecessary jump");
+        Check(!NavigatorRefreshDecision.SelectedGroupMoved(first, oldGroup,
+            new[] { new NavigatorProjectedRow { Id = second, GroupIdentity = newGroup } }),
+            "Filtered-out game is not revealed");
         Check(NavigatorRefreshDecision.ClassifyRows(oldRows, visualRows) == NavigatorRowChange.Visual,
             "Indicator changes are visual across duplicate group rows");
         visualRows[0].Name = "Renamed";
@@ -160,5 +173,48 @@ class NavigatorRefreshDecisionTests
             "Diagnostics never print preset identifiers");
 
         Console.WriteLine("PASS: " + checks + " Navigator refresh decision and diagnostic checks.");
+    }
+
+    static void OrganizationSelection(Guid first, Guid second)
+    {
+        var ungrouped = new NavigatorViewSnapshot { Grouping = "None", SortOrder = "Name", SortDirection = "Ascending" };
+        var completion = new NavigatorViewSnapshot { Grouping = "CompletionStatus", SortOrder = "Name", SortDirection = "Ascending" };
+        var series = new NavigatorViewSnapshot { Grouping = "Series", SortOrder = "Name", SortDirection = "Ascending" };
+        var descending = new NavigatorViewSnapshot { Grouping = "None", SortOrder = "Name", SortDirection = "Descending" };
+        var playtime = new NavigatorViewSnapshot { Grouping = "None", SortOrder = "Playtime", SortDirection = "Ascending" };
+        var localOnly = new NavigatorViewSnapshot { Grouping = "None", SortOrder = "Name", SortDirection = "Ascending", NavigatorGrouping = 1 };
+        var selection = new NavigatorOrganizationSelection();
+        var empty = Array.Empty<Guid>();
+        Func<Guid, bool> visible = id => id == first;
+
+        selection.ObserveOrganization(ungrouped);
+        Check(selection.ObserveSelection(completion, true, first, false), "Regrouping queues a cleared native selection");
+        Check(selection.ObserveSelection(series, true, Guid.Empty, false), "Consecutive grouping changes keep the original ID");
+        Check(selection.Take(true, empty, visible) == first, "Restore the same game if it remains in the filtered results");
+        Check(selection.Take(true, empty, visible) == Guid.Empty, "Restoration is consumed once");
+
+        foreach (var changed in new[] { descending, playtime }) {
+            selection.ObserveOrganization(ungrouped);
+            Check(selection.ObserveSelection(changed, true, first, false), "Native sorting or direction change can queue restoration");
+            Check(selection.Take(true, empty, id => false) == Guid.Empty, "Never restore a filtered-out game");
+        }
+
+        selection.ObserveOrganization(ungrouped);
+        selection.ObserveSelection(completion, true, first, false);
+        selection.ObserveSelection(completion, true, Guid.Empty, true);
+        selection.ObserveSelection(completion, true, second, false);
+        Check(selection.Take(true, empty, visible) == Guid.Empty, "New selection followed by deliberate deselection invalidates the old game");
+
+        selection.ObserveOrganization(ungrouped);
+        Check(!selection.ObserveSelection(localOnly, true, first, false), "Independent Navigator grouping cannot restore native selection");
+        selection.ObserveSelection(completion, true, first, false);
+        Check(selection.Take(true, new[] { second }, visible) == Guid.Empty, "Never overwrite the live selection");
+        selection.ObserveOrganization(ungrouped);
+        selection.ObserveSelection(completion, true, first, false);
+        selection.Cancel();
+        Check(selection.Take(true, empty, visible) == Guid.Empty, "A newer input can cancel queued restoration");
+        selection.ObserveOrganization(ungrouped);
+        selection.ObserveSelection(completion, true, first, false);
+        Check(selection.Take(false, empty, visible) == Guid.Empty, "View transitions stay with the Grid and Details restoration path");
     }
 }
