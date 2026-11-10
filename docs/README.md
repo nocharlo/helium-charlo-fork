@@ -2,11 +2,10 @@
 
 I've kept this directory focused on the current release. The older design notes, test reports, and development experiments are still available under `archive/`, organized by milestone.
 
-## Current release — v0.3.0
+## Current release — v0.3.2
 
 - [Changelog](CHANGELOG.md) — what changed between versions.
-- [v0.3.0 validation](VALIDATION-v0.3.0.md) — tests performed, automated coverage, and checks still pending.
-- [v0.3.0 release notes](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.3.0) — highlights and downloads.
+- [v0.3.2 release notes](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.3.2) — highlights and downloads.
 - [Project README](../README.md) — installation, features, limitations, and credits.
 
 ## Development
@@ -23,7 +22,11 @@ The build and package checks do not replace testing interactions in Playnite Des
 
 ## Historical documentation
 
-These files record specific older versions. Some descriptions, package names, and commands refer to the state of the project *at that time*, not to v0.3.0.
+These files record specific older versions. Some descriptions, package names, and commands refer to the version documented in each file.
+
+### v0.3.0 — Navigator Experience
+
+- [Validation record](VALIDATION-v0.3.0.md)
 
 ### v0.2.4 — Stability hotfix
 
