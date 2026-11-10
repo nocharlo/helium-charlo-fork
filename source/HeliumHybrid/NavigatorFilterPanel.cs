@@ -5,6 +5,8 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using Playnite.SDK.Models;
 
@@ -57,7 +59,7 @@ namespace HeliumHybrid
     internal sealed class NavigatorFilterPanel
     {
         private const int PageSize = 16;
-        private readonly Func<FilterWorkspaceField, int?, IEnumerable<FilterWorkspaceChoice>> loadChoices;
+        private readonly Func<FilterWorkspaceField, IEnumerable<FilterWorkspaceChoice>> loadChoices;
         private readonly Preferences preferences;
         private readonly Border frame;
         private readonly FilterWorkspaceColumns host;
@@ -69,13 +71,15 @@ namespace HeliumHybrid
         private readonly DispatcherTimer searchTimer, textTimer;
         private readonly Dictionary<FilterWorkspaceField, string> pendingText = new Dictionary<FilterWorkspaceField, string>();
         private FilterPresetSettings shown;
-        private int choiceRevision;
+        private Point? movedPosition;
+        private Rect workArea, ownerArea;
+        private double verticalScale = 1;
         private bool layoutDirty = true, syncingText;
         internal bool HasManagedSelection => active.Children.Count > 0;
 
         internal NavigatorFilterPanel(Preferences preferences, Border frame,
             FilterWorkspaceColumns host, WrapPanel active, TextBox search, TextBlock empty,
-            Func<FilterWorkspaceField, int?, IEnumerable<FilterWorkspaceChoice>> loadChoices,
+            Func<FilterWorkspaceField, IEnumerable<FilterWorkspaceChoice>> loadChoices,
             Action<Func<FilterPresetSettings, FilterPresetSettings>> apply)
         {
             this.loadChoices = loadChoices;
@@ -95,18 +99,96 @@ namespace HeliumHybrid
 
         internal void Position(Popup popup, Window window)
         {
-            if (window == null) return;
+            var source = window == null ? null : PresentationSource.FromVisual(window);
+            if (source == null) return;
+            var screen = System.Windows.Forms.Screen.FromHandle(new WindowInteropHelper(window).Handle).WorkingArea;
+            workArea = new Rect(window.PointFromScreen(new Point(screen.Left, screen.Top)),
+                window.PointFromScreen(new Point(screen.Right, screen.Bottom)));
+            ownerArea = Rect.Intersect(new Rect(new Point(), window.RenderSize), workArea);
+            if (ownerArea.IsEmpty) ownerArea = workArea;
+            verticalScale = source.CompositionTarget.TransformToDevice.M22;
             popup.PlacementTarget = window;
-            frame.Width = Math.Max(1, Math.Min(820, window.ActualWidth - 20));
-            frame.MaxHeight = Math.Max(1, Math.Min(610, window.ActualHeight - 32));
+            ApplyDimensions(popup);
+        }
+
+        internal void EnableWindowGestures(Popup popup, Thumb title, Thumb resize, Action save)
+        {
+            Point startPointer = new Point(), startPosition = new Point();
+            Size startSize = new Size();
+            bool sizeChanged = false;
+            Point Pointer(Window window, Thumb handle) => window.PointFromScreen(handle.PointToScreen(Mouse.GetPosition(handle)));
+            void Start(object sender, DragStartedEventArgs args)
+            {
+                if (!(popup.PlacementTarget is Window window)) return;
+                startPointer = Pointer(window, (Thumb)sender);
+                startPosition = window.PointFromScreen(frame.PointToScreen(new Point()));
+                startSize = frame.RenderSize;
+                sizeChanged = false;
+            }
+            title.DragStarted += Start;
+            resize.DragStarted += Start;
+            title.DragDelta += (s, e) => {
+                if (!(popup.PlacementTarget is Window window)) return;
+                movedPosition = startPosition + (Pointer(window, title) - startPointer);
+                ApplyAnchor(popup);
+            };
+            resize.DragDelta += (s, e) => {
+                if (!(popup.PlacementTarget is Window window)) return;
+                var delta = Pointer(window, resize) - startPointer;
+                var maxWidth = Math.Min(ManualWidthLimit, workArea.Right - startPosition.X);
+                var maxHeight = Math.Min(ManualHeightLimit, workArea.Bottom - startPosition.Y);
+                if (maxWidth < Preferences.MinFilterWidth || maxHeight < Preferences.MinFilterHeight) return;
+                preferences.FilterPopupWidth = Bound(startSize.Width + delta.X, Preferences.MinFilterWidth, maxWidth);
+                preferences.FilterPopupHeight = Bound(startSize.Height + delta.Y, Preferences.MinFilterHeight, maxHeight);
+                movedPosition = startPosition;
+                sizeChanged = true;
+                ApplyDimensions(popup);
+            };
+            resize.DragCompleted += (s, e) => { if (sizeChanged) save(); };
+        }
+
+        // WPF restricts a Popup to 75% of the screen area. Both manual dimensions stay within that limit.
+        private double ManualWidthLimit => Math.Max(1, Math.Min(Preferences.MaxFilterWidth, workArea.Width * .85));
+        private double ManualHeightLimit => Math.Max(1, Math.Min(Preferences.MaxFilterHeight, workArea.Height * .85));
+
+        private void ApplyDimensions(Popup popup)
+        {
+            var manual = preferences.HasFilterPopupSize;
+            frame.MaxWidth = manual ? ManualWidthLimit : 820;
+            frame.Width = manual ? Math.Min(preferences.FilterPopupWidth, ManualWidthLimit)
+                : Math.Max(1, Math.Min(820, ownerArea.Width - 20));
+            frame.MaxHeight = manual ? Math.Min(preferences.FilterPopupHeight, ManualHeightLimit)
+                : Math.Max(1, Math.Min(610, ownerArea.Height - 32));
+            frame.Height = manual ? frame.MaxHeight : double.NaN;
             // The vertical scrollbar must not change the number of columns when a field opens.
             host.SetWorkspaceWidth(frame.Width - frame.Padding.Left - frame.Padding.Right
                 - frame.BorderThickness.Left - frame.BorderThickness.Right);
+            ApplyAnchor(popup);
         }
 
-        internal CustomPopupPlacement[] Place(Size popup, Size target, Point offset) =>
-            new[] { new CustomPopupPlacement(new Point(Math.Max(0, (target.Width - popup.Width) / 2),
-                Math.Max(0, (target.Height - frame.MaxHeight) / 2)), PopupPrimaryAxis.None) };
+        private void ApplyAnchor(Popup popup)
+        {
+            if (movedPosition.HasValue) {
+                // Reserve the full possible height so expanding a field cannot move the header.
+                var anchor = KeepOnScreen(movedPosition.Value, workArea, new Size(frame.Width, frame.MaxHeight));
+                movedPosition = anchor;
+                popup.PlacementRectangle = new Rect(anchor, new Size());
+            } else {
+                popup.PlacementRectangle = ownerArea;
+            }
+        }
+
+        internal CustomPopupPlacement[] Place(Size popup, Size target, Point offset)
+        {
+            var point = movedPosition.HasValue ? new Point() : new Point(Math.Max(0, (target.Width - popup.Width) / 2),
+                Math.Max(0, (target.Height - frame.MaxHeight * verticalScale) / 2));
+            return new[] { new CustomPopupPlacement(point, PopupPrimaryAxis.None) };
+        }
+
+        internal static Point KeepOnScreen(Point point, Rect area, Size reserved) =>
+            new Point(Bound(point.X, area.Left, area.Right - reserved.Width), Bound(point.Y, area.Top, area.Bottom - reserved.Height));
+
+        private static double Bound(double value, double min, double max) => Math.Max(min, Math.Min(value, max));
 
         internal void InvalidateLayout() => layoutDirty = true;
 
@@ -116,7 +198,11 @@ namespace HeliumHybrid
             if (initialize) CreateControls();
             bool stateChanged = !NavigatorFilterComposer.Same(shown, current);
             if (stateChanged) shown = NavigatorFilterComposer.Copy(current);
-            if (reloadChoices) choiceRevision++;
+            if (initialize || reloadChoices) {
+                foreach (var field in groups.Values.SelectMany(group => group.Fields.Values)) {
+                    if (field.Model.Choices != null) field.LoadChoices(loadChoices(field.Model));
+                }
+            }
             if (initialize || reloadChoices || stateChanged) UpdateChips();
             if (initialize || reloadChoices || stateChanged || layoutDirty) UpdatePresentation();
         }
@@ -187,12 +273,7 @@ namespace HeliumHybrid
                     });
                     continue;
                 }
-                var selected = model.Selected(shown).Distinct().ToArray();
-                if (selected.Length > 0) {
-                    field.EnsureChoices(choiceRevision, loadChoices, field.NeedsAllChoices);
-                    if (selected.Any(key => !field.HasChoice(key))) field.EnsureChoices(choiceRevision, loadChoices, true);
-                }
-                foreach (var key in selected) {
+                foreach (var key in model.Selected(shown).Distinct()) {
                     AddChip(model.Label, field.Label(key), () => Change(state => model.SetChoice(state, key, false)));
                 }
             }
@@ -223,7 +304,7 @@ namespace HeliumHybrid
                     group.Panel.Children.Clear();
                     foreach (var id in item.FieldOrder) {
                         if (!item.HiddenFields.Contains(id) && group.Fields.TryGetValue(id, out var field))
-                            group.Panel.Children.Add(field.Root);
+                            group.Panel.Children.Add(field.Section);
                     }
                 }
                 layoutDirty = false;
@@ -232,15 +313,18 @@ namespace HeliumHybrid
             var visibleGroups = new List<UIElement>();
             foreach (var item in layout) {
                 if (item.Hidden || !groups.TryGetValue(item.Id, out var group)) continue;
-                bool hasVisible = false;
+                bool groupMatches = false, hasVisible = false;
                 foreach (var id in item.FieldOrder) {
                     if (item.HiddenFields.Contains(id) || !group.Fields.TryGetValue(id, out var field)) continue;
-                    found |= UpdateField(field, query);
-                    hasVisible |= field.Root.Visibility == Visibility.Visible;
+                    var matches = UpdateField(field, query);
+                    groupMatches |= matches;
+                    hasVisible |= field.Section.Visibility == Visibility.Visible;
                 }
-                if (hasVisible) visibleGroups.Add(group.Root);
+                if (hasVisible) visibleGroups.Add(group.Section);
+                group.Section.ApplySearch(query, groupMatches);
+                found |= groupMatches;
             }
-            // Only sections with visible fields take up a column slot.
+            // WrapPanel reserves a fixed-width slot even for a collapsed child.
             for (int index = host.Children.Count - 1; index >= 0; index--)
                 if (!visibleGroups.Contains(host.Children[index])) host.Children.RemoveAt(index);
             for (int index = 0; index < visibleGroups.Count; index++) {
@@ -257,23 +341,20 @@ namespace HeliumHybrid
             var model = field.Model;
             var text = model.Text?.Invoke(shown);
             var selected = model.Selected == null ? new HashSet<object>() : new HashSet<object>(model.Selected(shown));
-            if (model.Choices != null && (field.IsOpen || query.Length > 0)) {
-                field.EnsureChoices(choiceRevision, loadChoices, query.Length > 0 || field.NeedsAllChoices);
-            }
             var fieldMatch = NavigatorFilterComposer.OptionMatches(model.Label, query);
             var matches = fieldMatch || (text != null && NavigatorFilterComposer.OptionMatches(text, query)) ||
                 field.Options.Any(option => NavigatorFilterComposer.OptionMatches(option.Label, query));
             var count = model.Text != null ? (string.IsNullOrWhiteSpace(text) ? 0 : 1) : selected.Count;
-            field.SetHeader(count);
-            field.Root.Visibility = matches || count > 0 ? Visibility.Visible : Visibility.Collapsed;
-            field.Clear.Visibility = count > 0 && model.InlineChoiceLimit != 1 ? Visibility.Visible : Visibility.Collapsed;
+            field.Section.Header = count == 0 ? model.Label : model.Label + " (" + count + ")";
+            field.Section.Visibility = matches || count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            field.Clear.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;
             if (field.Input != null && !pendingText.ContainsKey(model) && field.Input.Text != (text ?? "")) {
                 syncingText = true;
                 try { field.Input.Text = text ?? ""; }
                 finally { syncingText = false; }
             }
-            field.ApplySearch(query, matches);
-            if (field.IsOpen && field.Input == null)
+            field.Section.ApplySearch(query, matches);
+            if (field.Section.IsExpanded && field.Input == null)
                 field.RenderChoices(query, selected, model.ExtraCondition?.Invoke(shown));
             return matches;
         }
@@ -281,158 +362,82 @@ namespace HeliumHybrid
         private sealed class SectionExpander : Expander
         {
             private bool? beforeSearch;
-            internal bool ApplyingSearch { get; private set; }
-
             internal void ApplySearch(string query, bool matches)
             {
-                bool expanded;
                 if (query.Length > 0) {
                     if (!matches || beforeSearch.HasValue) return;
                     beforeSearch = IsExpanded;
-                    expanded = true;
-                } else {
-                    if (!beforeSearch.HasValue) return;
-                    expanded = beforeSearch.Value;
+                    IsExpanded = true;
+                } else if (beforeSearch.HasValue) {
+                    var prior = beforeSearch.Value;
                     beforeSearch = null;
+                    IsExpanded = prior;
                 }
-                ApplyingSearch = true;
-                try { IsExpanded = expanded; }
-                finally { ApplyingSearch = false; }
             }
         }
 
         private sealed class GroupView
         {
-            internal readonly StackPanel Root = new StackPanel { Margin = new Thickness(2, 0, 11, 10) };
-            internal readonly StackPanel Panel = new StackPanel();
+            internal readonly SectionExpander Section;
+            internal readonly StackPanel Panel = new StackPanel { Margin = new Thickness(12, 2, 0, 0) };
             internal readonly Dictionary<string, FieldView> Fields = new Dictionary<string, FieldView>();
 
             internal GroupView(FilterWorkspaceGroup group)
             {
-                var heading = new TextBlock { Text = group.Label, TextWrapping = TextWrapping.Wrap };
-                heading.SetResourceReference(FrameworkElement.StyleProperty, "FilterSectionHeadingStyle");
-                Root.Children.Add(heading);
-                Root.Children.Add(Panel);
+                Section = new SectionExpander { Header = group.Label, Content = Panel, IsExpanded = true, Margin = new Thickness(0, 0, 8, 5) };
+                Section.SetResourceReference(FrameworkElement.StyleProperty, "FilterGroupDisclosureStyle");
+                AutomationProperties.SetName(Section, group.Label);
             }
         }
 
         private sealed class FieldView
         {
             internal readonly FilterWorkspaceField Model;
-            internal readonly FrameworkElement Root;
+            internal readonly SectionExpander Section;
             internal readonly TextBox Input;
             internal readonly Button Clear;
             internal Action Opened;
-            private readonly Panel choices;
-            private readonly SectionExpander disclosure;
-            private readonly TextBlock label;
+            private readonly StackPanel choices = new StackPanel();
             private readonly TextBlock message = new TextBlock { FontSize = 11, TextWrapping = TextWrapping.Wrap };
-            private readonly Button more = new Button();
-            private readonly Button fewer = new Button { Content = "Show fewer" };
+            private readonly Button more = new Button { HorizontalAlignment = HorizontalAlignment.Left };
             private readonly Action<object, bool> edit;
             private Dictionary<object, FilterWorkspaceChoice> byKey = new Dictionary<object, FilterWorkspaceChoice>();
             private FilterWorkspaceChoice[] options = new FilterWorkspaceChoice[0];
             private readonly Dictionary<object, CheckBox> controls = new Dictionary<object, CheckBox>();
             private string lastQuery;
-            private int limit;
-            private int loadedRevision = -1;
-            private bool allChoicesLoaded;
-            private int DefaultLimit => Model.InlineChoiceLimit > 0 ? Model.InlineChoiceLimit : PageSize;
-            internal bool IsOpen => disclosure == null || disclosure.IsExpanded;
-            internal bool NeedsAllChoices => Model.InlineChoiceLimit == 0 || limit > DefaultLimit;
+            private int limit = PageSize;
             internal IEnumerable<FilterWorkspaceChoice> Options => options;
 
             internal FieldView(FilterWorkspaceField model, Action<object, bool> edit, Action clear)
             {
                 Model = model;
                 this.edit = edit;
-                limit = DefaultLimit;
-                var panel = new StackPanel { Margin = model.IsInline ? new Thickness(0, 0, 0, 5) : new Thickness(12, 1, 0, 4) };
-                Clear = new Button { Content = "Clear", HorizontalAlignment = HorizontalAlignment.Right };
-                Clear.SetResourceReference(FrameworkElement.StyleProperty, "FilterSmallButtonStyle");
+                var panel = new StackPanel { Margin = new Thickness(13, 2, 0, 4) };
+                Section = new SectionExpander { Header = model.Label, Content = panel };
+                Section.SetResourceReference(FrameworkElement.StyleProperty, "FilterFieldDisclosureStyle");
+                Clear = new Button { Content = "Clear", HorizontalAlignment = HorizontalAlignment.Right, Padding = new Thickness(4, 1, 4, 1) };
                 AutomationProperties.SetName(Clear, "Clear " + model.Label);
                 Clear.Click += (s, e) => clear();
-                if (model.IsInline) {
-                    Root = panel;
-                    if (model.InlineChoiceLimit != 1) {
-                        label = new TextBlock { TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
-                        label.SetResourceReference(FrameworkElement.StyleProperty, "FilterFieldLabelStyle");
-                        var header = new DockPanel();
-                        DockPanel.SetDock(Clear, Dock.Right);
-                        header.Children.Add(Clear);
-                        header.Children.Add(label);
-                        panel.Children.Add(header);
-                    }
-                } else {
-                    disclosure = new SectionExpander { Header = model.Label, Content = panel };
-                    disclosure.SetResourceReference(FrameworkElement.StyleProperty, "FilterFieldDisclosureStyle");
-                    disclosure.Expanded += (s, e) => {
-                        if (!disclosure.ApplyingSearch) Opened?.Invoke();
-                    };
-                    Root = disclosure;
-                    panel.Children.Add(Clear);
-                }
+                panel.Children.Add(Clear);
                 if (model.Text != null) {
                     Input = new TextBox { MinHeight = 24, ToolTip = model.Label };
                     Input.SetResourceReference(FrameworkElement.StyleProperty, "FilterInputStyle");
                     AutomationProperties.SetName(Input, model.Label);
                     panel.Children.Add(Input);
                 } else {
-                    choices = model.IsInline ? (Panel)new WrapPanel() : new StackPanel();
                     message.SetResourceReference(TextBlock.ForegroundProperty, "SteamMutedBrush");
                     panel.Children.Add(message);
                     panel.Children.Add(choices);
-                    more.Click += (s, e) => {
-                        limit += PageSize;
-                        Opened?.Invoke();
-                        if (!more.IsVisible) {
-                            if (fewer.IsVisible) fewer.Focus();
-                            else choices.Children.OfType<CheckBox>().LastOrDefault()?.Focus();
-                        }
-                    };
-                    fewer.Click += (s, e) => {
-                        limit = DefaultLimit;
-                        Opened?.Invoke();
-                        if (more.IsVisible) more.Focus();
-                    };
-                    more.SetResourceReference(FrameworkElement.StyleProperty, "FilterSmallButtonStyle");
-                    fewer.SetResourceReference(FrameworkElement.StyleProperty, "FilterSmallButtonStyle");
-                    AutomationProperties.SetName(fewer, "Show fewer " + model.Label + " options");
-                    var actions = new WrapPanel();
-                    actions.Children.Add(more);
-                    if (model.IsInline) actions.Children.Add(fewer);
-                    panel.Children.Add(actions);
+                    more.Click += (s, e) => { limit += PageSize; Opened?.Invoke(); };
+                    panel.Children.Add(more);
                 }
+                Section.Expanded += (s, e) => { if (ReferenceEquals(e.OriginalSource, Section)) Opened?.Invoke(); };
             }
 
-            internal void ApplySearch(string query, bool matches) => disclosure?.ApplySearch(query, matches);
-
-            internal void SetHeader(int count)
+            internal void LoadChoices(IEnumerable<FilterWorkspaceChoice> values)
             {
-                var header = count == 0 ? Model.Label : Model.Label + " (" + count + ")";
-                if (label != null) label.Text = header;
-                if (disclosure != null) disclosure.Header = header;
-            }
-
-            internal bool HasChoice(object key) => byKey.ContainsKey(key);
-
-            internal void EnsureChoices(int revision,
-                Func<FilterWorkspaceField, int?, IEnumerable<FilterWorkspaceChoice>> load, bool all)
-            {
-                if (loadedRevision == revision && (allChoicesLoaded || !all)) return;
-                int? bound = all ? (int?)null : DefaultLimit + 1;
-                var loaded = load(Model, bound).Where(choice => choice.Key != null)
-                    .GroupBy(choice => choice.Key).Select(group => group.First()).ToArray();
-                // Keep the visible preview in place when the first full page is loaded.
-                if (all && loadedRevision == revision) {
-                    var prefix = options.Take(DefaultLimit).ToArray();
-                    var keys = new HashSet<object>(prefix.Select(choice => choice.Key));
-                    loaded = prefix.Concat(loaded.Where(choice => !keys.Contains(choice.Key))).ToArray();
-                }
-                options = loaded;
+                options = values.Where(choice => choice.Key != null).GroupBy(choice => choice.Key).Select(group => group.First()).ToArray();
                 byKey = options.ToDictionary(choice => choice.Key);
-                loadedRevision = revision;
-                allChoicesLoaded = !bound.HasValue || loaded.Length < bound.Value;
             }
 
             internal string Label(object key)
@@ -444,8 +449,8 @@ namespace HeliumHybrid
 
             internal void RenderChoices(string query, HashSet<object> selected, string extraCondition)
             {
-                if (lastQuery != query) { lastQuery = query; limit = DefaultLimit; }
-                var matching = options.Where(option => query.Length == 0 || selected.Contains(option.Key) ||
+                if (lastQuery != query) { lastQuery = query; limit = PageSize; }
+                var matching = options.Where(option => selected.Contains(option.Key) ||
                     FilterWorkspaceCatalog.Matches(Model.Label, option.Label, query)).Select(option => option.Key)
                     .Concat(selected.Where(key => !byKey.ContainsKey(key))).ToArray();
                 var visible = matching.Take(limit).ToArray();
@@ -457,8 +462,8 @@ namespace HeliumHybrid
                 for (int i = 0; i < visible.Length; i++) {
                     var key = visible[i];
                     if (!controls.TryGetValue(key, out var box)) {
-                        box = new CheckBox { Margin = new Thickness(0, 1, 9, 1) };
-                        box.SetResourceReference(FrameworkElement.StyleProperty, "FilterChoiceStyle");
+                        box = new CheckBox { Margin = new Thickness(1, 2, 0, 2) };
+                        box.SetResourceReference(Control.ForegroundProperty, "SteamTextBrush");
                         box.Click += (s, e) => edit(key, box.IsChecked == true);
                         controls.Add(key, box);
                     }
@@ -480,9 +485,7 @@ namespace HeliumHybrid
                     matching.Length == 0 && query.Length == 0 ? "No values available" : "";
                 message.Visibility = message.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
                 more.Visibility = matching.Length > limit ? Visibility.Visible : Visibility.Collapsed;
-                more.Content = allChoicesLoaded ? "Show more (" + Math.Max(0, matching.Length - limit) + ")" : "Show more";
-                AutomationProperties.SetName(more, "Show more " + Model.Label + " options");
-                fewer.Visibility = limit > DefaultLimit ? Visibility.Visible : Visibility.Collapsed;
+                more.Content = "Show more (" + Math.Max(0, matching.Length - limit) + ")";
             }
         }
     }

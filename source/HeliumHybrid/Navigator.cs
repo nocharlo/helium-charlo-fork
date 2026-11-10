@@ -136,7 +136,7 @@ namespace HeliumHybrid
                 (FilterWorkspaceColumns)root.FindName("FilterSections"),
                 (WrapPanel)root.FindName("ActiveFilters"), filterOptionSearch,
                 (TextBlock)root.FindName("FilterSearchEmpty"),
-                (field, limit) => field.Choices(api, limit),
+                field => field.Choices(api),
                 change => Safe(() => ApplyGlobalFilterChange(change)));
             grouping.ItemsSource = NavigatorOrganization.Groups;
             SelectedGrouping = prefs.Grouping;
@@ -200,6 +200,8 @@ namespace HeliumHybrid
             });
             readyButton.Click += (sender, args) => Safe(() => ApplyGlobalFilterChange(state => readyState.Toggle(state)));
             filtersPopup.CustomPopupPlacementCallback = filterPanel.Place;
+            filterPanel.EnableWindowGestures(filtersPopup, (Thumb)root.FindName("FilterTitleGrip"),
+                (Thumb)root.FindName("FilterSizeGrip"), Save);
             filtersButton.Click += (sender, args) => Safe(() => {
                 sortGroupPopup.IsOpen = false;
                 if (!filtersPopup.IsOpen) filterPanel.Position(filtersPopup, window);
@@ -406,6 +408,7 @@ namespace HeliumHybrid
             window = Window.GetWindow(this);
             if (window != null) {
                 window.SizeChanged += WindowSizeChanged;
+                window.LocationChanged += WindowLocationChanged;
                 window.PreviewKeyDown += WindowPreviewKeyDown;
             }
             RecomputeLayout();
@@ -451,6 +454,7 @@ namespace HeliumHybrid
             api.Database.Companies.ItemCollectionChanged -= MetadataChanged;
             if (window != null) {
                 window.SizeChanged -= WindowSizeChanged;
+                window.LocationChanged -= WindowLocationChanged;
                 window.PreviewKeyDown -= WindowPreviewKeyDown;
             }
             if (reopenButton != null) { reopenButton.Click -= ReopenClicked; reopenButton.Visibility = Visibility.Collapsed; reopenButton = null; }
@@ -917,6 +921,7 @@ namespace HeliumHybrid
             RecomputeLayout();
             if (filtersOpen) filterPanel.Position(filtersPopup, window);
         }
+        private void WindowLocationChanged(object sender, EventArgs args) => filtersPopup.IsOpen = false;
         [DllImport("user32.dll")]
         private static extern uint GetDoubleClickTime();
         private void BindGridClicks(Control gridView)
