@@ -89,27 +89,27 @@ internal static class NavigatorOrganizationTests
             var filterSections = (FilterWorkspaceColumns)root.FindName("FilterSections");
             var field = new Expander { Header = "Synthetic field", Style = (Style)root.Resources["FilterFieldDisclosureStyle"],
                 Content = new Border { Height = 600 } };
-            var group = new Expander { Header = "Synthetic group", Style = (Style)root.Resources["FilterGroupDisclosureStyle"],
-                Content = field };
+            var heading = new TextBlock { Text = "Synthetic group", Style = (Style)root.Resources["FilterSectionHeadingStyle"] };
+            var group = new StackPanel();
+            group.Children.Add(heading);
+            group.Children.Add(new CheckBox { Content = "Synthetic inline option", Style = (Style)root.Resources["FilterChoiceStyle"] });
+            group.Children.Add(field);
             filterSections.Children.Add(group);
             filterBorder.MaxHeight = 460;
             var collapsed = MeasureFilterWorkspace(filterBorder);
-            group.IsExpanded = true;
-            var expanded = MeasureFilterWorkspace(filterBorder);
             field.IsExpanded = true;
             var bounded = MeasureFilterWorkspace(filterBorder);
-            Check(group.FontSize > field.FontSize && group.FontWeight == FontWeights.SemiBold &&
-                !Equals(group.Foreground, field.Foreground) && group.Template == field.Template,
-                "Groups emphasize the same disclosure affordance with typography and color");
-            Check(collapsed < expanded && expanded < bounded && Math.Abs(bounded - filterBorder.MaxHeight) < 1,
-                "Groups and fields grow the popup only until its maximum height");
+            Check(heading.FontSize > field.FontSize && heading.FontWeight == FontWeights.SemiBold &&
+                !Equals(heading.Foreground, field.Foreground), "Static group headings are distinct from field controls");
+            Check(collapsed < bounded && Math.Abs(bounded - filterBorder.MaxHeight) < 1,
+                "Expanding a long field grows the popup only until its maximum height");
             Check(filterScroll.ScrollableHeight > 0 && filterScroll.ViewportHeight > 0,
                 "Expanded metadata sections exceed the finite scroll viewport");
             filterScroll.ScrollToBottom(); filterBorder.UpdateLayout();
             var clear = (Button)root.FindName("ClearAllFilters");
             Check(filterScroll.VerticalOffset > 0 && clear.TranslatePoint(new Point(0, clear.ActualHeight), filterBorder).Y <= bounded + 1,
                 "Metadata scroll reaches lower sections while the footer fits");
-            group.IsExpanded = false;
+            field.IsExpanded = false;
             Check(Math.Abs(MeasureFilterWorkspace(filterBorder) - collapsed) < 1 && filterScroll.ScrollableHeight == 0,
                 "Collapsing content restores compact height without a scrollbar");
             foreach (var grouping in new[] { true, false }) {
@@ -448,12 +448,12 @@ internal static class NavigatorOrganizationTests
         Check(first.Id == "ownership" && first.FieldOrder.Take(3).SequenceEqual(new[] { "Library", "future-field", "Platform" }) &&
             first.HiddenFields.SequenceEqual(new[] { "future-field", "Platform" }), "Save/reload preserves order, hidden fields and unknown IDs");
         Check(FilterWorkspaceCatalog.Columns(790) == 3 && FilterWorkspaceCatalog.Columns(650) == 2 &&
-            FilterWorkspaceCatalog.Columns(590) == 1, "Workspace width chooses three, two or one column");
+            FilterWorkspaceCatalog.Columns(480) == 1, "Workspace width chooses three, two or one column");
 
         var columns = new FilterWorkspaceColumns();
         foreach (var height in new[] { 120, 30, 40, 25, 20 })
             columns.Children.Add(new Border { Height = height });
-        foreach (var width in new[] { 790d, 650d, 590d }) {
+        foreach (var width in new[] { 790d, 590d, 480d }) {
             columns.Measure(new Size(width, double.PositiveInfinity));
             columns.Arrange(new Rect(columns.DesiredSize));
             var count = FilterWorkspaceCatalog.Columns(width);
@@ -473,18 +473,56 @@ internal static class NavigatorOrganizationTests
         var empty = new TextBlock();
         var platform = Guid.NewGuid();
         var other = Guid.NewGuid();
-        var state = new FilterPresetSettings { Hidden = true, UseAndFilteringStyle = true,
-            Platform = new IdItemFilterItemProperties { Ids = new List<Guid> { platform, other } } };
+        var state = new FilterPresetSettings { Hidden = true, UseAndFilteringStyle = true };
+        var loads = new List<KeyValuePair<string, int?>>();
+        var genreValues = Enumerable.Range(0, 40).Select(index => new FilterWorkspaceChoice(Guid.NewGuid(), "Genre option " + index)).ToArray();
         NavigatorFilterPanel workspace = null;
         workspace = new NavigatorFilterPanel(preferences, new Border(), host, chips, search, empty,
-            field => field.Id == "Platform" ? new[] { new FilterWorkspaceChoice(platform, "Test PC"),
-                new FilterWorkspaceChoice(other, "Test Console") } : new FilterWorkspaceChoice[0],
+            (field, limit) => {
+                loads.Add(new KeyValuePair<string, int?>(field.Id, limit));
+                if (field.Id == "Genre") return genreValues.Take(limit ?? genreValues.Length);
+                if (field.Id == "Platform") return new[] { new FilterWorkspaceChoice(platform, "Test PC"),
+                    new FilterWorkspaceChoice(other, "Test Console") };
+                if (field.Id == "favorites") return new[] { new FilterWorkspaceChoice(0, "Favorites only") };
+                return new FilterWorkspaceChoice[0];
+            },
             edit => { state = edit(state); workspace.Refresh(state); });
         workspace.Refresh(state);
+        Check(loads.Select(load => load.Key).OrderBy(id => id).SequenceEqual(
+            new[] { "CompletionStatus", "Genre", "installation", "Library", "Source", "favorites" }.OrderBy(id => id)) &&
+            loads.All(load => load.Value.HasValue), "Cold open requests only bounded previews of visible inline choices");
+        var genreGroup = host.Children.Cast<StackPanel>().Single(group => ((TextBlock)group.Children[0]).Text == "Classification");
+        var genreView = (StackPanel)((StackPanel)genreGroup.Children[1]).Children[0];
+        var genreChoices = genreView.Children.OfType<WrapPanel>().First();
+        var genreButtons = genreView.Children.OfType<WrapPanel>().Last();
+        var firstGenre = (CheckBox)genreChoices.Children[0];
+        Check(genreChoices.Children.Count == 4 && !((Expander)((StackPanel)genreGroup.Children[1]).Children[1]).IsExpanded,
+            "Genre is directly interactive while secondary fields remain compact");
+        firstGenre.IsChecked = true;
+        firstGenre.RaiseEvent(new RoutedEventArgs(CheckBox.ClickEvent));
+        Check(state.Genre.Ids.SequenceEqual(new[] { (Guid)genreValues[0].Key }) && chips.Children.Count == 1 &&
+            ReferenceEquals(firstGenre, genreChoices.Children[0]) && loads.Count == 6,
+            "Applying a preview choice updates native state and a chip without reloading catalogs or replacing the checkbox");
+        ((Button)genreButtons.Children[0]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Check(genreChoices.Children.Count == 20 && ReferenceEquals(firstGenre, genreChoices.Children[0]) &&
+            loads.Last().Key == "Genre" && !loads.Last().Value.HasValue, "More fetches the complete catalog once and adds only one batch");
+        ((Button)genreButtons.Children[1]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Check(genreChoices.Children.Count == 4 && firstGenre.IsChecked == true, "Show fewer restores the compact preview without dropping filters");
+        search.Text = "option 39";
+        workspace.InvalidateLayout(); workspace.Refresh(state);
+        Check(genreChoices.Children.Cast<CheckBox>().Any(box => ((TextBlock)box.Content).Text == "Genre option 39"),
+            "Search finds values outside the first batch");
+        search.Clear();
+        workspace.InvalidateLayout(); workspace.Refresh(state);
+        workspace.ClearAll();
+        state.Platform = new IdItemFilterItemProperties { Ids = new List<Guid> { platform, other } };
+        workspace.Refresh(state);
         Check(chips.Children.Count == 2 && workspace.HasManagedSelection, "Hidden active field still supplies removable chips");
-        var groupView = (Expander)host.Children[1];
-        var fieldsPanel = (StackPanel)groupView.Content;
-        Check(!fieldsPanel.Children.Cast<Expander>().Any(field => field.Header.ToString().StartsWith("Platform")),
+        var groupView = (StackPanel)host.Children[1];
+        var fieldsPanel = (StackPanel)groupView.Children[1];
+        bool HasPlatform(StackPanel field) => field.Children.OfType<DockPanel>()
+            .SelectMany(header => header.Children.OfType<TextBlock>()).Any(label => label.Text.StartsWith("Platform"));
+        Check(!fieldsPanel.Children.OfType<StackPanel>().Any(HasPlatform),
             "Presentation hides the configured field without clearing its condition");
         ((Button)chips.Children[0]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Check(state.Platform.Ids.SequenceEqual(new[] { other }) && chips.Children.Count == 1,
@@ -492,18 +530,15 @@ internal static class NavigatorOrganizationTests
         first.HiddenFields.Remove("Platform");
         workspace.InvalidateLayout();
         workspace.Refresh(state);
-        var platformView = fieldsPanel.Children.Cast<Expander>().Single(field => field.Header.ToString().StartsWith("Platform"));
-        platformView.IsExpanded = true;
-        var platformChoices = ((StackPanel)platformView.Content).Children.OfType<StackPanel>().Single();
+        var platformView = fieldsPanel.Children.OfType<StackPanel>().Single(HasPlatform);
+        var platformChoices = platformView.Children.OfType<WrapPanel>().First();
         var selected = platformChoices.Children.Cast<CheckBox>().Single(box => box.IsChecked == true);
-        var groupOrder = host.Children.Cast<Expander>().ToArray();
+        var groupOrder = host.Children.Cast<StackPanel>().ToArray();
         host.Measure(new Size(790, double.PositiveInfinity));
         host.Arrange(new Rect(host.DesiredSize));
-        groupView.IsExpanded = false;
         host.Measure(new Size(320, double.PositiveInfinity));
         host.Arrange(new Rect(host.DesiredSize));
-        groupView.IsExpanded = true;
-        Check(host.Children.Cast<Expander>().SequenceEqual(groupOrder) && platformView.IsExpanded &&
+        Check(host.Children.Cast<StackPanel>().SequenceEqual(groupOrder) &&
             selected.IsChecked == true && state.Platform.Ids.SequenceEqual(new[] { other }),
             "Responsive layout and disclosure preserve customized order, expansion and selected filters");
         search.Text = "absent";

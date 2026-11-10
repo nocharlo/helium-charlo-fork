@@ -27,9 +27,9 @@
     </Style>
     <Style x:Key="FilterDisclosureHeaderStyle" TargetType="ToggleButton">
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton">
-        <Border x:Name="DisclosureFace" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="3" Padding="4,3">
+        <Border x:Name="DisclosureFace" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="3" Padding="0,2,3,2">
           <DockPanel>
-            <Path x:Name="Chevron" Data="M0,0 L4,4 L8,0" Stretch="Uniform" Width="{TemplateBinding FontSize}" Height="8"
+            <Path x:Name="Chevron" Data="M0,0 L4,4 L8,0" Stretch="Uniform" Width="8" Height="7"
                   Stroke="{TemplateBinding Foreground}" StrokeThickness="1.5" Margin="0,0,6,0"
                   VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
               <Path.RenderTransform><RotateTransform Angle="-90"/></Path.RenderTransform>
@@ -68,10 +68,47 @@
         </ControlTemplate.Triggers>
       </ControlTemplate></Setter.Value></Setter>
     </Style>
-    <Style x:Key="FilterGroupDisclosureStyle" TargetType="Expander" BasedOn="{StaticResource FilterFieldDisclosureStyle}">
-      <Setter Property="FontSize" Value="15"/>
+    <Style x:Key="FilterSectionHeadingStyle" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="14"/>
       <Setter Property="FontWeight" Value="SemiBold"/>
-      <Setter Property="Foreground" Value="{DynamicResource SteamActiveBrush}"/>
+      <Setter Property="Foreground" Value="#FF8CC6EE"/>
+      <Setter Property="Margin" Value="0,0,0,5"/>
+    </Style>
+    <Style x:Key="FilterFieldLabelStyle" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Foreground" Value="{DynamicResource SteamTextBrush}"/>
+      <Setter Property="Margin" Value="0,1,0,2"/>
+    </Style>
+    <Style x:Key="FilterSmallButtonStyle" TargetType="Button">
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="Padding" Value="4,1"/>
+      <Setter Property="Margin" Value="0,1,4,1"/>
+    </Style>
+    <Style x:Key="FilterChoiceStyle" TargetType="CheckBox">
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Foreground" Value="{DynamicResource SteamTextBrush}"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox">
+        <DockPanel Background="Transparent">
+          <Border x:Name="Marker" Width="14" Height="14" CornerRadius="2" VerticalAlignment="Top" Margin="0,1,5,0"
+                  Background="#FF25272C" BorderBrush="#FF69737E" BorderThickness="1">
+            <Path x:Name="Check" Data="M2,6 L5,9 L10,3" Stroke="#FFF1F8FF" StrokeThickness="1.5" Visibility="Collapsed"/>
+          </Border>
+          <ContentPresenter VerticalAlignment="Center" RecognizesAccessKey="True"/>
+        </DockPanel>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsChecked" Value="True">
+            <Setter TargetName="Marker" Property="Background" Value="#FF32668D"/>
+            <Setter TargetName="Check" Property="Visibility" Value="Visible"/>
+          </Trigger>
+          <Trigger Property="IsMouseOver" Value="True">
+            <Setter TargetName="Marker" Property="BorderBrush" Value="#FF9BB7CB"/>
+          </Trigger>
+          <Trigger Property="IsKeyboardFocused" Value="True">
+            <Setter TargetName="Marker" Property="BorderBrush" Value="#FFD8EAFA"/>
+          </Trigger>
+          <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.48"/></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
     </Style>
     <Style x:Key="ToolbarButtonStyle" TargetType="Button">
       <Setter Property="Background" Value="Transparent"/>
@@ -186,7 +223,7 @@
         </Grid>
       </Border>
       <Popup x:Name="FiltersPopup" Placement="Custom" StaysOpen="False" AllowsTransparency="True" Focusable="False">
-        <Border x:Name="FilterWorkspaceFrame" Width="820" MaxWidth="820" MaxHeight="610" Background="{DynamicResource PopupBackgroundBrush}" BorderBrush="{DynamicResource PopupBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="14">
+        <Border x:Name="FilterWorkspaceFrame" Width="820" MaxWidth="820" MaxHeight="610" Background="{DynamicResource PopupBackgroundBrush}" BorderBrush="{DynamicResource PopupBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="12">
           <Grid TextElement.Foreground="{DynamicResource TextBrush}">
             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
             <DockPanel Grid.Row="0" Margin="0,0,0,7">
