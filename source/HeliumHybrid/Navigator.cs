@@ -49,7 +49,7 @@ namespace HeliumHybrid
         private readonly TextBox filterOptionSearch;
         private readonly NavigatorFilterPanel filterPanel;
         private readonly ReadyToPlayState readyState = new ReadyToPlayState();
-        private bool filtersOpen, shortcutGroupingChange;
+        private bool shortcutGroupingChange;
         private volatile bool filterOptionsDirty;
         private int? shortcutGroupingOverride;
         private int previousGrouping;
@@ -208,13 +208,11 @@ namespace HeliumHybrid
                 filtersPopup.IsOpen = !filtersPopup.IsOpen;
             });
             filtersPopup.Opened += (s, e) => {
-                filtersOpen = true;
                 filterOptionsDirty = true;
                 Safe(RefreshGlobalFilterUi);
                 filterOptionSearch.Focus();
             };
             filtersPopup.Closed += (s, e) => {
-                filtersOpen = false;
                 filterPanel.FlushText();
                 Safe(RefreshGlobalFilterUi);
                 if (active && !IsCollapsed()) filtersButton.Focus();
@@ -818,8 +816,7 @@ namespace HeliumHybrid
             readyButton.IsEnabled = !readyState.IsActive(current) || readyState.OwnsRestriction;
             readyButton.ToolTip = readyButton.IsEnabled ? "Ready to Play: installed games" :
                 "Installed filter is managed by Playnite; edit it in Library Filters";
-            filtersButton.Foreground = (Brush)root.Resources[filtersOpen ? "SteamActiveBrush" : "SteamIconBrush"];
-            if (filtersOpen) {
+            if (filtersPopup.IsOpen) {
                 filterPanel.Refresh(current, filterOptionsDirty);
                 clearAllFilters.IsEnabled = filterPanel.HasManagedSelection;
                 filterOptionsDirty = false;
@@ -919,7 +916,7 @@ namespace HeliumHybrid
         private void WindowSizeChanged(object sender, SizeChangedEventArgs args)
         {
             RecomputeLayout();
-            if (filtersOpen) filterPanel.Position(filtersPopup, window);
+            if (filtersPopup.IsOpen) filterPanel.Position(filtersPopup, window);
         }
         private void WindowLocationChanged(object sender, EventArgs args) => filtersPopup.IsOpen = false;
         [DllImport("user32.dll")]

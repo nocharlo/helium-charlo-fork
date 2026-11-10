@@ -179,7 +179,16 @@
           <TextBlock Grid.Column="1" Text="Search by name" Foreground="{StaticResource SteamMutedBrush}" VerticalAlignment="Center" IsHitTestVisible="False">
             <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=Search}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
           </TextBlock>
-          <Button x:Name="FiltersButton" Grid.Column="2" Style="{StaticResource ToolbarButtonStyle}" Width="31" Height="32" ToolTip="Library Filters" AutomationProperties.Name="Library Filters">
+          <Button x:Name="FiltersButton" Grid.Column="2" Width="31" Height="32" ToolTip="Library Filters" AutomationProperties.Name="Library Filters">
+            <Button.Style>
+              <Style TargetType="Button" BasedOn="{StaticResource ToolbarButtonStyle}">
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding IsOpen, ElementName=FiltersPopup}" Value="True">
+                    <Setter Property="Foreground" Value="#FF56B8F4"/>
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </Button.Style>
             <Viewbox Width="20" Height="20"><Canvas Width="24" Height="24"><Path Data="M2.5,6.5 L21.5,6.5 M5.5,12 L18.5,12 M8.5,17.5 L15.5,17.5" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2.5" StrokeStartLineCap="Flat" StrokeEndLineCap="Flat"/></Canvas></Viewbox>
           </Button>
           <TextBlock x:Name="FilterIndicator" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,1,1,0" Foreground="#FF78B9E7" FontSize="9" IsHitTestVisible="False"/>
