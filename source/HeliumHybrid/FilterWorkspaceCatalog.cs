@@ -27,9 +27,7 @@ namespace HeliumHybrid
     internal sealed class FilterWorkspaceField
     {
         internal readonly string Id, Label;
-        internal Func<IPlayniteAPI, int?, IEnumerable<FilterWorkspaceChoice>> Choices;
-        internal int InlineChoiceLimit;
-        internal bool IsInline => Text != null || InlineChoiceLimit > 0;
+        internal Func<IPlayniteAPI, IEnumerable<FilterWorkspaceChoice>> Choices;
         internal Func<FilterPresetSettings, IEnumerable<object>> Selected;
         internal Action<FilterPresetSettings, object, bool> SetChoice;
         internal Func<FilterPresetSettings, string> Text, ExtraCondition;
@@ -43,18 +41,18 @@ namespace HeliumHybrid
     {
         internal static readonly FilterWorkspaceGroup[] Groups = {
             new FilterWorkspaceGroup("ownership", "Library & Status",
-                Ids("Platform", NavigatorFilterField.Platform, api => api.Database.Platforms, inline: true),
+                Ids("Platform", NavigatorFilterField.Platform, api => api.Database.Platforms),
                 Ids("Library", NavigatorFilterField.Library, api => api.Addons.Plugins.OfType<LibraryPlugin>()
-                    .Select(plugin => new DatabaseObject { Id = plugin.Id, Name = plugin.Name }), inline: true),
-                Ids("Source", NavigatorFilterField.Source, api => api.Database.Sources, inline: true),
+                    .Select(plugin => new DatabaseObject { Id = plugin.Id, Name = plugin.Name })),
+                Ids("Source", NavigatorFilterField.Source, api => api.Database.Sources),
                 Flags("installation", "Installation Status", new[] { "Installed", "Not installed" },
                     (state, index) => index == 0 ? state.IsInstalled : state.IsUnInstalled,
                     (state, index, value) => { if (index == 0) state.IsInstalled = value; else state.IsUnInstalled = value; }),
-                Ids("Completion Status", NavigatorFilterField.CompletionStatus, api => api.Database.CompletionStatuses, inline: true),
+                Ids("Completion Status", NavigatorFilterField.CompletionStatus, api => api.Database.CompletionStatuses),
                 EnumValues<InstallSizeGroup>("install-size", "Install Size", s => s.InstallSize, (s, v) => s.InstallSize = v),
                 Flags("favorites", "Favorites", new[] { "Favorites only" }, (s, i) => s.Favorite, (s, i, v) => s.Favorite = v)),
             new FilterWorkspaceGroup("classification", "Classification",
-                Ids("Genre", NavigatorFilterField.Genre, api => api.Database.Genres, inline: true),
+                Ids("Genre", NavigatorFilterField.Genre, api => api.Database.Genres),
                 Ids("Category", NavigatorFilterField.Category, api => api.Database.Categories),
                 Ids("Tag", NavigatorFilterField.Tag, api => api.Database.Tags),
                 Ids("Feature", NavigatorFilterField.Feature, api => api.Database.Features),
@@ -83,17 +81,11 @@ namespace HeliumHybrid
                 EnumValues<ScoreGroup>("critic-score", "Critic Score", s => s.CriticScore, (s, v) => s.CriticScore = v))
         };
 
-        private static FilterWorkspaceField Ids(string label, NavigatorFilterField id,
-            Func<IPlayniteAPI, IEnumerable<DatabaseObject>> source, bool inline = false) =>
+        private static FilterWorkspaceField Ids(string label, NavigatorFilterField id, Func<IPlayniteAPI, IEnumerable<DatabaseObject>> source) =>
             new FilterWorkspaceField(id.ToString(), label) {
-                InlineChoiceLimit = inline ? 4 : 0,
-                Choices = (api, limit) => {
-                    var items = source(api).Where(item => item.Id != Guid.Empty);
-                    if (limit.HasValue) items = items.Take(limit.Value);
-                    return items.Select(item => new FilterWorkspaceChoice(item.Id,
-                        string.IsNullOrWhiteSpace(item.Name) ? "Unnamed value" : item.Name))
-                        .OrderBy(item => item.Label, StringComparer.CurrentCultureIgnoreCase);
-                },
+                Choices = api => source(api).Where(item => item.Id != Guid.Empty)
+                    .Select(item => new FilterWorkspaceChoice(item.Id, string.IsNullOrWhiteSpace(item.Name) ? "Unnamed value" : item.Name))
+                    .OrderBy(item => item.Label, StringComparer.CurrentCultureIgnoreCase),
                 Selected = s => NavigatorFilterComposer.IdField(s, id)?.Ids?.Cast<object>() ?? Enumerable.Empty<object>(),
                 ExtraCondition = s => NavigatorFilterComposer.IdField(s, id)?.Text,
                 SetChoice = (s, key, selected) => NavigatorFilterComposer.SetId(s, id, (Guid)key, selected),
@@ -103,8 +95,7 @@ namespace HeliumHybrid
         private static FilterWorkspaceField Flags(string id, string label, string[] options,
             Func<FilterPresetSettings, int, bool> get, Action<FilterPresetSettings, int, bool> set) =>
             new FilterWorkspaceField(id, label) {
-                InlineChoiceLimit = options.Length,
-                Choices = (api, limit) => options.Select((text, index) => new FilterWorkspaceChoice(index, text)),
+                Choices = api => options.Select((text, index) => new FilterWorkspaceChoice(index, text)),
                 Selected = s => Enumerable.Range(0, options.Length).Where(index => get(s, index)).Cast<object>(),
                 SetChoice = (s, key, selected) => set(s, (int)key, selected),
                 Clear = s => { for (int i = 0; i < options.Length; i++) set(s, i, false); }
@@ -133,7 +124,7 @@ namespace HeliumHybrid
         private static FilterWorkspaceField List<T>(string id, string label, Func<FilterPresetSettings, List<T>> get,
             Action<FilterPresetSettings, List<T>> set, Func<IPlayniteAPI, IEnumerable<FilterWorkspaceChoice>> choices) =>
             new FilterWorkspaceField(id, label) {
-                Choices = (api, limit) => choices(api),
+                Choices = choices,
                 Selected = s => get(s)?.Cast<object>().Where(value => value != null) ?? Enumerable.Empty<object>(),
                 SetChoice = (s, key, selected) => {
                     var values = get(s) ?? new List<T>();
@@ -148,6 +139,6 @@ namespace HeliumHybrid
         internal static bool Matches(string field, string value, string query) =>
             NavigatorFilterComposer.OptionMatches(field, query) || NavigatorFilterComposer.OptionMatches(value, query);
 
-        internal static int Columns(double contentWidth) => contentWidth >= 720 ? 3 : contentWidth >= 500 ? 2 : 1;
+        internal static int Columns(double contentWidth) => contentWidth >= 720 ? 3 : contentWidth >= 600 ? 2 : 1;
     }
 }

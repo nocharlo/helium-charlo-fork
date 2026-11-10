@@ -8,6 +8,7 @@
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net462" Version="1.0.3" PrivateAssets="all" />
     <Reference Include="PresentationCore"/><Reference Include="PresentationFramework"/>
     <Reference Include="WindowsBase"/><Reference Include="System.Xaml"/>
+    <Reference Include="System.Windows.Forms"/><Reference Include="System.Drawing"/>
     <Compile Include="NavigatorOrganizationTests.cs"/>
     <Compile Include="../source/HeliumHybrid/NavigatorOrganization.cs"/>
     <Compile Include="../source/HeliumHybrid/NavigatorNativeOrganization.cs"/>
