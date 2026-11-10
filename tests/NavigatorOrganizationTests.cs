@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Markup;
@@ -10,6 +11,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Xml.Serialization;
 using HeliumHybrid;
+using Playnite.SDK.Models;
 
 internal static class NavigatorOrganizationTests
 {
@@ -23,7 +25,7 @@ internal static class NavigatorOrganizationTests
     [STAThread]
     private static void Main()
     {
-        CatalogAndGroups(); Sorting(); Settings(); OrganizationControls(); Presentation(); Campaign(); Benchmarks();
+        CatalogAndGroups(); Sorting(); Settings(); RemovedDefaultModes(); NativeOrganization(); OrganizationControls(); FilterWorkspace(); Presentation(); Campaign(); Benchmarks();
         Console.WriteLine("PASS: " + checks + " Navigator organization, settings and WPF model checks.");
     }
     private static void Campaign()
@@ -71,6 +73,45 @@ internal static class NavigatorOrganizationTests
         using (var stream = assembly.GetManifestResourceStream("Navigator.xaml"))
         using (var reader = new StreamReader(stream)) {
             var root = (Grid)XamlReader.Parse(reader.ReadToEnd().Replace("assembly=HeliumCharlo", "assembly=" + assembly.GetName().Name));
+            var filterPopup = (System.Windows.Controls.Primitives.Popup)root.FindName("FiltersPopup");
+            var filterBorder = (Border)filterPopup.Child;
+            var filterLayout = (Grid)filterBorder.Child;
+            var filterScroll = (ScrollViewer)root.FindName("FilterSectionsScroll");
+            Check(double.IsNaN(filterBorder.Height) && filterBorder.MaxHeight == 610 &&
+                filterLayout.RowDefinitions.Count == 5 && filterLayout.RowDefinitions[3].Height.IsStar,
+                "Filter popup gives metadata sections a bounded star row");
+            Check(Grid.GetRow(filterScroll) == 3 && !filterScroll.CanContentScroll &&
+                filterScroll.VerticalScrollBarVisibility == ScrollBarVisibility.Auto && filterScroll.Focusable &&
+                Grid.GetRow((TextBox)root.FindName("FilterOptionSearch")) == 1 &&
+                Grid.GetRow((ScrollViewer)root.FindName("ActiveFilterScroll")) == 2 &&
+                Grid.GetRow((Button)root.FindName("ClearAllFilters")) == 4,
+                "Filter header and search stay above a keyboard-focusable scroll area; Clear stays below");
+            var filterSections = (FilterWorkspaceColumns)root.FindName("FilterSections");
+            var field = new Expander { Header = "Synthetic field", Style = (Style)root.Resources["FilterFieldDisclosureStyle"],
+                Content = new Border { Height = 600 } };
+            var group = new Expander { Header = "Synthetic group", Style = (Style)root.Resources["FilterGroupDisclosureStyle"],
+                Content = field };
+            filterSections.Children.Add(group);
+            filterBorder.MaxHeight = 460;
+            var collapsed = MeasureFilterWorkspace(filterBorder);
+            group.IsExpanded = true;
+            var expanded = MeasureFilterWorkspace(filterBorder);
+            field.IsExpanded = true;
+            var bounded = MeasureFilterWorkspace(filterBorder);
+            Check(group.FontSize > field.FontSize && group.FontWeight == FontWeights.SemiBold &&
+                !Equals(group.Foreground, field.Foreground) && group.Template == field.Template,
+                "Groups emphasize the same disclosure affordance with typography and color");
+            Check(collapsed < expanded && expanded < bounded && Math.Abs(bounded - filterBorder.MaxHeight) < 1,
+                "Groups and fields grow the popup only until its maximum height");
+            Check(filterScroll.ScrollableHeight > 0 && filterScroll.ViewportHeight > 0,
+                "Expanded metadata sections exceed the finite scroll viewport");
+            filterScroll.ScrollToBottom(); filterBorder.UpdateLayout();
+            var clear = (Button)root.FindName("ClearAllFilters");
+            Check(filterScroll.VerticalOffset > 0 && clear.TranslatePoint(new Point(0, clear.ActualHeight), filterBorder).Y <= bounded + 1,
+                "Metadata scroll reaches lower sections while the footer fits");
+            group.IsExpanded = false;
+            Check(Math.Abs(MeasureFilterWorkspace(filterBorder) - collapsed) < 1 && filterScroll.ScrollableHeight == 0,
+                "Collapsing content restores compact height without a scrollbar");
             foreach (var grouping in new[] { true, false }) {
                 var combo = (ComboBox)root.FindName(grouping ? "GroupOptions" : "SortOptions");
                 int selected = -1;
@@ -89,7 +130,7 @@ internal static class NavigatorOrganizationTests
         var settings = new NavigatorSettingsView { DataContext = prefs };
         var tabs = (TabControl)settings.Content;
         Check(tabs.Items.Cast<TabItem>().Select(tab => tab.Header.ToString())
-            .SequenceEqual(new[] { "Navigation", "Appearance", "Organization" }), "Settings tab structure");
+            .SequenceEqual(new[] { "Navigation", "Appearance", "Organization", "Filters" }), "Settings tab structure");
         tabs.SelectedIndex = 2;
         var page = (StackPanel)((ScrollViewer)((TabItem)tabs.SelectedItem).Content).Content;
         var style = (ListBox)((GroupBox)page.Children[0]).Content;
@@ -98,9 +139,12 @@ internal static class NavigatorOrganizationTests
             "Activity selection is bound to the existing persisted setting");
         Check(style.Items.Cast<ListBoxItem>().Select(item => ((TextBlock)((StackPanel)item.Content).Children[0]).Text)
             .SequenceEqual(new[] { "Hybrid", "Detailed" }), "Activity cards preserve the stored index order");
-        var editors = ((Grid)page.Children[1]).Children.Cast<GroupBox>().ToArray();
+        var nativeCheck = (CheckBox)page.Children[1];
+        Check(BindingOperations.GetBinding(nativeCheck, CheckBox.IsCheckedProperty).Path.Path ==
+            nameof(Preferences.ApplySortGroupToPlaynite), "Native organization setting bound in Organization tab");
+        var editors = ((Grid)page.Children[2]).Children.Cast<GroupBox>().ToArray();
         Check(editors.Length == 2, "Organization has separate visibility cards");
-        var layout = (Grid)page.Children[1];
+        var layout = (Grid)page.Children[2];
         NavigatorOrganizationControls.ArrangeEditors(layout, 700);
         Check(layout.ColumnDefinitions.Count == 2 && Grid.GetColumn(editors[1]) == 1, "Wide editors use balanced columns");
         NavigatorOrganizationControls.ArrangeEditors(layout, 420);
@@ -255,8 +299,13 @@ internal static class NavigatorOrganizationTests
             Check(prefs.Grouping == id && prefs.SortMode == 3 && prefs.Width == 270 && prefs.SidebarClickAction == 0, "Legacy navigation and mode preserved " + id);
             Check(prefs.RecentActivityGroupingStyle == (id == 4 ? 1 : 0), "Legacy activity style " + id);
             Check(prefs.VisibleGroupingModes.Count > 1 && prefs.VisibleSortingModes.Count > 1, "Older file receives catalog visibility defaults");
+            Check(prefs.ApplySortGroupToPlaynite, "Older settings default to native organization synchronization");
         }
         var p = new Preferences { Grouping = 15, SortMode = 8 }; p.MigrateNavigation();
+        p.BeginEdit(); p.ApplySortGroupToPlaynite = false; p.CancelEdit();
+        Check(p.ApplySortGroupToPlaynite, "Cancel restores native synchronization preference");
+        p.BeginEdit(); p.ApplySortGroupToPlaynite = false; p.EndEdit();
+        Check(!p.ApplySortGroupToPlaynite, "Save keeps native synchronization disabled");
         var original = p.VisibleGroupingModes.ToArray(); var originalSort = p.VisibleSortingModes.ToArray();
         p.BeginEdit(); p.VisibleGroupingModes.Clear(); p.VisibleSortingModes.Clear(); p.Width = 300;
         p.CancelEdit();
@@ -271,6 +320,7 @@ internal static class NavigatorOrganizationTests
             serializer.Serialize(writer, p);
             var copy = (Preferences)serializer.Deserialize(new StringReader(writer.ToString())); copy.MigrateNavigation();
             Check(copy.Grouping == 15 && copy.SortMode == 8 && copy.VisibleGroupingModes.SequenceEqual(new[] { 1 }) && copy.VisibleSortingModes.SequenceEqual(new[] { 1 }), "New settings roundtrip");
+            Check(!copy.ApplySortGroupToPlaynite, "Native synchronization preference persists");
         }
         p.BeginEdit(); p.VisibleGroupingModes.Clear(); p.VisibleSortingModes = new List<int> { -1, 999 }; p.EndEdit();
         Check(p.VisibleGroupingModes.SequenceEqual(new[] { 0 }) && p.VisibleSortingModes.SequenceEqual(new[] { 0 }), "At least one valid selectable option");
@@ -283,6 +333,201 @@ internal static class NavigatorOrganizationTests
         Check(NavigatorOrganization.Move(new[] { 1, 2, 3 }, 2, 1).SequenceEqual(new[] { 1, 3, 2 }), "Move visible option down");
         Check(NavigatorOrganization.Move(new[] { 1, 2, 3 }, 9, -1).SequenceEqual(new[] { 1, 2, 3 }), "Cannot reorder a hidden option");
     }
+    private static void RemovedDefaultModes()
+    {
+        var serializer = new XmlSerializer(typeof(Preferences));
+        Preferences Read(string xml)
+        {
+            var p = (Preferences)serializer.Deserialize(new StringReader(xml));
+            p.MigrateNavigation();
+            return p;
+        }
+
+        const string candidateLists =
+            "<DefaultOrganizationModesInitialized>true</DefaultOrganizationModesInitialized>" +
+            "<VisibleGroupingModes><int>2</int><int>20</int><int>5</int><int>1</int></VisibleGroupingModes>" +
+            "<VisibleSortingModes><int>2</int><int>16</int><int>1</int><int>0</int></VisibleSortingModes>";
+        var migrated = Read("<Preferences><Grouping>20</Grouping><SortMode>16</SortMode><SortDescending>true</SortDescending>" +
+            candidateLists + "</Preferences>");
+        Check(migrated.Grouping == (int)NavigatorGroupingMode.None &&
+            migrated.SortMode == (int)NavigatorSortMode.Name && !migrated.SortDescending,
+            "Candidate defaults migrate to No Grouping and Name ascending");
+        Check(migrated.VisibleGroupingModes.SequenceEqual(new[] { 2, 5, 1 }) &&
+            migrated.VisibleSortingModes.SequenceEqual(new[] { 2, 1, 0 }), "Removed IDs are dropped without reordering the remaining modes");
+        using (var writer = new StringWriter()) {
+            serializer.Serialize(writer, migrated);
+            var copy = Read(writer.ToString());
+            Check(copy.Grouping == migrated.Grouping && copy.SortMode == migrated.SortMode && !copy.SortDescending &&
+                copy.VisibleGroupingModes.SequenceEqual(migrated.VisibleGroupingModes) &&
+                copy.VisibleSortingModes.SequenceEqual(migrated.VisibleSortingModes), "Migrated organization survives saving and reopening");
+        }
+
+        var existing = Read("<Preferences><Grouping>2</Grouping><SortMode>1</SortMode><SortDescending>true</SortDescending>" +
+            candidateLists + "</Preferences>");
+        Check(existing.Grouping == 2 && existing.SortMode == (int)NavigatorSortMode.Name && existing.SortDescending,
+            "An existing Name descending preference is unaffected by obsolete visibility entries");
+        var onlyDefaults = Read("<Preferences><Grouping>20</Grouping><SortMode>16</SortMode>" +
+            "<VisibleGroupingModes><int>20</int></VisibleGroupingModes>" +
+            "<VisibleSortingModes><int>16</int></VisibleSortingModes></Preferences>");
+        Check(NavigatorOrganization.Visible(onlyDefaults.VisibleGroupingModes, true, onlyDefaults.Grouping)
+                .Select(mode => mode.Id).SequenceEqual(new[] { 0, (int)NavigatorGroupingMode.None }) &&
+            NavigatorOrganization.Visible(onlyDefaults.VisibleSortingModes, false, onlyDefaults.SortMode)
+                .Select(mode => mode.Id).SequenceEqual(new[] { 0, (int)NavigatorSortMode.Name }),
+            "Lists containing only removed IDs keep the safe fallback and the migrated active mode");
+    }
+    private static void NativeOrganization()
+    {
+        Check(NavigatorNativeOrganization.Group(1) == GroupableField.Series &&
+            NavigatorNativeOrganization.Group(2) == GroupableField.Category &&
+            NavigatorNativeOrganization.Group(3) == GroupableField.Platform &&
+            NavigatorNativeOrganization.Group(5) == GroupableField.None, "Native core grouping mappings");
+        Check(NavigatorNativeOrganization.Group(6) == GroupableField.Genre &&
+            NavigatorNativeOrganization.Group(7) == GroupableField.Tag &&
+            NavigatorNativeOrganization.Group(15) == GroupableField.CompletionStatus &&
+            NavigatorNativeOrganization.Group(16) == GroupableField.InstallationStatus &&
+            NavigatorNativeOrganization.Group(18) == GroupableField.ReleaseYear, "Native metadata and status grouping mappings");
+        Check(!NavigatorNativeOrganization.Group(0).HasValue &&
+            !NavigatorNativeOrganization.Group(4).HasValue &&
+            !NavigatorNativeOrganization.Group(17).HasValue &&
+            !NavigatorNativeOrganization.Group(19).HasValue, "Following Playnite and custom groups leave native grouping alone");
+        Check(NavigatorNativeOrganization.Sort(NavigatorSortMode.Name) == SortOrder.Name &&
+            NavigatorNativeOrganization.Sort(NavigatorSortMode.LastPlayed) == SortOrder.LastActivity &&
+            NavigatorNativeOrganization.Sort(NavigatorSortMode.PlayCount) == SortOrder.PlayCount &&
+            NavigatorNativeOrganization.Sort(NavigatorSortMode.InstallationStatus) == SortOrder.IsInstalled,
+            "Native sorting mappings");
+        Check(!NavigatorNativeOrganization.Sort(NavigatorSortMode.FollowingPlaynite).HasValue &&
+            !NavigatorNativeOrganization.Sort(NavigatorSortMode.SortingName).HasValue,
+            "Following Playnite and distinct Sorting Name do not force native sort");
+        Check(NavigatorNativeOrganization.Direction(false) == SortOrderDirection.Ascending &&
+            NavigatorNativeOrganization.Direction(true) == SortOrderDirection.Descending, "Native direction mapping");
+        var filters = new FilterPresetSettings { UseAndFilteringStyle = true, Name = "synthetic",
+            Genre = new IdItemFilterItemProperties { Ids = new List<Guid> { Guid.NewGuid() }, Text = "retained" } };
+        var preset = NavigatorNativeOrganization.SortPreset(filters, SortOrder.Name, SortOrderDirection.Descending, GroupableField.Series);
+        Check(preset.Id == Guid.Empty && preset.SortingOrder == SortOrder.Name &&
+            preset.SortingOrderDirection == SortOrderDirection.Descending && preset.GroupingOrder == GroupableField.Series,
+            "Native sort preset changes only requested view fields");
+        Check(preset.Settings.UseAndFilteringStyle && preset.Settings.Name == "synthetic" &&
+            preset.Settings.Genre.Text == "retained" && preset.Settings.Genre.Ids.SequenceEqual(filters.Genre.Ids),
+            "Native sort preset copies filter conditions");
+        preset.Settings.Genre.Ids.Clear();
+        Check(filters.Genre.Ids.Count == 1, "Native sort preset cannot mutate source filters");
+    }
+    private static void FilterWorkspace()
+    {
+        Check(FilterWorkspaceCatalog.Groups.Select(group => group.Id).SequenceEqual(
+                new[] { "ownership", "classification", "identity", "activity", "ratings" }) &&
+            FilterWorkspaceCatalog.Groups.Select(group => group.Label).SequenceEqual(
+                new[] { "Library & Status", "Classification", "Game Information", "Activity & History", "Ratings" }),
+            "Shared filter headings retain their persisted group IDs and order");
+        var preferences = new Preferences();
+        preferences.MigrateNavigation();
+        Check(preferences.FilterWorkspace.Select(group => group.Id).SequenceEqual(FilterWorkspaceCatalog.Groups.Select(group => group.Id)) &&
+            preferences.FilterWorkspace.All(group => !group.Hidden && group.HiddenFields.Count == 0), "Old settings show all native fields in default order");
+        var first = preferences.FilterWorkspace[0];
+        preferences.BeginEdit();
+        first.Hidden = true;
+        first.HiddenFields.Add("Platform");
+        preferences.CancelEdit();
+        Check(!preferences.FilterWorkspace[0].Hidden && preferences.FilterWorkspace[0].HiddenFields.Count == 0,
+            "Cancel restores a deep copy of workspace preferences");
+        preferences.BeginEdit();
+        first = preferences.FilterWorkspace[0];
+        first.FieldOrder.Insert(1, "future-field");
+        first.HiddenFields.Add("future-field");
+        FilterWorkspaceSettings.Move(first.FieldOrder, first.FieldOrder.Where(id => id != "future-field").ToList(), "Platform", 1);
+        FilterWorkspaceSettings.Move(preferences.FilterWorkspace, preferences.FilterWorkspace.ToList(), first, 1);
+        first.HiddenFields.Add("Platform");
+        preferences.EndEdit();
+        var serializer = new XmlSerializer(typeof(Preferences));
+        using (var writer = new StringWriter()) {
+            serializer.Serialize(writer, preferences);
+            preferences = (Preferences)serializer.Deserialize(new StringReader(writer.ToString()));
+            preferences.MigrateNavigation();
+        }
+        first = preferences.FilterWorkspace[1];
+        Check(first.Id == "ownership" && first.FieldOrder.Take(3).SequenceEqual(new[] { "Library", "future-field", "Platform" }) &&
+            first.HiddenFields.SequenceEqual(new[] { "future-field", "Platform" }), "Save/reload preserves order, hidden fields and unknown IDs");
+        Check(FilterWorkspaceCatalog.Columns(790) == 3 && FilterWorkspaceCatalog.Columns(650) == 2 &&
+            FilterWorkspaceCatalog.Columns(590) == 1, "Workspace width chooses three, two or one column");
+
+        var columns = new FilterWorkspaceColumns();
+        foreach (var height in new[] { 120, 30, 40, 25, 20 })
+            columns.Children.Add(new Border { Height = height });
+        foreach (var width in new[] { 790d, 650d, 590d }) {
+            columns.Measure(new Size(width, double.PositiveInfinity));
+            columns.Arrange(new Rect(columns.DesiredSize));
+            var count = FilterWorkspaceCatalog.Columns(width);
+            var last = (Border)columns.Children[4];
+            var expectedY = count == 3 ? 30 : count == 2 ? 160 : 215;
+            Check(last.TranslatePoint(new Point(), columns) == new Point((4 % count) * width / count, expectedY),
+                "Columns preserve group order and stack at each column's own height");
+        }
+        columns.SetWorkspaceWidth(725);
+        columns.Measure(new Size(708, double.PositiveInfinity));
+        columns.Arrange(new Rect(columns.DesiredSize));
+        Check(columns.Children[4].TranslatePoint(new Point(), columns).Y == 30,
+            "An appearing scrollbar does not move groups between columns");
+        var host = new FilterWorkspaceColumns();
+        var chips = new WrapPanel();
+        var search = new TextBox();
+        var empty = new TextBlock();
+        var platform = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        var state = new FilterPresetSettings { Hidden = true, UseAndFilteringStyle = true,
+            Platform = new IdItemFilterItemProperties { Ids = new List<Guid> { platform, other } } };
+        NavigatorFilterPanel workspace = null;
+        workspace = new NavigatorFilterPanel(preferences, new Border(), host, chips, search, empty,
+            field => field.Id == "Platform" ? new[] { new FilterWorkspaceChoice(platform, "Test PC"),
+                new FilterWorkspaceChoice(other, "Test Console") } : new FilterWorkspaceChoice[0],
+            edit => { state = edit(state); workspace.Refresh(state); });
+        workspace.Refresh(state);
+        Check(chips.Children.Count == 2 && workspace.HasManagedSelection, "Hidden active field still supplies removable chips");
+        var groupView = (Expander)host.Children[1];
+        var fieldsPanel = (StackPanel)groupView.Content;
+        Check(!fieldsPanel.Children.Cast<Expander>().Any(field => field.Header.ToString().StartsWith("Platform")),
+            "Presentation hides the configured field without clearing its condition");
+        ((Button)chips.Children[0]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Check(state.Platform.Ids.SequenceEqual(new[] { other }) && chips.Children.Count == 1,
+            "Removing one hidden chip preserves the other selected value");
+        first.HiddenFields.Remove("Platform");
+        workspace.InvalidateLayout();
+        workspace.Refresh(state);
+        var platformView = fieldsPanel.Children.Cast<Expander>().Single(field => field.Header.ToString().StartsWith("Platform"));
+        platformView.IsExpanded = true;
+        var platformChoices = ((StackPanel)platformView.Content).Children.OfType<StackPanel>().Single();
+        var selected = platformChoices.Children.Cast<CheckBox>().Single(box => box.IsChecked == true);
+        var groupOrder = host.Children.Cast<Expander>().ToArray();
+        host.Measure(new Size(790, double.PositiveInfinity));
+        host.Arrange(new Rect(host.DesiredSize));
+        groupView.IsExpanded = false;
+        host.Measure(new Size(320, double.PositiveInfinity));
+        host.Arrange(new Rect(host.DesiredSize));
+        groupView.IsExpanded = true;
+        Check(host.Children.Cast<Expander>().SequenceEqual(groupOrder) && platformView.IsExpanded &&
+            selected.IsChecked == true && state.Platform.Ids.SequenceEqual(new[] { other }),
+            "Responsive layout and disclosure preserve customized order, expansion and selected filters");
+        search.Text = "absent";
+        workspace.Refresh(state, true);
+        Check(empty.Visibility == Visibility.Visible && chips.Children.Count == 1 &&
+            platformChoices.Children.Contains(selected) && selected.IsChecked == true &&
+            host.Children.Count == 1 && ReferenceEquals(host.Children[0], groupView),
+            "No matches preserves the selected value and packs its existing group without blank columns");
+        first.Hidden = true;
+        workspace.InvalidateLayout();
+        workspace.Refresh(state);
+        workspace.ClearAll();
+        Check(!host.Children.Contains(groupView) && state.Platform == null && chips.Children.Count == 0 &&
+            state.Hidden && state.UseAndFilteringStyle, "Clear filters covers hidden groups and preserves unmanaged native state");
+    }
+
+    private static double MeasureFilterWorkspace(Border frame)
+    {
+        frame.Measure(new Size(frame.Width, double.PositiveInfinity));
+        frame.Arrange(new Rect(frame.DesiredSize));
+        frame.UpdateLayout();
+        return frame.ActualHeight;
+    }
+
     private static void Presentation()
     {
         var directory = Path.Combine(Path.GetTempPath(), "helium-icon-tests-" + Guid.NewGuid()); Directory.CreateDirectory(directory);

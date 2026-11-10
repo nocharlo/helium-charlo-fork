@@ -17,8 +17,44 @@ namespace HeliumHybrid
 
     internal enum NavigatorRowChange { None, Visual, Structural }
 
+    internal sealed class NavigatorOrganizationSelection
+    {
+        private NavigatorViewSnapshot organization;
+        private Guid pending;
+
+        internal void ObserveOrganization(NavigatorViewSnapshot current) { organization = current; }
+
+        internal bool ObserveSelection(NavigatorViewSnapshot current, bool sameGrid,
+            Guid previousId, bool hasSelection)
+        {
+            var changed = NavigatorRefreshDecision.NativeOrganizationChanged(current, organization);
+            ObserveOrganization(current);
+            if (!sameGrid || hasSelection || (!changed && previousId != Guid.Empty)) Cancel();
+            else if (changed && previousId != Guid.Empty) pending = previousId;
+            return pending != Guid.Empty;
+        }
+
+        internal void Cancel() { pending = Guid.Empty; }
+
+        internal Guid Take(bool sameGrid, IEnumerable<Guid> current, Func<Guid, bool> stillVisible)
+        {
+            var id = pending;
+            Cancel();
+            return sameGrid && Logic.ShouldRestoreSelection(id, current, () => stillVisible(id)) ? id : Guid.Empty;
+        }
+    }
+
     internal static class NavigatorRefreshDecision
     {
+        internal static bool SelectedGroupMoved(Guid selectedId, NavigatorGroupIdentity prior,
+            IEnumerable<NavigatorProjectedRow> projected)
+        {
+            if (selectedId == Guid.Empty || prior == null) return false;
+            var occurrences = (projected ?? Enumerable.Empty<NavigatorProjectedRow>())
+                .Where(row => row.Id == selectedId).ToArray();
+            return occurrences.Length != 0 &&
+                !occurrences.Any(row => Equals(row.GroupIdentity, prior));
+        }
         internal static NavigatorRowChange ClassifyRows(IEnumerable<NavigatorProjectedRow> before,
             IEnumerable<NavigatorProjectedRow> after)
         {
@@ -85,12 +121,14 @@ namespace HeliumHybrid
         internal static bool ViewStateChanged(NavigatorViewSnapshot current, NavigatorViewSnapshot previous)
         {
             if (current == null || previous == null) return !ReferenceEquals(current, previous);
-            return !string.Equals(current.SortOrder, previous.SortOrder, StringComparison.Ordinal) ||
-                !string.Equals(current.SortDirection, previous.SortDirection, StringComparison.Ordinal) ||
-                !string.Equals(current.Grouping, previous.Grouping, StringComparison.Ordinal) ||
+            return NativeOrganizationChanged(current, previous) ||
                 current.PresetId != previous.PresetId ||
                 current.CompletionStatusFilterActive != previous.CompletionStatusFilterActive ||
                 current.NavigatorGrouping != previous.NavigatorGrouping;
         }
+
+        internal static bool NativeOrganizationChanged(NavigatorViewSnapshot current, NavigatorViewSnapshot previous) =>
+            previous != null && (current.SortOrder != previous.SortOrder ||
+                current.SortDirection != previous.SortDirection || current.Grouping != previous.Grouping);
     }
 }

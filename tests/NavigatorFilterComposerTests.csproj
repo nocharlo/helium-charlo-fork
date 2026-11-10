@@ -5,6 +5,7 @@
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net462" Version="1.0.3" PrivateAssets="all" />
     <Compile Include="NavigatorFilterComposerTests.cs" />
     <Compile Include="../source/HeliumHybrid/NavigatorFilterComposer.cs" Link="NavigatorFilterComposer.cs" />
+    <Compile Include="../source/HeliumHybrid/FilterWorkspaceCatalog.cs" />
     <Compile Include="../source/HeliumHybrid/Logic.cs" Link="Logic.cs" />
   </ItemGroup>
 </Project>

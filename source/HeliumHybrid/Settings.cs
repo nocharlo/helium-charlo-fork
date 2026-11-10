@@ -17,11 +17,13 @@ namespace HeliumHybrid
         // 0 follows Playnite; other values sort Navigator rows within each group.
         public int SortMode { get; set; }
         public bool SortDescending { get; set; }
+        public bool ApplySortGroupToPlaynite { get; set; } = true;
         // Null means an older file: use catalog defaults. Lists are ordered visibility selections.
         public List<int> VisibleGroupingModes { get; set; }
         public List<int> VisibleSortingModes { get; set; }
         [XmlIgnore] public bool VisibleGroupingModesSpecified { get; set; }
         [XmlIgnore] public bool VisibleSortingModesSpecified { get; set; }
+        public List<FilterGroupPreference> FilterWorkspace { get; set; }
         public int RecentActivityGroupingStyle { get; set; } // 0: Hybrid, 1: Detailed.
         [XmlIgnore] public bool RecentActivityGroupingStyleSpecified { get; set; }
         // 0: Automatic, 1: Always hidden, 2: Always visible.
@@ -41,11 +43,20 @@ namespace HeliumHybrid
             RecentActivityGroupingStyle = Logic.RecentActivityStyle(Grouping, RecentActivityGroupingStyle,
                 RecentActivityGroupingStyleSpecified);
             RecentActivityGroupingStyleSpecified = true;
+            // The temporary v0.3.2 Default modes may still be selected in saved settings.
+            const int removedDefaultGrouping = 20;
+            const int removedDefaultSorting = 16;
+            if (Grouping == removedDefaultGrouping) Grouping = (int)NavigatorGroupingMode.None;
+            if (SortMode == removedDefaultSorting) {
+                SortMode = (int)NavigatorSortMode.Name;
+                SortDescending = false;
+            }
             SortMode = (int)NavigatorSortPolicy.ValidMode(SortMode);
             Grouping = NavigatorOrganization.Group(Grouping).Id;
             VisibleGroupingModes = NavigatorOrganization.Normalize(VisibleGroupingModesSpecified ? VisibleGroupingModes : null, true);
             VisibleSortingModes = NavigatorOrganization.Normalize(VisibleSortingModesSpecified ? VisibleSortingModes : null, false);
             VisibleGroupingModesSpecified = VisibleSortingModesSpecified = true;
+            FilterWorkspace = FilterWorkspaceSettings.Normalize(FilterWorkspace);
         }
         public bool PreserveGridScroll { get; set; } = true;
         public bool AutomaticallyRevealSelectedGame { get; set; } = true;
@@ -69,6 +80,7 @@ namespace HeliumHybrid
             VisibleGroupingModes = NavigatorOrganization.Normalize(VisibleGroupingModes, true);
             VisibleSortingModes = NavigatorOrganization.Normalize(VisibleSortingModes, false);
             VisibleGroupingModesSpecified = VisibleSortingModesSpecified = true;
+            FilterWorkspace = FilterWorkspaceSettings.Normalize(FilterWorkspace);
             backup = null;
             Save?.Invoke();
             Changed?.Invoke();
@@ -81,9 +93,10 @@ namespace HeliumHybrid
             return errors.Count == 0;
         }
         private Preferences Copy() => new Preferences { Width = Width, Collapsed = Collapsed, Grouping = Grouping,
-            SortMode = SortMode, SortDescending = SortDescending,
+            SortMode = SortMode, SortDescending = SortDescending, ApplySortGroupToPlaynite = ApplySortGroupToPlaynite,
             VisibleGroupingModes = VisibleGroupingModes == null ? null : new List<int>(VisibleGroupingModes),
             VisibleSortingModes = VisibleSortingModes == null ? null : new List<int>(VisibleSortingModes),
+            FilterWorkspace = FilterWorkspace?.ConvertAll(group => group?.Copy()),
             VisibleGroupingModesSpecified = VisibleGroupingModesSpecified, VisibleSortingModesSpecified = VisibleSortingModesSpecified,
             LayoutMode = LayoutMode,
             SteamMode = SteamMode, OpenFromGridCover = OpenFromGridCover,
@@ -95,8 +108,10 @@ namespace HeliumHybrid
         {
             Width = value.Width; Collapsed = value.Collapsed; Grouping = value.Grouping;
             SortMode = value.SortMode; SortDescending = value.SortDescending;
+            ApplySortGroupToPlaynite = value.ApplySortGroupToPlaynite;
             VisibleGroupingModes = value.VisibleGroupingModes == null ? null : new List<int>(value.VisibleGroupingModes);
             VisibleSortingModes = value.VisibleSortingModes == null ? null : new List<int>(value.VisibleSortingModes);
+            FilterWorkspace = value.FilterWorkspace?.ConvertAll(group => group?.Copy());
             VisibleGroupingModesSpecified = value.VisibleGroupingModesSpecified;
             VisibleSortingModesSpecified = value.VisibleSortingModesSpecified;
             LayoutMode = value.LayoutMode;
@@ -126,13 +141,19 @@ namespace HeliumHybrid
             width.SetBinding(TextBox.TextProperty, new Binding("Width") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
 
             var activity = Section("Recent Activity", ActivityStyle());
+            var nativeOrganization = BoundCheck("Apply Sort & Group changes to Playnite", nameof(Preferences.ApplySortGroupToPlaynite));
+            nativeOrganization.Margin = new Thickness(4, 0, 0, 12);
             var organization = new Grid();
+            var filters = new ContentControl();
             Action populate = () => {
                 organization.Children.Clear();
+                filters.Content = null;
                 if (!(DataContext is Preferences prefs)) return;
                 organization.Children.Add(NavigatorOrganizationControls.VisibilityEditor(prefs, true));
                 organization.Children.Add(NavigatorOrganizationControls.VisibilityEditor(prefs, false));
                 NavigatorOrganizationControls.ArrangeEditors(organization, organization.ActualWidth);
+                if (prefs.FilterWorkspace == null) prefs.FilterWorkspace = FilterWorkspaceSettings.Normalize(null);
+                filters.Content = FilterWorkspaceSettings.Editor(prefs);
             };
             organization.SizeChanged += (s, e) => NavigatorOrganizationControls.ArrangeEditors(organization, e.NewSize.Width);
             Loaded += (s, e) => populate();
@@ -143,7 +164,8 @@ namespace HeliumHybrid
             tabs.Items.Add(Page("Appearance", Section("Grid details panel",
                 Choice("Display mode", "LayoutMode", "Automatic", "Always hidden", "Always visible")),
                 Section("Sidebar width", width)));
-            tabs.Items.Add(Page("Organization", activity, organization));
+            tabs.Items.Add(Page("Organization", activity, nativeOrganization, organization));
+            tabs.Items.Add(Page("Filters", filters));
             Content = tabs;
         }
 

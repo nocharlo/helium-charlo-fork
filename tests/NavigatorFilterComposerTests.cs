@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using HeliumHybrid;
 using Playnite.SDK.Models;
 
@@ -18,7 +19,7 @@ internal static class NavigatorFilterComposerTests
         var missing = Guid.NewGuid();
         var original = new FilterPresetSettings {
             UseAndFilteringStyle = true, IsUnInstalled = true, Favorite = true,
-            Name = "kept", Genre = new IdItemFilterItemProperties { Ids = new List<Guid> { genre }, Text = "extra" },
+            Name = "kept", Hidden = true, Genre = new IdItemFilterItemProperties { Ids = new List<Guid> { genre }, Text = "extra" },
             Platform = new IdItemFilterItemProperties { Ids = new List<Guid> { platform } },
             LastActivity = new EnumFilterItemProperties { Values = new List<int> { 1 } },
             ReleaseYear = new StringFilterItemProperties { Values = new List<string> { "2025" } }
@@ -62,6 +63,42 @@ internal static class NavigatorFilterComposerTests
         var cleared = NavigatorFilterComposer.Clear(original);
         Check(cleared.UseAndFilteringStyle && !cleared.Favorite && !NavigatorFilterComposer.HasActiveFilters(cleared), "clear keeps AND/OR");
         Check(!NavigatorFilterComposer.Same(original, cleared), "clear refresh detected");
+        var sectionCleared = NavigatorFilterComposer.ClearSection(original, NavigatorFilterField.Genre);
+        Check(sectionCleared.Genre.Ids == null && sectionCleared.Genre.Text == "extra" &&
+              sectionCleared.Platform.Ids[0] == platform && sectionCleared.Favorite && sectionCleared.UseAndFilteringStyle,
+              "clear section preserves text, other categories and AND style");
+        var managedCleared = NavigatorFilterComposer.ClearManaged(original);
+        Check(!managedCleared.Favorite && !managedCleared.IsUnInstalled && managedCleared.Genre.Ids == null &&
+              managedCleared.Genre.Text == "extra" && managedCleared.Platform == null &&
+              managedCleared.Name == null && managedCleared.LastActivity == null &&
+              managedCleared.ReleaseYear == null && managedCleared.Hidden && managedCleared.UseAndFilteringStyle,
+              "clear managed includes new fields but preserves unmanaged native metadata text, Hidden and AND style");
+        var groups = FilterWorkspaceCatalog.Groups;
+        var fields = groups.SelectMany(group => group.Fields).ToDictionary(field => field.Id);
+        Check(groups.Select(group => group.Id).SequenceEqual(new[] { "ownership", "classification", "identity", "activity", "ratings" }) &&
+            groups.Select(group => group.Fields.Length).SequenceEqual(new[] { 7, 7, 5, 5, 3 }) &&
+            fields.Count == 27 && !fields.ContainsKey("release-date"), "27 native fields in the expected five groups");
+        var edited = NavigatorFilterComposer.Copy(original);
+        fields["recent-activity"].SetChoice(edited, (int)PastTimeSegment.Today, true);
+        fields["recent-activity"].SetChoice(edited, (int)PastTimeSegment.PastWeek, true);
+        fields["recent-activity"].SetChoice(edited, (int)PastTimeSegment.Today, false);
+        fields["recent-activity"].SetChoice(edited, (int)PastTimeSegment.Today, false);
+        Check(edited.RecentActivity.Values.SequenceEqual(new[] { (int)PastTimeSegment.PastWeek }) &&
+            edited.LastActivity.Values.SequenceEqual(original.LastActivity.Values), "Native dates are distinct and chip removal is idempotent");
+        fields["release-year"].SetChoice(edited, "2024", true);
+        fields["name"].SetText(edited, "^Synthetic");
+        Check(edited.ReleaseYear.Values.SequenceEqual(new[] { "2025", "2024" }) &&
+            edited.Name == "^Synthetic" && original.Name == "kept" &&
+            edited.UseAndFilteringStyle && edited.Hidden, "Native year multiselect and text edit preserve unrelated conditions");
+        Check(FilterWorkspaceCatalog.Matches("Genre", "Role Playing", "genre") &&
+            FilterWorkspaceCatalog.Matches("Genre", "Role Playing", "playing") &&
+            !FilterWorkspaceCatalog.Matches("Genre", "Role Playing", "absent"), "Search recognizes field and value independently");
+        Check(NavigatorFilterComposer.OptionVisible("Role Playing", "PLAY", false) &&
+              NavigatorFilterComposer.OptionVisible("Selected", "absent", true) &&
+              !NavigatorFilterComposer.OptionVisible("Action", "role", false), "search and selected visibility");
+        Check(!NavigatorFilterComposer.OptionMatches("Selected", "absent") &&
+              NavigatorFilterComposer.OptionVisible("Selected", "absent", true),
+              "Selected option remains visible without hiding empty search feedback");
         Check(NavigatorFilterComposer.HasActiveFilters(original), "active state");
         Check(Logic.ToggleRecentGrouping(2, 1) == 4 && Logic.ToggleRecentGrouping(4, 2) == 2 &&
               Logic.ToggleRecentGrouping(4, -1) == 0, "Recent Activity toggle");
