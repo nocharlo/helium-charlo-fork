@@ -57,7 +57,7 @@ namespace HeliumHybrid
     internal sealed class NavigatorFilterPanel
     {
         private const int PageSize = 16;
-        private readonly Func<FilterWorkspaceField, IEnumerable<FilterWorkspaceChoice>> loadChoices;
+        private readonly Func<FilterWorkspaceField, int?, IEnumerable<FilterWorkspaceChoice>> loadChoices;
         private readonly Preferences preferences;
         private readonly Border frame;
         private readonly FilterWorkspaceColumns host;
@@ -69,12 +69,13 @@ namespace HeliumHybrid
         private readonly DispatcherTimer searchTimer, textTimer;
         private readonly Dictionary<FilterWorkspaceField, string> pendingText = new Dictionary<FilterWorkspaceField, string>();
         private FilterPresetSettings shown;
+        private int choiceRevision;
         private bool layoutDirty = true, syncingText;
         internal bool HasManagedSelection => active.Children.Count > 0;
 
         internal NavigatorFilterPanel(Preferences preferences, Border frame,
             FilterWorkspaceColumns host, WrapPanel active, TextBox search, TextBlock empty,
-            Func<FilterWorkspaceField, IEnumerable<FilterWorkspaceChoice>> loadChoices,
+            Func<FilterWorkspaceField, int?, IEnumerable<FilterWorkspaceChoice>> loadChoices,
             Action<Func<FilterPresetSettings, FilterPresetSettings>> apply)
         {
             this.loadChoices = loadChoices;
@@ -115,11 +116,7 @@ namespace HeliumHybrid
             if (initialize) CreateControls();
             bool stateChanged = !NavigatorFilterComposer.Same(shown, current);
             if (stateChanged) shown = NavigatorFilterComposer.Copy(current);
-            if (initialize || reloadChoices) {
-                foreach (var field in groups.Values.SelectMany(group => group.Fields.Values)) {
-                    if (field.Model.Choices != null) field.LoadChoices(loadChoices(field.Model));
-                }
-            }
+            if (reloadChoices) choiceRevision++;
             if (initialize || reloadChoices || stateChanged) UpdateChips();
             if (initialize || reloadChoices || stateChanged || layoutDirty) UpdatePresentation();
         }
@@ -190,7 +187,12 @@ namespace HeliumHybrid
                     });
                     continue;
                 }
-                foreach (var key in model.Selected(shown).Distinct()) {
+                var selected = model.Selected(shown).Distinct().ToArray();
+                if (selected.Length > 0) {
+                    field.EnsureChoices(choiceRevision, loadChoices, field.NeedsAllChoices);
+                    if (selected.Any(key => !field.HasChoice(key))) field.EnsureChoices(choiceRevision, loadChoices, true);
+                }
+                foreach (var key in selected) {
                     AddChip(model.Label, field.Label(key), () => Change(state => model.SetChoice(state, key, false)));
                 }
             }
@@ -221,7 +223,7 @@ namespace HeliumHybrid
                     group.Panel.Children.Clear();
                     foreach (var id in item.FieldOrder) {
                         if (!item.HiddenFields.Contains(id) && group.Fields.TryGetValue(id, out var field))
-                            group.Panel.Children.Add(field.Section);
+                            group.Panel.Children.Add(field.Root);
                     }
                 }
                 layoutDirty = false;
@@ -230,18 +232,15 @@ namespace HeliumHybrid
             var visibleGroups = new List<UIElement>();
             foreach (var item in layout) {
                 if (item.Hidden || !groups.TryGetValue(item.Id, out var group)) continue;
-                bool groupMatches = false, hasVisible = false;
+                bool hasVisible = false;
                 foreach (var id in item.FieldOrder) {
                     if (item.HiddenFields.Contains(id) || !group.Fields.TryGetValue(id, out var field)) continue;
-                    var matches = UpdateField(field, query);
-                    groupMatches |= matches;
-                    hasVisible |= field.Section.Visibility == Visibility.Visible;
+                    found |= UpdateField(field, query);
+                    hasVisible |= field.Root.Visibility == Visibility.Visible;
                 }
-                if (hasVisible) visibleGroups.Add(group.Section);
-                group.Section.ApplySearch(query, groupMatches);
-                found |= groupMatches;
+                if (hasVisible) visibleGroups.Add(group.Root);
             }
-            // WrapPanel reserves a fixed-width slot even for a collapsed child.
+            // Only sections with visible fields take up a column slot.
             for (int index = host.Children.Count - 1; index >= 0; index--)
                 if (!visibleGroups.Contains(host.Children[index])) host.Children.RemoveAt(index);
             for (int index = 0; index < visibleGroups.Count; index++) {
@@ -258,20 +257,23 @@ namespace HeliumHybrid
             var model = field.Model;
             var text = model.Text?.Invoke(shown);
             var selected = model.Selected == null ? new HashSet<object>() : new HashSet<object>(model.Selected(shown));
+            if (model.Choices != null && (field.IsOpen || query.Length > 0)) {
+                field.EnsureChoices(choiceRevision, loadChoices, query.Length > 0 || field.NeedsAllChoices);
+            }
             var fieldMatch = NavigatorFilterComposer.OptionMatches(model.Label, query);
             var matches = fieldMatch || (text != null && NavigatorFilterComposer.OptionMatches(text, query)) ||
                 field.Options.Any(option => NavigatorFilterComposer.OptionMatches(option.Label, query));
             var count = model.Text != null ? (string.IsNullOrWhiteSpace(text) ? 0 : 1) : selected.Count;
-            field.Section.Header = count == 0 ? model.Label : model.Label + " (" + count + ")";
-            field.Section.Visibility = matches || count > 0 ? Visibility.Visible : Visibility.Collapsed;
-            field.Clear.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            field.SetHeader(count);
+            field.Root.Visibility = matches || count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            field.Clear.Visibility = count > 0 && model.InlineChoiceLimit != 1 ? Visibility.Visible : Visibility.Collapsed;
             if (field.Input != null && !pendingText.ContainsKey(model) && field.Input.Text != (text ?? "")) {
                 syncingText = true;
                 try { field.Input.Text = text ?? ""; }
                 finally { syncingText = false; }
             }
-            field.Section.ApplySearch(query, matches);
-            if (field.Section.IsExpanded && field.Input == null)
+            field.ApplySearch(query, matches);
+            if (field.IsOpen && field.Input == null)
                 field.RenderChoices(query, selected, model.ExtraCondition?.Invoke(shown));
             return matches;
         }
@@ -279,82 +281,158 @@ namespace HeliumHybrid
         private sealed class SectionExpander : Expander
         {
             private bool? beforeSearch;
+            internal bool ApplyingSearch { get; private set; }
+
             internal void ApplySearch(string query, bool matches)
             {
+                bool expanded;
                 if (query.Length > 0) {
                     if (!matches || beforeSearch.HasValue) return;
                     beforeSearch = IsExpanded;
-                    IsExpanded = true;
-                } else if (beforeSearch.HasValue) {
-                    var prior = beforeSearch.Value;
+                    expanded = true;
+                } else {
+                    if (!beforeSearch.HasValue) return;
+                    expanded = beforeSearch.Value;
                     beforeSearch = null;
-                    IsExpanded = prior;
                 }
+                ApplyingSearch = true;
+                try { IsExpanded = expanded; }
+                finally { ApplyingSearch = false; }
             }
         }
 
         private sealed class GroupView
         {
-            internal readonly SectionExpander Section;
-            internal readonly StackPanel Panel = new StackPanel { Margin = new Thickness(12, 2, 0, 0) };
+            internal readonly StackPanel Root = new StackPanel { Margin = new Thickness(2, 0, 11, 10) };
+            internal readonly StackPanel Panel = new StackPanel();
             internal readonly Dictionary<string, FieldView> Fields = new Dictionary<string, FieldView>();
 
             internal GroupView(FilterWorkspaceGroup group)
             {
-                Section = new SectionExpander { Header = group.Label, Content = Panel, IsExpanded = true, Margin = new Thickness(0, 0, 8, 5) };
-                Section.SetResourceReference(FrameworkElement.StyleProperty, "FilterGroupDisclosureStyle");
-                AutomationProperties.SetName(Section, group.Label);
+                var heading = new TextBlock { Text = group.Label, TextWrapping = TextWrapping.Wrap };
+                heading.SetResourceReference(FrameworkElement.StyleProperty, "FilterSectionHeadingStyle");
+                Root.Children.Add(heading);
+                Root.Children.Add(Panel);
             }
         }
 
         private sealed class FieldView
         {
             internal readonly FilterWorkspaceField Model;
-            internal readonly SectionExpander Section;
+            internal readonly FrameworkElement Root;
             internal readonly TextBox Input;
             internal readonly Button Clear;
             internal Action Opened;
-            private readonly StackPanel choices = new StackPanel();
+            private readonly Panel choices;
+            private readonly SectionExpander disclosure;
+            private readonly TextBlock label;
             private readonly TextBlock message = new TextBlock { FontSize = 11, TextWrapping = TextWrapping.Wrap };
-            private readonly Button more = new Button { HorizontalAlignment = HorizontalAlignment.Left };
+            private readonly Button more = new Button();
+            private readonly Button fewer = new Button { Content = "Show fewer" };
             private readonly Action<object, bool> edit;
             private Dictionary<object, FilterWorkspaceChoice> byKey = new Dictionary<object, FilterWorkspaceChoice>();
             private FilterWorkspaceChoice[] options = new FilterWorkspaceChoice[0];
             private readonly Dictionary<object, CheckBox> controls = new Dictionary<object, CheckBox>();
             private string lastQuery;
-            private int limit = PageSize;
+            private int limit;
+            private int loadedRevision = -1;
+            private bool allChoicesLoaded;
+            private int DefaultLimit => Model.InlineChoiceLimit > 0 ? Model.InlineChoiceLimit : PageSize;
+            internal bool IsOpen => disclosure == null || disclosure.IsExpanded;
+            internal bool NeedsAllChoices => Model.InlineChoiceLimit == 0 || limit > DefaultLimit;
             internal IEnumerable<FilterWorkspaceChoice> Options => options;
 
             internal FieldView(FilterWorkspaceField model, Action<object, bool> edit, Action clear)
             {
                 Model = model;
                 this.edit = edit;
-                var panel = new StackPanel { Margin = new Thickness(13, 2, 0, 4) };
-                Section = new SectionExpander { Header = model.Label, Content = panel };
-                Section.SetResourceReference(FrameworkElement.StyleProperty, "FilterFieldDisclosureStyle");
-                Clear = new Button { Content = "Clear", HorizontalAlignment = HorizontalAlignment.Right, Padding = new Thickness(4, 1, 4, 1) };
+                limit = DefaultLimit;
+                var panel = new StackPanel { Margin = model.IsInline ? new Thickness(0, 0, 0, 5) : new Thickness(12, 1, 0, 4) };
+                Clear = new Button { Content = "Clear", HorizontalAlignment = HorizontalAlignment.Right };
+                Clear.SetResourceReference(FrameworkElement.StyleProperty, "FilterSmallButtonStyle");
                 AutomationProperties.SetName(Clear, "Clear " + model.Label);
                 Clear.Click += (s, e) => clear();
-                panel.Children.Add(Clear);
+                if (model.IsInline) {
+                    Root = panel;
+                    if (model.InlineChoiceLimit != 1) {
+                        label = new TextBlock { TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+                        label.SetResourceReference(FrameworkElement.StyleProperty, "FilterFieldLabelStyle");
+                        var header = new DockPanel();
+                        DockPanel.SetDock(Clear, Dock.Right);
+                        header.Children.Add(Clear);
+                        header.Children.Add(label);
+                        panel.Children.Add(header);
+                    }
+                } else {
+                    disclosure = new SectionExpander { Header = model.Label, Content = panel };
+                    disclosure.SetResourceReference(FrameworkElement.StyleProperty, "FilterFieldDisclosureStyle");
+                    disclosure.Expanded += (s, e) => {
+                        if (!disclosure.ApplyingSearch) Opened?.Invoke();
+                    };
+                    Root = disclosure;
+                    panel.Children.Add(Clear);
+                }
                 if (model.Text != null) {
                     Input = new TextBox { MinHeight = 24, ToolTip = model.Label };
                     Input.SetResourceReference(FrameworkElement.StyleProperty, "FilterInputStyle");
                     AutomationProperties.SetName(Input, model.Label);
                     panel.Children.Add(Input);
                 } else {
+                    choices = model.IsInline ? (Panel)new WrapPanel() : new StackPanel();
                     message.SetResourceReference(TextBlock.ForegroundProperty, "SteamMutedBrush");
                     panel.Children.Add(message);
                     panel.Children.Add(choices);
-                    more.Click += (s, e) => { limit += PageSize; Opened?.Invoke(); };
-                    panel.Children.Add(more);
+                    more.Click += (s, e) => {
+                        limit += PageSize;
+                        Opened?.Invoke();
+                        if (!more.IsVisible) {
+                            if (fewer.IsVisible) fewer.Focus();
+                            else choices.Children.OfType<CheckBox>().LastOrDefault()?.Focus();
+                        }
+                    };
+                    fewer.Click += (s, e) => {
+                        limit = DefaultLimit;
+                        Opened?.Invoke();
+                        if (more.IsVisible) more.Focus();
+                    };
+                    more.SetResourceReference(FrameworkElement.StyleProperty, "FilterSmallButtonStyle");
+                    fewer.SetResourceReference(FrameworkElement.StyleProperty, "FilterSmallButtonStyle");
+                    AutomationProperties.SetName(fewer, "Show fewer " + model.Label + " options");
+                    var actions = new WrapPanel();
+                    actions.Children.Add(more);
+                    if (model.IsInline) actions.Children.Add(fewer);
+                    panel.Children.Add(actions);
                 }
-                Section.Expanded += (s, e) => { if (ReferenceEquals(e.OriginalSource, Section)) Opened?.Invoke(); };
             }
 
-            internal void LoadChoices(IEnumerable<FilterWorkspaceChoice> values)
+            internal void ApplySearch(string query, bool matches) => disclosure?.ApplySearch(query, matches);
+
+            internal void SetHeader(int count)
             {
-                options = values.Where(choice => choice.Key != null).GroupBy(choice => choice.Key).Select(group => group.First()).ToArray();
+                var header = count == 0 ? Model.Label : Model.Label + " (" + count + ")";
+                if (label != null) label.Text = header;
+                if (disclosure != null) disclosure.Header = header;
+            }
+
+            internal bool HasChoice(object key) => byKey.ContainsKey(key);
+
+            internal void EnsureChoices(int revision,
+                Func<FilterWorkspaceField, int?, IEnumerable<FilterWorkspaceChoice>> load, bool all)
+            {
+                if (loadedRevision == revision && (allChoicesLoaded || !all)) return;
+                int? bound = all ? (int?)null : DefaultLimit + 1;
+                var loaded = load(Model, bound).Where(choice => choice.Key != null)
+                    .GroupBy(choice => choice.Key).Select(group => group.First()).ToArray();
+                // Keep the visible preview in place when the first full page is loaded.
+                if (all && loadedRevision == revision) {
+                    var prefix = options.Take(DefaultLimit).ToArray();
+                    var keys = new HashSet<object>(prefix.Select(choice => choice.Key));
+                    loaded = prefix.Concat(loaded.Where(choice => !keys.Contains(choice.Key))).ToArray();
+                }
+                options = loaded;
                 byKey = options.ToDictionary(choice => choice.Key);
+                loadedRevision = revision;
+                allChoicesLoaded = !bound.HasValue || loaded.Length < bound.Value;
             }
 
             internal string Label(object key)
@@ -366,8 +444,8 @@ namespace HeliumHybrid
 
             internal void RenderChoices(string query, HashSet<object> selected, string extraCondition)
             {
-                if (lastQuery != query) { lastQuery = query; limit = PageSize; }
-                var matching = options.Where(option => selected.Contains(option.Key) ||
+                if (lastQuery != query) { lastQuery = query; limit = DefaultLimit; }
+                var matching = options.Where(option => query.Length == 0 || selected.Contains(option.Key) ||
                     FilterWorkspaceCatalog.Matches(Model.Label, option.Label, query)).Select(option => option.Key)
                     .Concat(selected.Where(key => !byKey.ContainsKey(key))).ToArray();
                 var visible = matching.Take(limit).ToArray();
@@ -379,8 +457,8 @@ namespace HeliumHybrid
                 for (int i = 0; i < visible.Length; i++) {
                     var key = visible[i];
                     if (!controls.TryGetValue(key, out var box)) {
-                        box = new CheckBox { Margin = new Thickness(1, 2, 0, 2) };
-                        box.SetResourceReference(Control.ForegroundProperty, "SteamTextBrush");
+                        box = new CheckBox { Margin = new Thickness(0, 1, 9, 1) };
+                        box.SetResourceReference(FrameworkElement.StyleProperty, "FilterChoiceStyle");
                         box.Click += (s, e) => edit(key, box.IsChecked == true);
                         controls.Add(key, box);
                     }
@@ -402,7 +480,9 @@ namespace HeliumHybrid
                     matching.Length == 0 && query.Length == 0 ? "No values available" : "";
                 message.Visibility = message.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
                 more.Visibility = matching.Length > limit ? Visibility.Visible : Visibility.Collapsed;
-                more.Content = "Show more (" + Math.Max(0, matching.Length - limit) + ")";
+                more.Content = allChoicesLoaded ? "Show more (" + Math.Max(0, matching.Length - limit) + ")" : "Show more";
+                AutomationProperties.SetName(more, "Show more " + Model.Label + " options");
+                fewer.Visibility = limit > DefaultLimit ? Visibility.Visible : Visibility.Collapsed;
             }
         }
     }

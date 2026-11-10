@@ -136,7 +136,7 @@ namespace HeliumHybrid
                 (FilterWorkspaceColumns)root.FindName("FilterSections"),
                 (WrapPanel)root.FindName("ActiveFilters"), filterOptionSearch,
                 (TextBlock)root.FindName("FilterSearchEmpty"),
-                field => field.Choices(api),
+                (field, limit) => field.Choices(api, limit),
                 change => Safe(() => ApplyGlobalFilterChange(change)));
             grouping.ItemsSource = NavigatorOrganization.Groups;
             SelectedGrouping = prefs.Grouping;
