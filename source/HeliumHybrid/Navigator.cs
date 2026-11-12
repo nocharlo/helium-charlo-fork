@@ -192,7 +192,7 @@ namespace HeliumHybrid
             ((Button)root.FindName("SortClose")).Click += (s, e) => DismissSortGroup();
             ((Button)root.FindName("SortDone")).Click += (s, e) => DismissSortGroup();
             sortGroupPopup.PreviewKeyDown += SortGroupPopupPreviewKeyDown;
-            homeButton.Click += (sender, args) => Safe(ReturnToGrid);
+            homeButton.Click += (sender, args) => Safe(() => ReturnToGrid());
             recentButton.Click += (sender, args) => Safe(() => {
                 shortcutGroupingChange = true;
                 try { SelectedGrouping = Logic.ToggleRecentGrouping(SelectedGrouping, previousGrouping); }
@@ -236,12 +236,7 @@ namespace HeliumHybrid
                 sidebarClickTimer.Stop();
                 if (RowUnderPointer(e.OriginalSource as DependencyObject) != null) StartSelected();
             };
-            list.PreviewKeyDown += (s, e) => { if (e.Key == Key.Enter && list.SelectedItem != null) { StartSelected(); e.Handled = true; } };
-            // These commands use public APIs. The native grid keeps its complete original menu.
-            list.ContextMenuOpening += ContextOpening;
-            var menu = new ContextMenu(); var play = new MenuItem { Header = "Play" }; play.Click += (s, e) => StartSelected();
-            
-            menu.Items.Add(play); list.ContextMenu = menu;
+            ConfigureGameActions();
             Loaded += OnLoaded; Unloaded += OnUnloaded;
             UpdateSortGroupUi();
             ApplySize();
@@ -250,16 +245,46 @@ namespace HeliumHybrid
         {
             return source == null ? null : ItemsControl.ContainerFromElement(list, source) as ListBoxItem;
         }
-        private void ContextOpening(object sender, ContextMenuEventArgs e)
+        private void ConfigureGameActions()
         {
-            // Keyboard invocation belongs to the selected row, independent of cursor position.
-            if (e.CursorLeft < 0 || e.CursorTop < 0) {
-                if (!(list.SelectedItem is GameRow)) e.Handled = true;
-                return;
-            }
-            var container = RowUnderPointer(Mouse.DirectlyOver as DependencyObject);
-            if (container == null) { e.Handled = true; return; }
-            list.SelectedItem = container.DataContext;
+            var actions = new NavigatorGameActions(api.Database.Games.Get, api.StartGame, api.InstallGame,
+                NavigatorGameActions.BindNativeEditor(api.MainView));
+            var menu = new ContextMenu();
+            var launch = new MenuItem { Header = "Play" };
+            var edit = new MenuItem { Header = "Edit Game", InputGestureText = "F3" };
+            menu.Items.Add(launch);
+            if (actions.HasNativeEditor) menu.Items.Add(edit);
+            list.ContextMenu = menu;
+
+            Guid target = Guid.Empty;
+            var offered = NavigatorLaunchAction.Unavailable;
+            launch.Click += (s, e) => Safe(() => actions.Launch(target, offered));
+            edit.Click += (s, e) => Safe(() => actions.Edit(target));
+            list.ContextMenuOpening += (s, e) => {
+                sidebarClickTimer.Stop();
+                // Keyboard invocation uses the selected occurrence even when the pointer is over another row.
+                var row = e.CursorLeft < 0 || e.CursorTop < 0 ? list.SelectedItem as GameRow
+                    : RowUnderPointer(Mouse.DirectlyOver as DependencyObject)?.DataContext as GameRow;
+                if (row == null) {
+                    e.Handled = true;
+                    return;
+                }
+                target = row.Id;
+                list.SelectedItem = row;
+                offered = actions.LaunchAction(target);
+                launch.Header = offered == NavigatorLaunchAction.Install ? "Install" : "Play";
+                launch.IsEnabled = offered != NavigatorLaunchAction.Unavailable;
+            };
+            list.PreviewKeyDown += (s, e) => {
+                if (!(list.SelectedItem is GameRow row)) return;
+                if (e.Key == Key.Enter) {
+                    StartSelected();
+                    e.Handled = true;
+                } else if (e.Key == Key.F3 && Keyboard.Modifiers == ModifierKeys.None && actions.HasNativeEditor) {
+                    e.Handled = true;
+                    Safe(() => actions.Edit(row.Id));
+                }
+            };
         }
         private void SidebarDown(object sender, MouseButtonEventArgs args)
         {
@@ -326,14 +351,15 @@ namespace HeliumHybrid
             command.Execute(selected);
             RecomputeLayout();
         }
-        private void ReturnToGrid()
+        private bool ReturnToGrid()
         {
-            if (!active || IsCollapsed() || library.ActiveDesktopView != DesktopView.Details) return;
+            if (!active || IsCollapsed() || library.ActiveDesktopView != DesktopView.Details) return false;
             var switchButton = FindNamed(window, "HeliumCharlo_SwitchGrid") as Button;
-            if (switchButton?.Command == null || !switchButton.Command.CanExecute(null)) return;
+            if (switchButton?.Command == null || !switchButton.Command.CanExecute(null)) return false;
             switchButton.Command.Execute(null);
             navigatedDetails = false;
             RecomputeLayout();
+            return true;
         }
         private void CaptureGridScroll()
         {
@@ -408,6 +434,7 @@ namespace HeliumHybrid
                 window.SizeChanged += WindowSizeChanged;
                 window.LocationChanged += WindowLocationChanged;
                 window.PreviewKeyDown += WindowPreviewKeyDown;
+                window.KeyDown += WindowKeyDown;
             }
             RecomputeLayout();
             Interlocked.Exchange(ref dirty, 1); Refresh(); RefreshGlobalFilterUi(); timer.Start();
@@ -454,9 +481,11 @@ namespace HeliumHybrid
                 window.SizeChanged -= WindowSizeChanged;
                 window.LocationChanged -= WindowLocationChanged;
                 window.PreviewKeyDown -= WindowPreviewKeyDown;
+                window.KeyDown -= WindowKeyDown;
             }
             if (reopenButton != null) { reopenButton.Click -= ReopenClicked; reopenButton.Visibility = Visibility.Collapsed; reopenButton = null; }
             window = null;
+            navigatedDetails = false;
             RestoreDetails();
             ShowNativeList();
             Save();
@@ -787,6 +816,20 @@ namespace HeliumHybrid
         private void WindowPreviewKeyDown(object sender, KeyEventArgs args)
         {
             CloseSortGroupOnEscape(args);
+        }
+        private void WindowKeyDown(object sender, KeyEventArgs args)
+        {
+            // Let focused controls and Playnite handle Escape before offering the Home action.
+            if (args.Handled || args.Key != Key.Escape || args.IsRepeat ||
+                Keyboard.Modifiers != ModifierKeys.None || !navigatedDetails ||
+                window?.IsActive != true || filtersPopup.IsOpen || sortGroupPopup.IsOpen ||
+                list.ContextMenu?.IsOpen == true || Mouse.Captured != null) return;
+
+            var focused = Keyboard.FocusedElement;
+            if (!(focused is Visual visual) || PresentationSource.FromVisual(visual) != PresentationSource.FromVisual(window) ||
+                focused is TextBoxBase || focused is PasswordBox || focused is MenuItem) return;
+
+            Safe(() => args.Handled = ReturnToGrid());
         }
         private void CloseSortGroupOnEscape(KeyEventArgs args)
         {
