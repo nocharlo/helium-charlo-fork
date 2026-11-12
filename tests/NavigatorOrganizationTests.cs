@@ -25,8 +25,41 @@ internal static class NavigatorOrganizationTests
     [STAThread]
     private static void Main()
     {
-        CatalogAndGroups(); Sorting(); Settings(); RemovedDefaultModes(); NativeOrganization(); OrganizationControls(); FilterWorkspace(); Presentation(); Campaign(); Benchmarks();
+        CatalogAndGroups(); Sorting(); Settings(); RemovedDefaultModes(); NativeOrganization(); OrganizationControls(); FilterWorkspace(); GameActions(); Presentation(); Campaign(); Benchmarks();
         Console.WriteLine("PASS: " + checks + " Navigator organization, settings and WPF model checks.");
+    }
+    private static void GameActions()
+    {
+        var installed = new Game { Id = Guid.NewGuid(), IsInstalled = true };
+        var uninstalled = new Game { Id = Guid.NewGuid() };
+        var games = new Dictionary<Guid, Game> { { installed.Id, installed }, { uninstalled.Id, uninstalled } };
+        Game Find(Guid id) => games.TryGetValue(id, out var game) ? game : null;
+        var played = new List<Guid>();
+        var installs = new List<Guid>();
+        var edited = new List<Guid>();
+        var actions = new NavigatorGameActions(Find, played.Add, installs.Add, id => { edited.Add(id); return false; });
+
+        Check(actions.LaunchAction(installed.Id) == NavigatorLaunchAction.Play &&
+            actions.LaunchAction(uninstalled.Id) == NavigatorLaunchAction.Install, "Menu labels follow native game state");
+        actions.Launch(installed.Id, NavigatorLaunchAction.Play);
+        actions.Launch(uninstalled.Id, NavigatorLaunchAction.Install);
+        Check(played.SequenceEqual(new[] { installed.Id }) && installs.SequenceEqual(new[] { uninstalled.Id }),
+            "Launch dispatch uses the offered action and the captured game ID");
+        uninstalled.IsInstalled = true;
+        actions.Launch(uninstalled.Id, NavigatorLaunchAction.Install);
+        installed.IsRunning = true;
+        actions.Launch(installed.Id, NavigatorLaunchAction.Play);
+        Check(actions.LaunchAction(installed.Id) == NavigatorLaunchAction.Unavailable &&
+            played.Count == 1 && installs.Count == 1, "Stale and disabled launch actions cannot run");
+        actions.Edit(uninstalled.Id);
+        games.Remove(uninstalled.Id);
+        actions.Edit(uninstalled.Id);
+        Check(actions.HasNativeEditor && edited.SequenceEqual(new[] { uninstalled.Id }),
+            "Editor receives exactly the requested existing game");
+        var legacy = new NavigatorGameActions(Find, played.Add, installs.Add, null);
+        legacy.Edit(installed.Id);
+        Check(!legacy.HasNativeEditor && edited.Count == 1 &&
+            legacy.LaunchAction(Guid.NewGuid()) == NavigatorLaunchAction.Unavailable, "Legacy SDK and missing games degrade safely");
     }
     private static void Campaign()
     {
