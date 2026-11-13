@@ -87,6 +87,9 @@ namespace HeliumHybrid
         private DispatcherOperation pendingViewSelection;
         private DispatcherOperation pendingOrganizationRestore;
         private DispatcherOperation pendingMetadataSelection;
+        private DispatcherOperation pendingNeutralSelection;
+        private NavigatorViewSnapshot neutralOrganization;
+        private FilterPresetSettings neutralFilters;
         private readonly NavigatorOrganizationSelection organizationSelection = new NavigatorOrganizationSelection();
         private int dirty = 1;
         private Guid[] lastIds = new Guid[0];
@@ -333,7 +336,8 @@ namespace HeliumHybrid
                 }
                 if (header == null && focus != list) return false;
             }
-            var row = focusedRow ?? (header == null ? list.SelectedItem as GameRow : null);
+            var selectedRow = list.SelectedItem as GameRow;
+            var row = header == null && selectedRow != null ? focusedRow ?? selectedRow : null;
             var group = row?.GroupIdentity ?? (header?.DataContext as CollectionViewGroup)?.Name as NavigatorGroupIdentity;
             var mode = EffectiveGrouping;
             if (key == Key.Left || key == Key.Right) {
@@ -413,6 +417,7 @@ namespace HeliumHybrid
         }
         private void SelectGame(Guid id)
         {
+            EndNeutralSelection();
             navigatorSelectionId = id; navigatorSelectionAt = DateTime.UtcNow;
             api.MainView.SelectGame(id);
         }
@@ -542,6 +547,7 @@ namespace HeliumHybrid
             sortGroupPopup.IsOpen = false;
             filtersPopup.IsOpen = false;
             if (!active) return; active = false; timer.Stop(); searchTimer.Stop(); coverClickTimer.Stop(); sidebarClickTimer.Stop(); sidebarDownItem = null; panelRequested = false; UnbindGridClicks();
+            EndNeutralSelection();
             plugin.SelectionChanged -= NativeSelectionChanged;
             InputManager.Current.PreProcessInput -= BeforeOrganizationInput;
             organizationSelection.Cancel();
@@ -625,6 +631,8 @@ namespace HeliumHybrid
             if (!active) return;
             Safe(() => {
                 var target = library.ActiveDesktopView;
+                if (neutralOrganization != null && target != DesktopView.Grid) EndNeutralSelection();
+                if (args.NewValue?.Count > 0 && KeepNeutralAfterNativeUpdate()) return;
                 bool enteringDetails = lastDesktopView == DesktopView.Grid && target == DesktopView.Details;
                 bool returningToGrid = lastDesktopView == DesktopView.Details && target == DesktopView.Grid;
                 var previousId = args.OldValue?.Count == 1 ? args.OldValue[0].Id : Guid.Empty;
@@ -937,9 +945,67 @@ namespace HeliumHybrid
         }
         private void WindowKeyDown(object sender, KeyEventArgs args)
         {
-            // Let focused controls and Playnite handle Escape before offering the Home action.
-            if (args.Key == Key.Escape && navigatedDetails && CanHandleWindowKey(args))
-                Safe(() => args.Handled = ReturnToGrid());
+            // Focused controls and Playnite get the first opportunity to handle Escape.
+            if (args.Key != Key.Escape || !CanHandleWindowKey(args)) return;
+            Safe(() => args.Handled = library.ActiveDesktopView == DesktopView.Details
+                ? navigatedDetails && ReturnToGrid()
+                : ClearGridDetailsSelection());
+        }
+        private bool ClearGridDetailsSelection()
+        {
+            if (library.ActiveDesktopView != DesktopView.Grid || IsCollapsed() ||
+                detailsBorder?.IsVisible != true || nativeGridList?.IsVisible != true ||
+                nativeGridList.SelectedItems.Count == 0) return false;
+
+            pendingViewSelection?.Abort();
+            pendingViewSelection = null;
+            pendingOrganizationRestore?.Abort();
+            pendingOrganizationRestore = null;
+            pendingMetadataSelection?.Abort();
+            pendingMetadataSelection = null;
+            organizationSelection.Cancel();
+            revealAfterExplicitReorganization = null;
+            sidebarClickTimer.Stop();
+            coverClickTimer.Stop();
+            sidebarDownItem = coverDownItem = null;
+
+            // The Grid's native two-way selection binding updates Playnite and its details panel.
+            neutralOrganization = library.ViewState(NavigatorGrouping);
+            neutralFilters = api.MainView.GetCurrentFilterSettings();
+            nativeGridList.UnselectAll();
+            SyncSelection(false);
+            return true;
+        }
+        private bool KeepNeutralAfterNativeUpdate()
+        {
+            if (neutralOrganization == null) return false;
+            if (pendingNeutralSelection != null) return true;
+            var organization = library.ViewState(NavigatorGrouping);
+            var filters = api.MainView.GetCurrentFilterSettings();
+            if (!NavigatorRefreshDecision.NativeOrganizationChanged(organization, neutralOrganization) &&
+                organization.PresetId == neutralOrganization.PresetId &&
+                NavigatorFilterComposer.Same(filters, neutralFilters)) {
+                EndNeutralSelection();
+                return false;
+            }
+
+            neutralOrganization = organization;
+            neutralFilters = filters;
+            // A filter preset can select the first game before its native ListBox binding settles.
+            pendingNeutralSelection = Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
+                pendingNeutralSelection = null;
+                if (!active || neutralOrganization == null || library.ActiveDesktopView != DesktopView.Grid) return;
+                nativeGridList?.UnselectAll();
+                SyncSelection(false);
+            }));
+            return true;
+        }
+        private void EndNeutralSelection()
+        {
+            neutralOrganization = null;
+            neutralFilters = null;
+            pendingNeutralSelection?.Abort();
+            pendingNeutralSelection = null;
         }
         private bool CanHandleWindowKey(KeyEventArgs args)
         {
@@ -1140,7 +1206,9 @@ namespace HeliumHybrid
                 library.ActiveDesktopView != DesktopView.Grid || Keyboard.Modifiers != ModifierKeys.None) return;
             var source = args.OriginalSource as DependencyObject;
             var item = source == null ? null : ItemsControl.ContainerFromElement(nativeGridList, source) as ListBoxItem;
-            if (item == null || IsInteractiveChild(source, item)) return;
+            if (item == null) return;
+            EndNeutralSelection();
+            if (IsInteractiveChild(source, item)) return;
             coverDownItem = item;
             coverDownPosition = args.GetPosition(nativeGridList);
         }
@@ -1189,6 +1257,7 @@ namespace HeliumHybrid
         {
             if (!active) return;
             if (lastDesktopView != library.ActiveDesktopView) {
+                if (library.ActiveDesktopView != DesktopView.Grid) EndNeutralSelection();
                 organizationSelection.Cancel();
                 sidebarClickTimer.Stop();
                 coverClickTimer.Stop();

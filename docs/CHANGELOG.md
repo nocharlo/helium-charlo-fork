@@ -2,11 +2,14 @@
 
 A history of changes to Helium (charlo fork), from the original Navigator prototype to the current release.
 
-## v0.3.3 — Library Filters Refined & Contextual Actions (in development)
+## v0.3.3 — Navigator Controls (in development)
 
 - Move Library Filters by its title and resize it from the bottom-right corner. The Navigator remembers the manual size and offers automatic sizing in Filters settings.
 - The Library Filters launcher highlights while the popup is open.
 - Escape returns to Grid from Full Details opened through the Navigator, using the same selection and scroll restoration as Home.
+- In Grid with the Details Panel open, Escape clears the current selection. Use Up or Down in the Navigator to resume browsing.
+- Up and Down navigate visible Navigator rows. Left and Right collapse and expand the focused group.
+- Game titles retain their installed or uninstalled color on hover and selection. Favorite stars are easier to see at the same row height.
 - The Navigator game menu offers Play or Install for the chosen game. Edit Game and the Navigator's F3 shortcut open Playnite's native editor on hosts with SDK 6.13 or later.
 - Set Category toggles individual category memberships, and Set Completion Status selects or clears the game's status using Playnite's library metadata. A selected game that moves to another Navigator group is revealed there if it still matches the active filters.
 
