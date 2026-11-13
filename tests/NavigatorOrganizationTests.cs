@@ -144,12 +144,37 @@ internal static class NavigatorOrganizationTests
         Check(prefs.VisibleGroupingModes.Distinct().Count() == initial.Length && list.Items.Count == NavigatorOrganization.Groups.Length,
             "Clearing search keeps every choice without duplicates");
     }
+    private static void NavigatorRowAppearance(ListBox list)
+    {
+        var model = new GameRow { Name = "Synthetic title", Favorite = true };
+        var content = new ContentPresenter { Content = model, ContentTemplate = list.ItemTemplate };
+        content.ApplyTemplate();
+        var row = (Grid)VisualTreeHelper.GetChild(content, 0);
+        var title = (TextBlock)row.Children[1];
+        var star = (TextBlock)row.Children[2];
+        var container = new ListBoxItem { Style = list.ItemContainerStyle, Content = content };
+        container.Measure(new Size(200, 100));
+        var border = (Border)container.Template.FindName("RowBorder", container);
+        var uninstalled = ((SolidColorBrush)title.Foreground).Color;
+        container.IsSelected = true;
+        Check(uninstalled == Color.FromRgb(163, 170, 185) && ((SolidColorBrush)title.Foreground).Color == uninstalled &&
+            ((SolidColorBrush)border.BorderBrush).Color == Color.FromRgb(103, 179, 255),
+            "An uninstalled game keeps its muted title and gets a separate selection accent");
+        model.IsInstalled = true;
+        Check(container.IsSelected && ((SolidColorBrush)title.Foreground).Color == Color.FromRgb(241, 247, 255),
+            "An installed game uses the installed title color while selected");
+        Check(star.FontSize == 16 && star.Visibility == Visibility.Visible && container.DesiredSize.Height == 26,
+            "The larger favorite star fits the compact row");
+        model.Favorite = false;
+        Check(star.Visibility == Visibility.Collapsed, "The star follows the favorite state");
+    }
     private static void OrganizationControls()
     {
         var assembly = typeof(NavigatorOrganizationTests).Assembly;
         using (var stream = assembly.GetManifestResourceStream("Navigator.xaml"))
         using (var reader = new StreamReader(stream)) {
             var root = (Grid)XamlReader.Parse(reader.ReadToEnd().Replace("assembly=HeliumCharlo", "assembly=" + assembly.GetName().Name));
+            NavigatorRowAppearance((ListBox)root.FindName("Games"));
             var filterPopup = (System.Windows.Controls.Primitives.Popup)root.FindName("FiltersPopup");
             var filterBorder = (Border)filterPopup.Child;
             var filterLayout = (Grid)filterBorder.Child;

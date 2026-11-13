@@ -325,15 +325,17 @@
       <ListBox.ItemContainerStyle>
         <Style TargetType="ListBoxItem">
           <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-          <Setter Property="Padding" Value="4,0"/>
           <Setter Property="MinHeight" Value="26"/>
           <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
-            <Border x:Name="RowBorder" Background="Transparent" Padding="{TemplateBinding Padding}">
+            <Border x:Name="RowBorder" Background="Transparent" BorderBrush="Transparent" BorderThickness="2,0,0,0" Padding="2,0,4,0">
               <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="RowBorder" Property="Background" Value="#FF303E4D"/></Trigger>
-              <Trigger Property="IsSelected" Value="True"><Setter TargetName="RowBorder" Property="Background" Value="#FF355675"/></Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="RowBorder" Property="Background" Value="#FF303E4D"/>
+                <Setter TargetName="RowBorder" Property="BorderBrush" Value="#FF67B3FF"/>
+              </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate></Setter.Value></Setter>
         </Style>
@@ -349,11 +351,9 @@
           <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontSize="12">
             <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#FFA3AAB9"/><Style.Triggers>
               <DataTrigger Binding="{Binding IsInstalled}" Value="True"><Setter Property="Foreground" Value="#FFF1F7FF"/></DataTrigger>
-              <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True"><Setter Property="Foreground" Value="#FFF1F7FF"/></DataTrigger>
-              <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True"><Setter Property="Foreground" Value="#FFF1F7FF"/></DataTrigger>
             </Style.Triggers></Style></TextBlock.Style>
           </TextBlock>
-          <TextBlock Grid.Column="2" Text="★" Foreground="#FF67B3FF" FontSize="10" VerticalAlignment="Center" ToolTip="Favorite">
+          <TextBlock Grid.Column="2" Text="★" Foreground="#FF67B3FF" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" ToolTip="Favorite">
             <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Favorite}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
           </TextBlock>
         </Grid>
