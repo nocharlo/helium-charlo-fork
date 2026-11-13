@@ -361,7 +361,7 @@
       <ListBox.GroupStyle><GroupStyle>
         <GroupStyle.ContainerStyle><Style TargetType="GroupItem">
           <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="GroupItem">
-            <local:NavigatorGroupExpander IsExpanded="True" Foreground="#FFADBAC8" Margin="0,5,0,1">
+            <local:NavigatorGroupExpander IsExpanded="True" Focusable="True" IsTabStop="False" Foreground="#FFADBAC8" Margin="0,5,0,1">
               <Expander.Header><StackPanel Orientation="Horizontal"><TextBlock Text="{Binding Name.Label}" FontWeight="SemiBold"/>
                 <TextBlock Text="{Binding ItemCount, StringFormat=' ({0})'}" Opacity="0.6"/></StackPanel></Expander.Header>
               <ItemsPresenter/>
