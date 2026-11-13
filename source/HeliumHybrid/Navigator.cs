@@ -85,6 +85,7 @@ namespace HeliumHybrid
         private DesktopView lastDesktopView;
         private DispatcherOperation pendingViewSelection;
         private DispatcherOperation pendingOrganizationRestore;
+        private DispatcherOperation pendingMetadataSelection;
         private readonly NavigatorOrganizationSelection organizationSelection = new NavigatorOrganizationSelection();
         private int dirty = 1;
         private Guid[] lastIds = new Guid[0];
@@ -247,13 +248,18 @@ namespace HeliumHybrid
         }
         private void ConfigureGameActions()
         {
-            var actions = new NavigatorGameActions(api.Database.Games.Get, api.StartGame, api.InstallGame,
-                NavigatorGameActions.BindNativeEditor(api.MainView));
+            var database = api.Database;
+            var actions = new NavigatorGameActions(database.Games.Get, api.StartGame, api.InstallGame,
+                NavigatorGameActions.BindNativeEditor(api.MainView), database.Games.Update);
             var menu = new ContextMenu();
             var launch = new MenuItem { Header = "Play" };
             var edit = new MenuItem { Header = "Edit Game", InputGestureText = "F3" };
+            var categories = new MenuItem { Header = "Set Category" };
+            var completion = new MenuItem { Header = "Set Completion Status" };
             menu.Items.Add(launch);
             if (actions.HasNativeEditor) menu.Items.Add(edit);
+            menu.Items.Add(categories);
+            menu.Items.Add(completion);
             list.ContextMenu = menu;
 
             Guid target = Guid.Empty;
@@ -274,6 +280,29 @@ namespace HeliumHybrid
                 offered = actions.LaunchAction(target);
                 launch.Header = offered == NavigatorLaunchAction.Install ? "Install" : "Play";
                 launch.IsEnabled = offered != NavigatorLaunchAction.Unavailable;
+                var gameId = target;
+                var game = database.Games.Get(gameId);
+                var categoryIds = new HashSet<Guid>(game?.CategoryIds ?? Enumerable.Empty<Guid>());
+                categories.Items.Clear();
+                foreach (var category in database.Categories.OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)) {
+                    var id = category.Id;
+                    AddMetadataChoice(categories, category.Name, categoryIds.Contains(id), gameId,
+                        () => actions.ToggleCategory(gameId, database.Categories.Get(id)));
+                }
+                if (categories.Items.Count == 0)
+                    categories.Items.Add(new MenuItem { Header = "No categories defined", IsEnabled = false });
+                categories.IsEnabled = completion.IsEnabled = game != null;
+
+                completion.Items.Clear();
+                var statusId = game?.CompletionStatusId;
+                AddMetadataChoice(completion, "None", statusId == Guid.Empty, gameId,
+                    () => actions.SetCompletionStatus(gameId, Guid.Empty, null));
+                foreach (var item in database.CompletionStatuses.OrderBy(status => status.Name, StringComparer.CurrentCultureIgnoreCase)) {
+                    var id = item.Id;
+                    if (id == Guid.Empty) continue;
+                    AddMetadataChoice(completion, item.Name, statusId == id, gameId,
+                        () => actions.SetCompletionStatus(gameId, id, database.CompletionStatuses.Get(id)));
+                }
             };
             list.PreviewKeyDown += (s, e) => {
                 if (!(list.SelectedItem is GameRow row)) return;
@@ -285,6 +314,33 @@ namespace HeliumHybrid
                     Safe(() => actions.Edit(row.Id));
                 }
             };
+        }
+        private void AddMetadataChoice(MenuItem parent, string name, bool selected, Guid gameId, Func<bool> change)
+        {
+            var item = new MenuItem { Header = name.Replace("_", "__"), IsCheckable = true, IsChecked = selected };
+            item.Click += (s, e) => Safe(() => ApplyGameMetadataChange(gameId, change));
+            parent.Items.Add(item);
+        }
+        private void ApplyGameMetadataChange(Guid gameId, Func<bool> change)
+        {
+            var desktopView = library.ActiveDesktopView;
+            var wasSelected = library.IsSelected(gameId);
+            var priorRow = list.SelectedItem as GameRow;
+            var priorGroup = priorRow?.Id == gameId ? priorRow.GroupIdentity : null;
+            if (!change() || !wasSelected) return;
+
+            // Native regrouping can clear selection. Wait for the new filtered view before restoring it.
+            pendingMetadataSelection?.Abort();
+            pendingMetadataSelection = Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
+                pendingMetadataSelection = null;
+                if (!active || library.ActiveDesktopView != desktopView) return;
+                Safe(() => {
+                    var selected = library.SelectedIds();
+                    if (Logic.ShouldRestoreSelection(gameId, selected,
+                        () => library.FilteredGames.Any(game => game.Id == gameId))) SelectGame(gameId);
+                    if (library.IsSelected(gameId)) Refresh(gameId, priorGroup);
+                });
+            }));
         }
         private void SidebarDown(object sender, MouseButtonEventArgs args)
         {
@@ -449,6 +505,8 @@ namespace HeliumHybrid
             organizationSelection.Cancel();
             pendingOrganizationRestore?.Abort();
             pendingOrganizationRestore = null;
+            pendingMetadataSelection?.Abort();
+            pendingMetadataSelection = null;
             pendingViewSelection?.Abort();
             pendingViewSelection = null;
             gridIds = null;
@@ -576,6 +634,8 @@ namespace HeliumHybrid
             if (input != Mouse.PreviewMouseDownEvent && input != Keyboard.PreviewKeyDownEvent) return;
             // Native toolbar menus also run on this Dispatcher. A new gesture owns the selection.
             organizationSelection.Cancel();
+            pendingMetadataSelection?.Abort();
+            pendingMetadataSelection = null;
             organizationSelection.ObserveOrganization(library.ViewState(NavigatorGrouping));
         }
         private void SelectionChanged()
@@ -590,7 +650,7 @@ namespace HeliumHybrid
             });
         }
         public override void GameContextChanged(Game oldContext, Game newContext) { SelectionChanged(); }
-        private void Refresh()
+        private void Refresh(Guid metadataGameId = default(Guid), NavigatorGroupIdentity priorGroup = null)
         {
             if (!active || IsCollapsed() || Visibility != Visibility.Visible) return;
             Safe(() => {
@@ -663,6 +723,15 @@ namespace HeliumHybrid
                             return;
                         }
                     }
+                    if (metadataGameId != Guid.Empty && library.IsSelected(metadataGameId)) {
+                        var row = FindRevealRow(new HashSet<Guid> { metadataGameId }, priorGroup);
+                        if (row != null && (!Equals(row.GroupIdentity, priorGroup) ||
+                            !groupState.IsExpanded(effectiveGrouping, row.GroupIdentity))) {
+                            RevealRow(row);
+                            return;
+                        }
+                        if (row != null) SelectNavigatorRow(row);
+                    }
                     if (movedSelected) {
                         var selected = library.SelectedIds();
                         if (selected.Contains(selectedRow.Id) && currentView.Cast<GameRow>().Any(row => row.Id == selectedRow.Id)) {
@@ -720,9 +789,10 @@ namespace HeliumHybrid
         {
             if (view == null) return;
             var key = NavigatorProjection.SearchKey(search.Text);
+            var wasSyncing = syncing;
             syncing = true;
             try { view.Filter = obj => NavigatorProjection.Matches(((GameRow)obj).Key, key); view.Refresh(); }
-            finally { syncing = false; }
+            finally { syncing = wasSyncing; }
             count.Text = NavigatorProjection.DistinctGameCount(view.Cast<GameRow>().Select(r => r.Id)) + " games";
             status.Text = view.IsEmpty ? "No games found. Check the global filters too." : "";
             SyncSelection(false);
@@ -874,29 +944,40 @@ namespace HeliumHybrid
         private void RevealSelected(HashSet<Guid> selected)
         {
             if (view == null || IsCollapsed() || Visibility != Visibility.Visible) return;
-            var matching = view.Cast<GameRow>().Where(item => selected.Contains(item.Id)).ToList();
-            var row = matching.FirstOrDefault(item => groupState.IsExpanded(EffectiveGrouping, item.GroupIdentity)) ??
-                matching.FirstOrDefault();
-            if (row == null) return;
+            var row = FindRevealRow(selected, null);
+            if (row != null) RevealRow(row);
+        }
+        private GameRow FindRevealRow(HashSet<Guid> selected, NavigatorGroupIdentity priorGroup) =>
+            groupState.FindRevealOccurrence(EffectiveGrouping,
+                view.Cast<GameRow>().Where(item => selected.Contains(item.Id)), item => item.GroupIdentity, priorGroup);
+
+        private void RevealRow(GameRow row)
+        {
             var mode = EffectiveGrouping;
             if (mode != 0) {
                 groupState.SetExpanded(mode, row.GroupIdentity, true);
                 var visibleGroup = FindGroupExpander(list, row.GroupIdentity);
                 if (visibleGroup != null) visibleGroup.IsExpanded = true;
             }
-            syncing = true;
-            try { list.SelectedItem = row; }
-            finally { syncing = false; }
+            SelectNavigatorRow(row);
             list.ScrollIntoView(row);
             var currentView = view;
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
-                if (!active || !ReferenceEquals(view, currentView) || !view.Contains(row)) return;
+                if (!active || !ReferenceEquals(view, currentView) || !view.Contains(row) ||
+                    !ReferenceEquals(list.SelectedItem, row) || !library.IsSelected(row.Id)) return;
                 if (mode != 0) {
                     var group = FindGroupExpander(list, row.GroupIdentity);
                     if (group != null) group.IsExpanded = true;
                 }
                 list.ScrollIntoView(row);
             }));
+        }
+        private void SelectNavigatorRow(GameRow row)
+        {
+            var wasSyncing = syncing;
+            syncing = true;
+            try { list.SelectedItem = row; }
+            finally { syncing = wasSyncing; }
         }
         private static NavigatorGroupExpander FindGroupExpander(DependencyObject root, NavigatorGroupIdentity name)
         {

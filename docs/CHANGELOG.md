@@ -8,8 +8,9 @@ A history of changes to Helium (charlo fork), from the original Navigator protot
 - The Library Filters launcher highlights while the popup is open.
 - Escape returns to Grid from Full Details opened through the Navigator, using the same selection and scroll restoration as Home.
 - The Navigator game menu offers Play or Install for the chosen game. Edit Game and the Navigator's F3 shortcut open Playnite's native editor on hosts with SDK 6.13 or later.
+- Set Category toggles individual category memberships, and Set Completion Status selects or clears the game's status using Playnite's library metadata. A selected game that moves to another Navigator group is revealed there if it still matches the active filters.
 
-Category and completion status actions, native removal and uninstall, and Friendly Set Playtime integration are outside this increment.
+Native removal and uninstall and Friendly Set Playtime integration are outside this increment.
 
 ## v0.3.2 — Library Filters & Native Organization
 

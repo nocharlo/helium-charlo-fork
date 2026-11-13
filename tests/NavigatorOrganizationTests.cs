@@ -25,7 +25,7 @@ internal static class NavigatorOrganizationTests
     [STAThread]
     private static void Main()
     {
-        CatalogAndGroups(); Sorting(); Settings(); RemovedDefaultModes(); NativeOrganization(); OrganizationControls(); FilterWorkspace(); GameActions(); Presentation(); Campaign(); Benchmarks();
+        CatalogAndGroups(); Sorting(); Settings(); RemovedDefaultModes(); NativeOrganization(); OrganizationControls(); FilterWorkspace(); GameActions(); GameMetadataActions(); Presentation(); Campaign(); Benchmarks();
         Console.WriteLine("PASS: " + checks + " Navigator organization, settings and WPF model checks.");
     }
     private static void GameActions()
@@ -37,7 +37,8 @@ internal static class NavigatorOrganizationTests
         var played = new List<Guid>();
         var installs = new List<Guid>();
         var edited = new List<Guid>();
-        var actions = new NavigatorGameActions(Find, played.Add, installs.Add, id => { edited.Add(id); return false; });
+        var actions = new NavigatorGameActions(Find, played.Add, installs.Add, id => { edited.Add(id); return false; },
+            game => { throw new InvalidOperationException("Launch and edit must not write metadata"); });
 
         Check(actions.LaunchAction(installed.Id) == NavigatorLaunchAction.Play &&
             actions.LaunchAction(uninstalled.Id) == NavigatorLaunchAction.Install, "Menu labels follow native game state");
@@ -56,10 +57,53 @@ internal static class NavigatorOrganizationTests
         actions.Edit(uninstalled.Id);
         Check(actions.HasNativeEditor && edited.SequenceEqual(new[] { uninstalled.Id }),
             "Editor receives exactly the requested existing game");
-        var legacy = new NavigatorGameActions(Find, played.Add, installs.Add, null);
+        var legacy = new NavigatorGameActions(Find, played.Add, installs.Add, null,
+            game => { throw new InvalidOperationException("Launch and edit must not write metadata"); });
         legacy.Edit(installed.Id);
         Check(!legacy.HasNativeEditor && edited.Count == 1 &&
             legacy.LaunchAction(Guid.NewGuid()) == NavigatorLaunchAction.Unavailable, "Legacy SDK and missing games degrade safely");
+    }
+    private static void GameMetadataActions()
+    {
+        var original = new Game("Synthetic target") { Id = Guid.NewGuid(), Favorite = true };
+        var other = new Game("Synthetic other") { Id = Guid.NewGuid() };
+        var games = new Dictionary<Guid, Game> { { original.Id, original }, { other.Id, other } };
+        var first = new Category { Id = Guid.NewGuid(), Name = "First" };
+        var second = new Category { Id = Guid.NewGuid(), Name = "Second" };
+        var backlog = new CompletionStatus { Id = Guid.NewGuid(), Name = "Backlog" };
+        var done = new CompletionStatus { Id = Guid.NewGuid(), Name = "Done" };
+        var writes = 0;
+        var actions = new NavigatorGameActions(id => games.TryGetValue(id, out var game) ? game : null,
+            null, null, null, game => { games[game.Id] = game; writes++; });
+
+        var changed = actions.ToggleCategory(original.Id, first);
+        Check(changed && games[original.Id].CategoryIds.SequenceEqual(new[] { first.Id }) &&
+            original.CategoryIds == null && other.CategoryIds == null, "Assign to the captured uncategorized game only");
+        actions.ToggleCategory(original.Id, second);
+        Check(games[original.Id].CategoryIds.SequenceEqual(new[] { first.Id, second.Id }), "Add a category without replacing existing categories");
+        actions.ToggleCategory(original.Id, first);
+        Check(games[original.Id].CategoryIds.SequenceEqual(new[] { second.Id }), "Remove only the chosen category");
+        actions.ToggleCategory(original.Id, second);
+        Check(games[original.Id].CategoryIds == null && writes == 4, "Remove the last category using the SDK's unassigned representation");
+
+        actions.ToggleCategory(original.Id, first);
+        actions.SetCompletionStatus(original.Id, backlog.Id, backlog);
+        actions.SetCompletionStatus(original.Id, done.Id, done);
+        Check(games[original.Id].CompletionStatusId == done.Id && other.CompletionStatusId == Guid.Empty &&
+            games[original.Id].CategoryIds.SequenceEqual(new[] { first.Id }) && games[original.Id].Favorite,
+            "Replace only the captured game's status while preserving unrelated metadata");
+        var ignored = new[] {
+            actions.SetCompletionStatus(original.Id, done.Id, done),
+            actions.SetCompletionStatus(original.Id, backlog.Id, null),
+            actions.SetCompletionStatus(original.Id, backlog.Id, done),
+            actions.ToggleCategory(original.Id, null),
+            actions.ToggleCategory(Guid.NewGuid(), first),
+            actions.SetCompletionStatus(Guid.NewGuid(), done.Id, done)
+        };
+        Check(ignored.All(result => !result) && writes == 7 && games[original.Id].CompletionStatusId == done.Id,
+            "No writes for unchanged values, stale definitions or missing games");
+        actions.SetCompletionStatus(original.Id, Guid.Empty, null);
+        Check(games[original.Id].CompletionStatusId == Guid.Empty && writes == 8, "None clears the status using Guid.Empty");
     }
     private static void Campaign()
     {
