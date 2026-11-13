@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Playnite.SDK;
 using Playnite.SDK.Models;
 
@@ -11,13 +12,16 @@ namespace HeliumHybrid
         private readonly Func<Guid, Game> findGame;
         private readonly Action<Guid> play, install;
         private readonly Func<Guid, bool?> edit;
+        private readonly Action<Game> update;
 
-        internal NavigatorGameActions(Func<Guid, Game> findGame, Action<Guid> play, Action<Guid> install, Func<Guid, bool?> edit)
+        internal NavigatorGameActions(Func<Guid, Game> findGame, Action<Guid> play, Action<Guid> install,
+            Func<Guid, bool?> edit, Action<Game> update)
         {
             this.findGame = findGame;
             this.play = play;
             this.install = install;
             this.edit = edit;
+            this.update = update;
         }
 
         internal static Func<Guid, bool?> BindNativeEditor(IMainViewAPI mainView)
@@ -49,6 +53,31 @@ namespace HeliumHybrid
         internal void Edit(Guid id)
         {
             if (edit != null && findGame(id) != null) edit(id);
+        }
+
+        internal bool ToggleCategory(Guid id, Category category)
+        {
+            var game = findGame(id);
+            if (game == null || category == null) return false;
+
+            var categories = game.CategoryIds == null ? new List<Guid>() : new List<Guid>(game.CategoryIds);
+            if (categories.RemoveAll(categoryId => categoryId == category.Id) == 0) categories.Add(category.Id);
+            var updated = game.GetCopy();
+            updated.CategoryIds = categories.Count == 0 ? null : categories;
+            update(updated);
+            return true;
+        }
+
+        internal bool SetCompletionStatus(Guid id, Guid statusId, CompletionStatus status)
+        {
+            var game = findGame(id);
+            if (game == null || game.CompletionStatusId == statusId ||
+                (statusId != Guid.Empty && status?.Id != statusId)) return false;
+
+            var updated = game.GetCopy();
+            updated.CompletionStatusId = statusId;
+            update(updated);
+            return true;
         }
     }
 }

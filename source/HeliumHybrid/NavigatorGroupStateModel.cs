@@ -21,5 +21,19 @@ namespace HeliumHybrid
         }
         internal void SetExpanded(int mode, NavigatorGroupIdentity group, bool value)
         { if (group != null) expanded[Key(mode, "id:" + group.Key)] = value; }
+
+        internal T FindRevealOccurrence<T>(int mode, IEnumerable<T> occurrences,
+            Func<T, NavigatorGroupIdentity> groupOf, NavigatorGroupIdentity previousGroup) where T : class
+        {
+            T first = null;
+            T firstExpanded = null;
+            foreach (var occurrence in occurrences) {
+                var group = groupOf(occurrence);
+                if (previousGroup != null && Equals(previousGroup, group)) return occurrence;
+                if (first == null) first = occurrence;
+                if (firstExpanded == null && IsExpanded(mode, group)) firstExpanded = occurrence;
+            }
+            return firstExpanded ?? first;
+        }
     }
 }

@@ -102,6 +102,21 @@ class NavigatorRefreshDecisionTests
         Check(!NavigatorRefreshDecision.SelectedGroupMoved(first, oldGroup,
             new[] { new NavigatorProjectedRow { Id = second, GroupIdentity = newGroup } }),
             "Filtered-out game is not revealed");
+        var thirdGroup = new NavigatorGroupIdentity("category:third", "Third");
+        var occurrences = new[] { newGroup, thirdGroup };
+        var revealState = new NavigatorGroupState();
+        revealState.SetExpanded(2, newGroup, false);
+        Check(revealState.FindRevealOccurrence(2, occurrences, group => group, oldGroup) == thirdGroup,
+            "Prefer an already expanded category when the previous occurrence disappears");
+        revealState.SetExpanded(2, thirdGroup, false);
+        Check(revealState.FindRevealOccurrence(2, occurrences, group => group, oldGroup) == newGroup &&
+            !revealState.IsExpanded(2, thirdGroup),
+            "With collapsed destinations, pick the first projected occurrence and leave the other collapsed");
+        revealState.SetExpanded(2, newGroup, true);
+        Check(revealState.FindRevealOccurrence(2, occurrences, group => group, thirdGroup) == thirdGroup,
+            "Keep the previous category occurrence when it still exists");
+        Check(revealState.FindRevealOccurrence(4, new NavigatorGroupIdentity[0], group => group, oldGroup) == null,
+            "No destination is chosen for a game missing from the filtered Navigator");
         Check(NavigatorRefreshDecision.ClassifyRows(oldRows, visualRows) == NavigatorRowChange.Visual,
             "Indicator changes are visual across duplicate group rows");
         visualRows[0].Name = "Renamed";
