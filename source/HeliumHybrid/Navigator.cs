@@ -26,6 +26,7 @@ namespace HeliumHybrid
         private readonly LibraryStateAdapter library;
         private readonly NavigatorDiagnostics diagnostics;
         private readonly HybridPlugin plugin;
+        private readonly NavigatorGameActions gameActions;
         private readonly Grid root;
         private readonly ListBox list;
         private readonly TextBox search;
@@ -104,6 +105,8 @@ namespace HeliumHybrid
         public Navigator(IPlayniteAPI api, HybridPlugin plugin)
         {
             this.api = api; this.plugin = plugin; library = new LibraryStateAdapter(api);
+            gameActions = new NavigatorGameActions(api.Database.Games.Get, api.StartGame, api.InstallGame,
+                NavigatorGameActions.BindNativeEditor(api.MainView), api.Database.Games.Update);
             diagnostics = new NavigatorDiagnostics(NavigatorDiagnostics.Requested(),
                 message => LogManager.GetLogger().Info(message));
             prefs = plugin.Settings;
@@ -249,23 +252,21 @@ namespace HeliumHybrid
         private void ConfigureGameActions()
         {
             var database = api.Database;
-            var actions = new NavigatorGameActions(database.Games.Get, api.StartGame, api.InstallGame,
-                NavigatorGameActions.BindNativeEditor(api.MainView), database.Games.Update);
             var menu = new ContextMenu();
             var launch = new MenuItem { Header = "Play" };
             var edit = new MenuItem { Header = "Edit Game", InputGestureText = "F3" };
             var categories = new MenuItem { Header = "Set Category" };
             var completion = new MenuItem { Header = "Set Completion Status" };
             menu.Items.Add(launch);
-            if (actions.HasNativeEditor) menu.Items.Add(edit);
+            if (gameActions.HasNativeEditor) menu.Items.Add(edit);
             menu.Items.Add(categories);
             menu.Items.Add(completion);
             list.ContextMenu = menu;
 
             Guid target = Guid.Empty;
             var offered = NavigatorLaunchAction.Unavailable;
-            launch.Click += (s, e) => Safe(() => actions.Launch(target, offered));
-            edit.Click += (s, e) => Safe(() => actions.Edit(target));
+            launch.Click += (s, e) => Safe(() => gameActions.Launch(target, offered));
+            edit.Click += (s, e) => Safe(() => EditGame(target));
             list.ContextMenuOpening += (s, e) => {
                 sidebarClickTimer.Stop();
                 // Keyboard invocation uses the selected occurrence even when the pointer is over another row.
@@ -277,7 +278,7 @@ namespace HeliumHybrid
                 }
                 target = row.Id;
                 list.SelectedItem = row;
-                offered = actions.LaunchAction(target);
+                offered = gameActions.LaunchAction(target);
                 launch.Header = offered == NavigatorLaunchAction.Install ? "Install" : "Play";
                 launch.IsEnabled = offered != NavigatorLaunchAction.Unavailable;
                 var gameId = target;
@@ -287,7 +288,7 @@ namespace HeliumHybrid
                 foreach (var category in database.Categories.OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)) {
                     var id = category.Id;
                     AddMetadataChoice(categories, category.Name, categoryIds.Contains(id), gameId,
-                        () => actions.ToggleCategory(gameId, database.Categories.Get(id)));
+                        () => gameActions.ToggleCategory(gameId, database.Categories.Get(id)));
                 }
                 if (categories.Items.Count == 0)
                     categories.Items.Add(new MenuItem { Header = "No categories defined", IsEnabled = false });
@@ -296,12 +297,12 @@ namespace HeliumHybrid
                 completion.Items.Clear();
                 var statusId = game?.CompletionStatusId;
                 AddMetadataChoice(completion, "None", statusId == Guid.Empty, gameId,
-                    () => actions.SetCompletionStatus(gameId, Guid.Empty, null));
+                    () => gameActions.SetCompletionStatus(gameId, Guid.Empty, null));
                 foreach (var item in database.CompletionStatuses.OrderBy(status => status.Name, StringComparer.CurrentCultureIgnoreCase)) {
                     var id = item.Id;
                     if (id == Guid.Empty) continue;
                     AddMetadataChoice(completion, item.Name, statusId == id, gameId,
-                        () => actions.SetCompletionStatus(gameId, id, database.CompletionStatuses.Get(id)));
+                        () => gameActions.SetCompletionStatus(gameId, id, database.CompletionStatuses.Get(id)));
                 }
             };
             list.PreviewKeyDown += (s, e) => {
@@ -309,9 +310,9 @@ namespace HeliumHybrid
                 if (e.Key == Key.Enter) {
                     StartSelected();
                     e.Handled = true;
-                } else if (e.Key == Key.F3 && Keyboard.Modifiers == ModifierKeys.None && actions.HasNativeEditor) {
+                } else if (e.Key == Key.F3 && Keyboard.Modifiers == ModifierKeys.None && gameActions.HasNativeEditor) {
                     e.Handled = true;
-                    Safe(() => actions.Edit(row.Id));
+                    Safe(() => EditGame(row.Id));
                 }
             };
         }
@@ -886,20 +887,40 @@ namespace HeliumHybrid
         private void WindowPreviewKeyDown(object sender, KeyEventArgs args)
         {
             CloseSortGroupOnEscape(args);
+            if (args.Key != Key.F3 || !gameActions.HasNativeEditor ||
+                library.ActiveDesktopView != DesktopView.Details || !CanHandleWindowKey(args)) return;
+            var selected = library.SelectedIds();
+            if (selected.Count != 1) return;
+            args.Handled = true;
+            Safe(() => EditGame(selected.Single()));
         }
         private void WindowKeyDown(object sender, KeyEventArgs args)
         {
             // Let focused controls and Playnite handle Escape before offering the Home action.
-            if (args.Handled || args.Key != Key.Escape || args.IsRepeat ||
-                Keyboard.Modifiers != ModifierKeys.None || !navigatedDetails ||
+            if (args.Key == Key.Escape && navigatedDetails && CanHandleWindowKey(args))
+                Safe(() => args.Handled = ReturnToGrid());
+        }
+        private bool CanHandleWindowKey(KeyEventArgs args)
+        {
+            if (!active || args.Handled || args.IsRepeat || Keyboard.Modifiers != ModifierKeys.None ||
                 window?.IsActive != true || filtersPopup.IsOpen || sortGroupPopup.IsOpen ||
-                list.ContextMenu?.IsOpen == true || Mouse.Captured != null) return;
+                list.ContextMenu?.IsOpen == true || Mouse.Captured != null) return false;
 
+            var focused = Keyboard.FocusedElement ?? args.OriginalSource as IInputElement;
+            return focused is Visual visual && PresentationSource.FromVisual(visual) == PresentationSource.FromVisual(window) &&
+                !(focused is TextBoxBase || focused is PasswordBox || focused is MenuItem);
+        }
+        private void EditGame(Guid id)
+        {
+            var owner = window;
             var focused = Keyboard.FocusedElement;
-            if (!(focused is Visual visual) || PresentationSource.FromVisual(visual) != PresentationSource.FromVisual(window) ||
-                focused is TextBoxBase || focused is PasswordBox || focused is MenuItem) return;
+            gameActions.Edit(id);
 
-            Safe(() => args.Handled = ReturnToGrid());
+            // The native modal can return focus to a control from the view that opened Details.
+            if (!active || owner?.IsActive != true || library.ActiveDesktopView != DesktopView.Details) return;
+            if (Keyboard.FocusedElement is UIElement current && current.IsVisible && owner.IsKeyboardFocusWithin) return;
+            if (focused is UIElement previous && previous.IsVisible && previous.Focus()) return;
+            owner.Focus();
         }
         private void CloseSortGroupOnEscape(KeyEventArgs args)
         {
