@@ -55,6 +55,26 @@ namespace HeliumHybrid
             if (edit != null && findGame(id) != null) edit(id);
         }
 
+        internal bool SetFavorite(Guid id, bool value)
+        {
+            var game = findGame(id);
+            if (game == null || game.Favorite == value) return false;
+            var updated = game.GetCopy();
+            updated.Favorite = value;
+            update(updated);
+            return true;
+        }
+
+        internal bool SetHidden(Guid id, bool value)
+        {
+            var game = findGame(id);
+            if (game == null || game.Hidden == value) return false;
+            var updated = game.GetCopy();
+            updated.Hidden = value;
+            update(updated);
+            return true;
+        }
+
         internal bool ToggleCategory(Guid id, Category category)
         {
             var game = findGame(id);

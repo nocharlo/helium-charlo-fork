@@ -104,6 +104,17 @@ internal static class NavigatorOrganizationTests
             "No writes for unchanged values, stale definitions or missing games");
         actions.SetCompletionStatus(original.Id, Guid.Empty, null);
         Check(games[original.Id].CompletionStatusId == Guid.Empty && writes == 8, "None clears the status using Guid.Empty");
+
+        Check(actions.SetFavorite(original.Id, false) && !games[original.Id].Favorite && original.Favorite &&
+            !games[other.Id].Favorite && !actions.SetFavorite(original.Id, false),
+            "Remove from Favorites updates only the target and ignores an already-applied action");
+        Check(actions.SetFavorite(original.Id, true) && games[original.Id].Favorite,
+            "Add to Favorites restores the flag");
+        Check(actions.SetHidden(other.Id, true) && games[other.Id].Hidden && !games[original.Id].Hidden &&
+            !actions.SetHidden(other.Id, true), "Hide updates only the target and ignores an already-applied action");
+        Check(actions.SetHidden(other.Id, false) && !games[other.Id].Hidden &&
+            !actions.SetHidden(Guid.Empty, true) && !actions.SetFavorite(Guid.Empty, true) && writes == 12,
+            "Unhide restores visibility and missing games cannot be changed");
     }
     private static void Campaign()
     {

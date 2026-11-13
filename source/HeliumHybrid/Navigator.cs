@@ -258,9 +258,15 @@ namespace HeliumHybrid
             var menu = new ContextMenu();
             var launch = new MenuItem { Header = "Play" };
             var edit = new MenuItem { Header = "Edit Game", InputGestureText = "F3" };
+            var favorite = new MenuItem();
+            var hidden = new MenuItem();
             var categories = new MenuItem { Header = "Set Category" };
             var completion = new MenuItem { Header = "Set Completion Status" };
             menu.Items.Add(launch);
+            menu.Items.Add(new Separator());
+            menu.Items.Add(favorite);
+            menu.Items.Add(hidden);
+            menu.Items.Add(new Separator());
             if (gameActions.HasNativeEditor) menu.Items.Add(edit);
             menu.Items.Add(categories);
             menu.Items.Add(completion);
@@ -268,8 +274,17 @@ namespace HeliumHybrid
 
             Guid target = Guid.Empty;
             var offered = NavigatorLaunchAction.Unavailable;
+            bool setFavorite = false, setHidden = false;
             launch.Click += (s, e) => Safe(() => gameActions.Launch(target, offered));
             edit.Click += (s, e) => Safe(() => EditGame(target));
+            favorite.Click += (s, e) => Safe(() => {
+                var id = target;
+                ApplyGameMetadataChange(id, () => gameActions.SetFavorite(id, setFavorite));
+            });
+            hidden.Click += (s, e) => Safe(() => {
+                var id = target;
+                ApplyGameMetadataChange(id, () => gameActions.SetHidden(id, setHidden));
+            });
             list.ContextMenuOpening += (s, e) => {
                 sidebarClickTimer.Stop();
                 // Keyboard invocation uses the selected occurrence even when the pointer is over another row.
@@ -286,6 +301,11 @@ namespace HeliumHybrid
                 launch.IsEnabled = offered != NavigatorLaunchAction.Unavailable;
                 var gameId = target;
                 var game = database.Games.Get(gameId);
+                setFavorite = game?.Favorite != true;
+                setHidden = game?.Hidden != true;
+                favorite.Header = setFavorite ? "Add to Favorites" : "Remove from Favorites";
+                hidden.Header = setHidden ? "Hide this game" : "Unhide this game";
+                favorite.IsEnabled = hidden.IsEnabled = game != null;
                 var categoryIds = new HashSet<Guid>(game?.CategoryIds ?? Enumerable.Empty<Guid>());
                 categories.Items.Clear();
                 foreach (var category in database.Categories.OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)) {
