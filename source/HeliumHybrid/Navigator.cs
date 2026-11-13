@@ -306,6 +306,10 @@ namespace HeliumHybrid
                 }
             };
             list.PreviewKeyDown += (s, e) => {
+                if (Keyboard.Modifiers == ModifierKeys.None && HandleNavigatorArrow(e.Key)) {
+                    e.Handled = true;
+                    return;
+                }
                 if (!(list.SelectedItem is GameRow row)) return;
                 if (e.Key == Key.Enter) {
                     StartSelected();
@@ -315,6 +319,43 @@ namespace HeliumHybrid
                     Safe(() => EditGame(row.Id));
                 }
             };
+        }
+        private bool HandleNavigatorArrow(Key key)
+        {
+            if (view == null || (key != Key.Up && key != Key.Down && key != Key.Left && key != Key.Right) ||
+                !(Keyboard.FocusedElement is Visual focus)) return false;
+            var focusedRow = RowUnderPointer(focus)?.DataContext as GameRow;
+            NavigatorGroupExpander header = null;
+            if (focusedRow == null) {
+                for (DependencyObject element = focus; element != null && element != list;
+                    element = VisualTreeHelper.GetParent(element)) {
+                    if (element is NavigatorGroupExpander expander) { header = expander; break; }
+                }
+                if (header == null && focus != list) return false;
+            }
+            var row = focusedRow ?? (header == null ? list.SelectedItem as GameRow : null);
+            var group = row?.GroupIdentity ?? (header?.DataContext as CollectionViewGroup)?.Name as NavigatorGroupIdentity;
+            var mode = EffectiveGrouping;
+            if (key == Key.Left || key == Key.Right) {
+                if (mode == 0 || group == null) return false;
+                var expander = header ?? FindGroupExpander(list, group);
+                if (expander == null) return false;
+                var expanded = key == Key.Right;
+                if (!expanded && header == null) expander.Focus();
+                expander.IsExpanded = expanded;
+                return true;
+            }
+            var next = groupState.NextVisibleOccurrence(mode, view.Cast<GameRow>(), item => item.GroupIdentity,
+                row, header == null ? null : group, key == Key.Down);
+            if (next == null) return true;
+            list.SelectedItem = next;
+            list.ScrollIntoView(next);
+            if (list.ItemContainerGenerator.ContainerFromItem(next) is ListBoxItem container) container.Focus();
+            else Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
+                if (list.IsKeyboardFocusWithin && ReferenceEquals(list.SelectedItem, next) &&
+                    list.ItemContainerGenerator.ContainerFromItem(next) is ListBoxItem realized) realized.Focus();
+            }));
+            return true;
         }
         private void AddMetadataChoice(MenuItem parent, string name, bool selected, Guid gameId, Func<bool> change)
         {

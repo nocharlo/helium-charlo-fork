@@ -117,6 +117,23 @@ class NavigatorRefreshDecisionTests
             "Keep the previous category occurrence when it still exists");
         Check(revealState.FindRevealOccurrence(4, new NavigatorGroupIdentity[0], group => group, oldGroup) == null,
             "No destination is chosen for a game missing from the filtered Navigator");
+        var keyboardRows = new[] {
+            new NavigatorProjectedRow { Id = first, GroupIdentity = oldGroup },
+            new NavigatorProjectedRow { Id = second, GroupIdentity = thirdGroup },
+            new NavigatorProjectedRow { Id = first, GroupIdentity = newGroup }
+        };
+        var keyboardState = new NavigatorGroupState();
+        keyboardState.SetExpanded(2, thirdGroup, false);
+        Func<NavigatorProjectedRow, NavigatorGroupIdentity> groupOf = row => row.GroupIdentity;
+        Check(keyboardState.NextVisibleOccurrence(2, keyboardRows, groupOf, keyboardRows[0], null, true) == keyboardRows[2],
+            "Down skips collapsed groups and reaches a distinct occurrence of the same game");
+        Check(keyboardState.NextVisibleOccurrence(2, keyboardRows, groupOf, null, thirdGroup, false) == keyboardRows[0],
+            "Up from a collapsed header finds the preceding visible occurrence");
+        Check(keyboardState.NextVisibleOccurrence(2, keyboardRows, groupOf, null, null, true) == keyboardRows[0] &&
+            keyboardState.NextVisibleOccurrence(2, keyboardRows, groupOf, null, null, false) == keyboardRows[2],
+            "From neutral selection, Down starts at the first visible occurrence and Up at the last");
+        Check(keyboardState.NextVisibleOccurrence(2, keyboardRows, groupOf, keyboardRows[2], null, true) == null,
+            "Down at the last visible occurrence does not wrap");
         Check(NavigatorRefreshDecision.ClassifyRows(oldRows, visualRows) == NavigatorRowChange.Visual,
             "Indicator changes are visual across duplicate group rows");
         visualRows[0].Name = "Renamed";

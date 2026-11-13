@@ -22,6 +22,29 @@ namespace HeliumHybrid
         internal void SetExpanded(int mode, NavigatorGroupIdentity group, bool value)
         { if (group != null) expanded[Key(mode, "id:" + group.Key)] = value; }
 
+        internal T NextVisibleOccurrence<T>(int mode, IEnumerable<T> rows,
+            Func<T, NavigatorGroupIdentity> groupOf, T current, NavigatorGroupIdentity header, bool down) where T : class
+        {
+            var pastAnchor = current == null && header == null;
+            T previous = null;
+            foreach (var row in rows) {
+                var group = groupOf(row);
+                if (!pastAnchor && header != null && Equals(header, group)) {
+                    if (!down) return previous;
+                    pastAnchor = true;
+                }
+                if (ReferenceEquals(row, current)) {
+                    if (!down) return previous;
+                    pastAnchor = true;
+                    continue;
+                }
+                if (!IsExpanded(mode, group)) continue;
+                if (pastAnchor && down) return row;
+                previous = row;
+            }
+            return current == null && header == null && !down ? previous : null;
+        }
+
         internal T FindRevealOccurrence<T>(int mode, IEnumerable<T> occurrences,
             Func<T, NavigatorGroupIdentity> groupOf, NavigatorGroupIdentity previousGroup) where T : class
         {
