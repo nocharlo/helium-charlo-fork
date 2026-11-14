@@ -25,6 +25,13 @@
     <TextBlock x:Key="UnHideIcon" Text="&#xef21;" FontFamily="{DynamicResource FontIcoFont}" FontWeight="Light"/>
     <TextBlock x:Key="EditGameIcon" Text="&#xeded;" FontFamily="{DynamicResource FontIcoFont}" FontWeight="Light"/>
     <TextBlock x:Key="RemoveGameIcon" Text="&#xec53;" FontFamily="{DynamicResource FontIcoFont}" Foreground="OrangeRed" FontWeight="Light"/>
+    <DrawingImage x:Key="HeliumCharlo_UninstallIcon">
+        <DrawingImage.Drawing>
+            <GeometryDrawing Geometry="M 1,5 L 4,2 12,2 15,5 15,14 1,14 Z M 1,5 L 15,5 M 5,10 L 11,10">
+                <GeometryDrawing.Pen><Pen Brush="OrangeRed" Thickness="1.3"/></GeometryDrawing.Pen>
+            </GeometryDrawing>
+        </DrawingImage.Drawing>
+    </DrawingImage>
     <TextBlock x:Key="DiceIcon" Text="&#xef03;" FontFamily="{DynamicResource FontIcoFont}" FontWeight="Light"/>
     <TextBlock x:Key="ManualIcon" Text="&#xead1;" FontFamily="{DynamicResource FontIcoFont}" FontWeight="Light"/>
     <TextBlock x:Key="BackupIcon" Text="&#xeea5;" FontFamily="{DynamicResource FontIcoFont}" />
