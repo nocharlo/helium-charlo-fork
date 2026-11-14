@@ -5,6 +5,8 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using Playnite.SDK.Models;
 
@@ -69,6 +71,9 @@ namespace HeliumHybrid
         private readonly DispatcherTimer searchTimer, textTimer;
         private readonly Dictionary<FilterWorkspaceField, string> pendingText = new Dictionary<FilterWorkspaceField, string>();
         private FilterPresetSettings shown;
+        private Point? movedPosition;
+        private Rect workArea, ownerArea;
+        private double verticalScale = 1;
         private bool layoutDirty = true, syncingText;
         internal bool HasManagedSelection => active.Children.Count > 0;
 
@@ -94,18 +99,106 @@ namespace HeliumHybrid
 
         internal void Position(Popup popup, Window window)
         {
-            if (window == null) return;
+            var source = window == null ? null : PresentationSource.FromVisual(window);
+            if (source == null) return;
+            var screen = System.Windows.Forms.Screen.FromHandle(new WindowInteropHelper(window).Handle).WorkingArea;
+            workArea = new Rect(window.PointFromScreen(new Point(screen.Left, screen.Top)),
+                window.PointFromScreen(new Point(screen.Right, screen.Bottom)));
+            ownerArea = Rect.Intersect(new Rect(new Point(), window.RenderSize), workArea);
+            if (ownerArea.IsEmpty) ownerArea = workArea;
+            verticalScale = source.CompositionTarget.TransformToDevice.M22;
             popup.PlacementTarget = window;
-            frame.Width = Math.Max(1, Math.Min(820, window.ActualWidth - 20));
-            frame.MaxHeight = Math.Max(1, Math.Min(610, window.ActualHeight - 32));
+            movedPosition = preferences.HasFilterPopupPosition
+                ? new Point(preferences.FilterPopupX.Value, preferences.FilterPopupY.Value) : (Point?)null;
+            ApplyDimensions(popup);
+        }
+
+        internal void EnableWindowGestures(Popup popup, Thumb title, Thumb resize, Action save)
+        {
+            Point startPointer = new Point(), startPosition = new Point();
+            Size startSize = new Size();
+            bool sizeChanged = false;
+            Point Pointer(Window window, Thumb handle) => window.PointFromScreen(handle.PointToScreen(Mouse.GetPosition(handle)));
+            void Start(object sender, DragStartedEventArgs args)
+            {
+                if (!(popup.PlacementTarget is Window window)) return;
+                startPointer = Pointer(window, (Thumb)sender);
+                startPosition = window.PointFromScreen(frame.PointToScreen(new Point()));
+                startSize = frame.RenderSize;
+                sizeChanged = false;
+            }
+            title.DragStarted += Start;
+            resize.DragStarted += Start;
+            title.DragDelta += (s, e) => {
+                if (!(popup.PlacementTarget is Window window)) return;
+                movedPosition = startPosition + (Pointer(window, title) - startPointer);
+                ApplyAnchor(popup);
+            };
+            resize.DragDelta += (s, e) => {
+                if (!(popup.PlacementTarget is Window window)) return;
+                var delta = Pointer(window, resize) - startPointer;
+                var maxWidth = Math.Min(ManualWidthLimit, workArea.Right - startPosition.X);
+                var maxHeight = Math.Min(ManualHeightLimit, workArea.Bottom - startPosition.Y);
+                if (maxWidth < Preferences.MinFilterWidth || maxHeight < Preferences.MinFilterHeight) return;
+                preferences.FilterPopupWidth = Bound(startSize.Width + delta.X, Preferences.MinFilterWidth, maxWidth);
+                preferences.FilterPopupHeight = Bound(startSize.Height + delta.Y, Preferences.MinFilterHeight, maxHeight);
+                movedPosition = startPosition;
+                sizeChanged = true;
+                ApplyDimensions(popup);
+            };
+            void SavePosition()
+            {
+                if (!movedPosition.HasValue) return;
+                preferences.FilterPopupX = movedPosition.Value.X;
+                preferences.FilterPopupY = movedPosition.Value.Y;
+                save();
+            }
+            title.DragCompleted += (s, e) => { if (!e.Canceled && movedPosition.HasValue) SavePosition(); };
+            resize.DragCompleted += (s, e) => { if (sizeChanged) SavePosition(); };
+        }
+
+        // WPF restricts a Popup to 75% of the screen area. Both manual dimensions stay within that limit.
+        private double ManualWidthLimit => Math.Max(1, Math.Min(Preferences.MaxFilterWidth, workArea.Width * .85));
+        private double ManualHeightLimit => Math.Max(1, Math.Min(Preferences.MaxFilterHeight, workArea.Height * .85));
+
+        private void ApplyDimensions(Popup popup)
+        {
+            var manual = preferences.HasFilterPopupSize;
+            frame.MaxWidth = manual ? ManualWidthLimit : 820;
+            frame.Width = manual ? Math.Min(preferences.FilterPopupWidth, ManualWidthLimit)
+                : Math.Max(1, Math.Min(820, ownerArea.Width - 20));
+            frame.MaxHeight = manual ? Math.Min(preferences.FilterPopupHeight, ManualHeightLimit)
+                : Math.Max(1, Math.Min(610, ownerArea.Height - 32));
+            frame.Height = manual ? frame.MaxHeight : double.NaN;
             // The vertical scrollbar must not change the number of columns when a field opens.
             host.SetWorkspaceWidth(frame.Width - frame.Padding.Left - frame.Padding.Right
                 - frame.BorderThickness.Left - frame.BorderThickness.Right);
+            ApplyAnchor(popup);
         }
 
-        internal CustomPopupPlacement[] Place(Size popup, Size target, Point offset) =>
-            new[] { new CustomPopupPlacement(new Point(Math.Max(0, (target.Width - popup.Width) / 2),
-                Math.Max(0, (target.Height - frame.MaxHeight) / 2)), PopupPrimaryAxis.None) };
+        private void ApplyAnchor(Popup popup)
+        {
+            if (movedPosition.HasValue) {
+                // Reserve the full possible height so expanding a field cannot move the header.
+                var anchor = KeepOnScreen(movedPosition.Value, workArea, new Size(frame.Width, frame.MaxHeight));
+                movedPosition = anchor;
+                popup.PlacementRectangle = new Rect(anchor, new Size());
+            } else {
+                popup.PlacementRectangle = ownerArea;
+            }
+        }
+
+        internal CustomPopupPlacement[] Place(Size popup, Size target, Point offset)
+        {
+            var point = movedPosition.HasValue ? new Point() : new Point(Math.Max(0, (target.Width - popup.Width) / 2),
+                Math.Max(0, (target.Height - frame.MaxHeight * verticalScale) / 2));
+            return new[] { new CustomPopupPlacement(point, PopupPrimaryAxis.None) };
+        }
+
+        internal static Point KeepOnScreen(Point point, Rect area, Size reserved) =>
+            new Point(Bound(point.X, area.Left, area.Right - reserved.Width), Bound(point.Y, area.Top, area.Bottom - reserved.Height));
+
+        private static double Bound(double value, double min, double max) => Math.Max(min, Math.Min(value, max));
 
         internal void InvalidateLayout() => layoutDirty = true;
 

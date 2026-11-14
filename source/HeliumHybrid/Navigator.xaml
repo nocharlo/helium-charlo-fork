@@ -179,7 +179,16 @@
           <TextBlock Grid.Column="1" Text="Search by name" Foreground="{StaticResource SteamMutedBrush}" VerticalAlignment="Center" IsHitTestVisible="False">
             <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=Search}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
           </TextBlock>
-          <Button x:Name="FiltersButton" Grid.Column="2" Style="{StaticResource ToolbarButtonStyle}" Width="31" Height="32" ToolTip="Library Filters" AutomationProperties.Name="Library Filters">
+          <Button x:Name="FiltersButton" Grid.Column="2" Width="31" Height="32" ToolTip="Library Filters" AutomationProperties.Name="Library Filters">
+            <Button.Style>
+              <Style TargetType="Button" BasedOn="{StaticResource ToolbarButtonStyle}">
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding IsOpen, ElementName=FiltersPopup}" Value="True">
+                    <Setter Property="Foreground" Value="#FF56B8F4"/>
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </Button.Style>
             <Viewbox Width="20" Height="20"><Canvas Width="24" Height="24"><Path Data="M2.5,6.5 L21.5,6.5 M5.5,12 L18.5,12 M8.5,17.5 L15.5,17.5" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2.5" StrokeStartLineCap="Flat" StrokeEndLineCap="Flat"/></Canvas></Viewbox>
           </Button>
           <TextBlock x:Name="FilterIndicator" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,1,1,0" Foreground="#FF78B9E7" FontSize="9" IsHitTestVisible="False"/>
@@ -191,7 +200,15 @@
             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
             <DockPanel Grid.Row="0" Margin="0,0,0,7">
               <Button x:Name="CloseFilters" DockPanel.Dock="Right" Content="×" Width="24" Height="23" Style="{StaticResource ToolbarButtonStyle}" AutomationProperties.Name="Close filters"/>
-              <TextBlock Text="Library Filters" FontWeight="SemiBold" FontSize="17" VerticalAlignment="Center"/>
+              <Thumb x:Name="FilterTitleGrip" Focusable="False" Cursor="SizeAll" Foreground="{DynamicResource TextBrush}"
+                     AutomationProperties.Name="Move Library Filters">
+                <Thumb.Template><ControlTemplate TargetType="Thumb">
+                  <Border Background="Transparent">
+                    <TextBlock Text="Library Filters" Foreground="{TemplateBinding Foreground}"
+                               FontWeight="SemiBold" FontSize="17" VerticalAlignment="Center"/>
+                  </Border>
+                </ControlTemplate></Thumb.Template>
+              </Thumb>
             </DockPanel>
             <TextBox x:Name="FilterOptionSearch" Grid.Row="1" Height="29" Margin="0,0,0,8" Style="{StaticResource FilterInputStyle}" AutomationProperties.Name="Search filter fields and values"/>
             <TextBlock Grid.Row="1" Text="Search fields and values…" Foreground="{DynamicResource SteamMutedBrush}" Margin="8,0,0,8" VerticalAlignment="Center" IsHitTestVisible="False">
@@ -211,7 +228,15 @@
                 <local:FilterWorkspaceColumns x:Name="FilterSections"/>
               </StackPanel>
             </ScrollViewer>
-            <Button x:Name="ClearAllFilters" Grid.Row="4" Content="Clear filters" HorizontalAlignment="Right" Padding="8,4" Margin="7,8,0,0"/>
+            <Button x:Name="ClearAllFilters" Grid.Row="4" Content="Clear filters" HorizontalAlignment="Right" Padding="8,4" Margin="7,8,20,0"/>
+            <Thumb x:Name="FilterSizeGrip" Grid.Row="4" Focusable="False" Cursor="SizeNWSE" Width="16" Height="16"
+                   HorizontalAlignment="Right" VerticalAlignment="Bottom" AutomationProperties.Name="Resize Library Filters">
+              <Thumb.Template><ControlTemplate TargetType="Thumb">
+                <Border Background="Transparent">
+                  <Path Data="M4,12 L12,4 M8,12 L12,8" Stroke="{DynamicResource SteamMutedBrush}" StrokeThickness="1"/>
+                </Border>
+              </ControlTemplate></Thumb.Template>
+            </Thumb>
           </Grid>
         </Border>
       </Popup>
@@ -300,15 +325,23 @@
       <ListBox.ItemContainerStyle>
         <Style TargetType="ListBoxItem">
           <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-          <Setter Property="Padding" Value="4,0"/>
           <Setter Property="MinHeight" Value="26"/>
           <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
-            <Border x:Name="RowBorder" Background="Transparent" Padding="{TemplateBinding Padding}">
+            <Grid>
+            <Border x:Name="RowBorder" Background="Transparent" BorderBrush="Transparent" BorderThickness="2,0,0,0" Padding="2,0,4,0">
               <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
             </Border>
+            <Border x:Name="ContextOutline" BorderBrush="#FFA8CFEF" BorderThickness="1" Visibility="Collapsed" IsHitTestVisible="False"/>
+            </Grid>
             <ControlTemplate.Triggers>
+              <DataTrigger Binding="{Binding IsContextTarget}" Value="True">
+                <Setter TargetName="ContextOutline" Property="Visibility" Value="Visible"/>
+              </DataTrigger>
               <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="RowBorder" Property="Background" Value="#FF303E4D"/></Trigger>
-              <Trigger Property="IsSelected" Value="True"><Setter TargetName="RowBorder" Property="Background" Value="#FF355675"/></Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="RowBorder" Property="Background" Value="#FF303E4D"/>
+                <Setter TargetName="RowBorder" Property="BorderBrush" Value="#FF67B3FF"/>
+              </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate></Setter.Value></Setter>
         </Style>
@@ -324,11 +357,9 @@
           <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontSize="12">
             <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#FFA3AAB9"/><Style.Triggers>
               <DataTrigger Binding="{Binding IsInstalled}" Value="True"><Setter Property="Foreground" Value="#FFF1F7FF"/></DataTrigger>
-              <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True"><Setter Property="Foreground" Value="#FFF1F7FF"/></DataTrigger>
-              <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True"><Setter Property="Foreground" Value="#FFF1F7FF"/></DataTrigger>
             </Style.Triggers></Style></TextBlock.Style>
           </TextBlock>
-          <TextBlock Grid.Column="2" Text="★" Foreground="#FF67B3FF" FontSize="10" VerticalAlignment="Center" ToolTip="Favorite">
+          <TextBlock Grid.Column="2" Text="★" Foreground="#FF67B3FF" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" ToolTip="Favorite">
             <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Favorite}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
           </TextBlock>
         </Grid>
@@ -336,7 +367,7 @@
       <ListBox.GroupStyle><GroupStyle>
         <GroupStyle.ContainerStyle><Style TargetType="GroupItem">
           <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="GroupItem">
-            <local:NavigatorGroupExpander IsExpanded="True" Foreground="#FFADBAC8" Margin="0,5,0,1">
+            <local:NavigatorGroupExpander IsExpanded="True" Focusable="True" IsTabStop="False" Foreground="#FFADBAC8" Margin="0,5,0,1">
               <Expander.Header><StackPanel Orientation="Horizontal"><TextBlock Text="{Binding Name.Label}" FontWeight="SemiBold"/>
                 <TextBlock Text="{Binding ItemCount, StringFormat=' ({0})'}" Opacity="0.6"/></StackPanel></Expander.Header>
               <ItemsPresenter/>

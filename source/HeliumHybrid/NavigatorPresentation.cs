@@ -19,7 +19,17 @@ namespace HeliumHybrid
         public long GroupOrder { get; set; }
         public ulong? SortValue { get; set; }
         public string SortText { get; set; }
-        private bool isInstalled, favorite;
+        private bool isInstalled, favorite, isContextTarget;
+        public bool IsContextTarget
+        {
+            get => isContextTarget;
+            internal set
+            {
+                if (isContextTarget == value) return;
+                isContextTarget = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsContextTarget)));
+            }
+        }
         public bool IsInstalled { get => isInstalled; set { if (isInstalled == value) return; isInstalled = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsInstalled))); } }
         public bool Favorite { get => favorite; set { if (favorite == value) return; favorite = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Favorite))); } }
         public event PropertyChangedEventHandler PropertyChanged;

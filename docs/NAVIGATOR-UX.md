@@ -20,3 +20,6 @@ For example, **Following Playnite** already tells users who controls the sort. H
 
 - Short option descriptions and helper fragments omit terminal periods. Keep ellipses for search placeholders and punctuation for complete error messages.
 - Put paired customization lists in equal-width panels when space permits and stack them on narrow windows. Preserve each list's search, selection, and scroll state while resizing. Keep checkbox visibility, row selection, and keyboard focus visually distinct.
+
+- Right-click opens a game menu for that row while preserving the active library selection and scroll position. Keyboard invocation uses the selected row.
+- A launcher that opens a floating panel also closes it on the next click. Keep its active state tied to panel visibility.

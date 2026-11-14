@@ -24,6 +24,19 @@ namespace HeliumHybrid
         [XmlIgnore] public bool VisibleGroupingModesSpecified { get; set; }
         [XmlIgnore] public bool VisibleSortingModesSpecified { get; set; }
         public List<FilterGroupPreference> FilterWorkspace { get; set; }
+        internal const double MinFilterWidth = 320, MaxFilterWidth = 1200, MinFilterHeight = 260, MaxFilterHeight = 900;
+        public double FilterPopupWidth { get; set; }
+        public double FilterPopupHeight { get; set; }
+        public double? FilterPopupX { get; set; }
+        public double? FilterPopupY { get; set; }
+        [XmlIgnore] internal bool HasFilterPopupPosition => FilterPopupX.HasValue && FilterPopupY.HasValue &&
+            Math.Abs(FilterPopupX.Value) <= 100000 && Math.Abs(FilterPopupY.Value) <= 100000;
+        public bool ShouldSerializeFilterPopupX() => HasFilterPopupPosition;
+        public bool ShouldSerializeFilterPopupY() => HasFilterPopupPosition;
+        [XmlIgnore] internal bool HasFilterPopupSize => FilterPopupWidth >= MinFilterWidth && FilterPopupWidth <= MaxFilterWidth &&
+            FilterPopupHeight >= MinFilterHeight && FilterPopupHeight <= MaxFilterHeight;
+        public bool ShouldSerializeFilterPopupWidth() => HasFilterPopupSize;
+        public bool ShouldSerializeFilterPopupHeight() => HasFilterPopupSize;
         public int RecentActivityGroupingStyle { get; set; } // 0: Hybrid, 1: Detailed.
         [XmlIgnore] public bool RecentActivityGroupingStyleSpecified { get; set; }
         // 0: Automatic, 1: Always hidden, 2: Always visible.
@@ -57,6 +70,8 @@ namespace HeliumHybrid
             VisibleSortingModes = NavigatorOrganization.Normalize(VisibleSortingModesSpecified ? VisibleSortingModes : null, false);
             VisibleGroupingModesSpecified = VisibleSortingModesSpecified = true;
             FilterWorkspace = FilterWorkspaceSettings.Normalize(FilterWorkspace);
+            if (!HasFilterPopupSize) FilterPopupWidth = FilterPopupHeight = 0;
+            if (!HasFilterPopupPosition) FilterPopupX = FilterPopupY = null;
         }
         public bool PreserveGridScroll { get; set; } = true;
         public bool AutomaticallyRevealSelectedGame { get; set; } = true;
@@ -97,6 +112,8 @@ namespace HeliumHybrid
             VisibleGroupingModes = VisibleGroupingModes == null ? null : new List<int>(VisibleGroupingModes),
             VisibleSortingModes = VisibleSortingModes == null ? null : new List<int>(VisibleSortingModes),
             FilterWorkspace = FilterWorkspace?.ConvertAll(group => group?.Copy()),
+            FilterPopupWidth = FilterPopupWidth, FilterPopupHeight = FilterPopupHeight,
+            FilterPopupX = FilterPopupX, FilterPopupY = FilterPopupY,
             VisibleGroupingModesSpecified = VisibleGroupingModesSpecified, VisibleSortingModesSpecified = VisibleSortingModesSpecified,
             LayoutMode = LayoutMode,
             SteamMode = SteamMode, OpenFromGridCover = OpenFromGridCover,
@@ -112,6 +129,8 @@ namespace HeliumHybrid
             VisibleGroupingModes = value.VisibleGroupingModes == null ? null : new List<int>(value.VisibleGroupingModes);
             VisibleSortingModes = value.VisibleSortingModes == null ? null : new List<int>(value.VisibleSortingModes);
             FilterWorkspace = value.FilterWorkspace?.ConvertAll(group => group?.Copy());
+            FilterPopupWidth = value.FilterPopupWidth; FilterPopupHeight = value.FilterPopupHeight;
+            FilterPopupX = value.FilterPopupX; FilterPopupY = value.FilterPopupY;
             VisibleGroupingModesSpecified = value.VisibleGroupingModesSpecified;
             VisibleSortingModesSpecified = value.VisibleSortingModesSpecified;
             LayoutMode = value.LayoutMode;
@@ -145,15 +164,24 @@ namespace HeliumHybrid
             nativeOrganization.Margin = new Thickness(4, 0, 0, 12);
             var organization = new Grid();
             var filters = new ContentControl();
+            var automaticSize = new Button { Content = "Use automatic filter panel size", HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 0, 0, 8), Visibility = Visibility.Collapsed };
+            automaticSize.Click += (s, e) => {
+                if (!(DataContext is Preferences prefs)) return;
+                prefs.FilterPopupWidth = prefs.FilterPopupHeight = 0;
+                automaticSize.Visibility = Visibility.Collapsed;
+            };
             Action populate = () => {
                 organization.Children.Clear();
                 filters.Content = null;
+                automaticSize.Visibility = Visibility.Collapsed;
                 if (!(DataContext is Preferences prefs)) return;
                 organization.Children.Add(NavigatorOrganizationControls.VisibilityEditor(prefs, true));
                 organization.Children.Add(NavigatorOrganizationControls.VisibilityEditor(prefs, false));
                 NavigatorOrganizationControls.ArrangeEditors(organization, organization.ActualWidth);
                 if (prefs.FilterWorkspace == null) prefs.FilterWorkspace = FilterWorkspaceSettings.Normalize(null);
                 filters.Content = FilterWorkspaceSettings.Editor(prefs);
+                automaticSize.Visibility = prefs.HasFilterPopupSize ? Visibility.Visible : Visibility.Collapsed;
             };
             organization.SizeChanged += (s, e) => NavigatorOrganizationControls.ArrangeEditors(organization, e.NewSize.Width);
             Loaded += (s, e) => populate();
@@ -165,7 +193,7 @@ namespace HeliumHybrid
                 Choice("Display mode", "LayoutMode", "Automatic", "Always hidden", "Always visible")),
                 Section("Sidebar width", width)));
             tabs.Items.Add(Page("Organization", activity, nativeOrganization, organization));
-            tabs.Items.Add(Page("Filters", filters));
+            tabs.Items.Add(Page("Filters", automaticSize, filters));
             Content = tabs;
         }
 
