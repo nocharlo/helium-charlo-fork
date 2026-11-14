@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Windows.Input;
 using Playnite.SDK;
 using Playnite.SDK.Models;
 
@@ -53,6 +55,26 @@ namespace HeliumHybrid
         internal void Edit(Guid id)
         {
             if (edit != null && findGame(id) != null) edit(id);
+        }
+
+        internal bool RunNative(Guid id, ICommand command, Func<Game, bool> available)
+        {
+            var game = findGame(id);
+            if (game == null || command == null || !available(game) || !command.CanExecute(game)) return false;
+            command.Execute(game);
+            return true;
+        }
+
+        internal static bool HasExistingDirectory(string path) =>
+            !string.IsNullOrWhiteSpace(path) && Path.IsPathRooted(path) && Directory.Exists(path);
+
+        internal static bool HasExistingManual(string path) =>
+            !string.IsNullOrWhiteSpace(path) && Path.IsPathRooted(path) && File.Exists(path);
+
+        internal static Uri WebLink(string value)
+        {
+            if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || string.IsNullOrEmpty(uri.Host)) return null;
+            return uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp ? uri : null;
         }
 
         internal bool SetFavorite(Guid id, bool value)

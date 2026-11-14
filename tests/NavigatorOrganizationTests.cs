@@ -17,6 +17,14 @@ internal static class NavigatorOrganizationTests
 {
     private static int checks;
     private static readonly DateTime Now = new DateTime(2026, 10, 20, 12, 0, 0);
+    private sealed class RecordingGameCommand : System.Windows.Input.ICommand
+    {
+        public Game Executed { get; private set; }
+        public bool Allowed { get; set; } = true;
+        public event EventHandler CanExecuteChanged { add { } remove { } }
+        public bool CanExecute(object parameter) => Allowed && parameter is Game;
+        public void Execute(object parameter) => Executed = (Game)parameter;
+    }
     private static void Check(bool value, string message) { checks++; if (!value) throw new Exception(message); }
     private static NavigatorSource Game(int id, string name = "Synthetic") => new NavigatorSource { Id = new Guid(id, 0, 0, new byte[8]), Name = name };
     private static List<NavigatorProjectedRow> Build(IEnumerable<NavigatorSource> games, int group, NavigatorSortMode sort = NavigatorSortMode.Name, bool descending = false) =>
@@ -62,6 +70,20 @@ internal static class NavigatorOrganizationTests
         legacy.Edit(installed.Id);
         Check(!legacy.HasNativeEditor && edited.Count == 1 &&
             legacy.LaunchAction(Guid.NewGuid()) == NavigatorLaunchAction.Unavailable, "Legacy SDK and missing games degrade safely");
+        var native = new RecordingGameCommand();
+        var fresh = installed.GetCopy();
+        games[installed.Id] = fresh;
+        Check(actions.RunNative(installed.Id, native, game => game.IsInstalled) &&
+            ReferenceEquals(native.Executed, fresh), "Native commands receive the fresh game for the captured ID");
+        native.Allowed = false;
+        Check(!actions.RunNative(installed.Id, native, game => true) &&
+            !actions.RunNative(uninstalled.Id, native, game => true),
+            "Native command availability and deleted games are respected");
+        Check(NavigatorGameActions.WebLink("https://example.com/game") != null &&
+            NavigatorGameActions.WebLink("http://example.com/game") != null &&
+            NavigatorGameActions.WebLink("file:///game.exe") == null &&
+            NavigatorGameActions.WebLink("custom://host/game") == null &&
+            NavigatorGameActions.WebLink("game") == null, "Only absolute HTTP and HTTPS links are dispatched");
     }
     private static void GameMetadataActions()
     {
