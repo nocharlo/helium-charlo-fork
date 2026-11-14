@@ -13,6 +13,7 @@ A history of changes to Helium (charlo fork), from the original Navigator protot
 - The Navigator game menu offers Play or Install for the chosen game. Edit Game and the Navigator's F3 shortcut open Playnite's native editor on hosts with SDK 6.13 or later.
 - Set Category toggles individual category memberships, and Set Completion Status selects or clears the game's status using Playnite's library metadata. A selected game that moves to another Navigator group is revealed there if it still matches the active filters.
 - The Navigator game menu can add or remove a favorite and hide or unhide a game.
+- Game actions reuse the active Playnite theme's menu icons.
 
 Native removal and uninstall and Friendly Set Playtime integration are outside this increment.
 
