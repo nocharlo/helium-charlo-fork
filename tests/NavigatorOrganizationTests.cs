@@ -181,6 +181,15 @@ internal static class NavigatorOrganizationTests
     }
     private static void OrganizationControls()
     {
+        var glyph = new TextBlock { Text = "Synthetic icon", Foreground = Brushes.Yellow };
+        var firstIcon = (TextBlock)NavigatorMenuIcons.Create(glyph);
+        var secondIcon = (TextBlock)NavigatorMenuIcons.Create(glyph);
+        Check(!ReferenceEquals(firstIcon, glyph) && !ReferenceEquals(firstIcon, secondIcon) &&
+            firstIcon.FontSize == 16 && firstIcon.Width == 16 && firstIcon.Foreground == Brushes.Yellow,
+            "Theme icons are independently parentable and preserve the theme accent");
+        Check(NavigatorMenuIcons.Create(null) == null &&
+            ((TextBlock)NavigatorMenuIcons.Create(new TextBlock())).ReadLocalValue(TextBlock.ForegroundProperty) ==
+                DependencyProperty.UnsetValue, "Missing icons fall back to text and monochrome glyphs inherit menu foreground");
         var assembly = typeof(NavigatorOrganizationTests).Assembly;
         using (var stream = assembly.GetManifestResourceStream("Navigator.xaml"))
         using (var reader = new StreamReader(stream)) {

@@ -299,12 +299,16 @@ namespace HeliumHybrid
                 offered = gameActions.LaunchAction(target);
                 launch.Header = offered == NavigatorLaunchAction.Install ? "Install" : "Play";
                 launch.IsEnabled = offered != NavigatorLaunchAction.Unavailable;
+                NavigatorMenuIcons.Set(this, launch, offered == NavigatorLaunchAction.Install ? "InstallIcon" : "PlayIcon");
                 var gameId = target;
                 var game = database.Games.Get(gameId);
                 setFavorite = game?.Favorite != true;
                 setHidden = game?.Hidden != true;
                 favorite.Header = setFavorite ? "Add to Favorites" : "Remove from Favorites";
                 hidden.Header = setHidden ? "Hide this game" : "Unhide this game";
+                NavigatorMenuIcons.Set(this, favorite, setFavorite ? "AddFavoritesIcon" : "RemoveFavoritesIcon");
+                NavigatorMenuIcons.Set(this, hidden, setHidden ? "HideIcon" : "UnHideIcon");
+                NavigatorMenuIcons.Set(this, edit, "EditGameIcon");
                 favorite.IsEnabled = hidden.IsEnabled = game != null;
                 var categoryIds = new HashSet<Guid>(game?.CategoryIds ?? Enumerable.Empty<Guid>());
                 categories.Items.Clear();
