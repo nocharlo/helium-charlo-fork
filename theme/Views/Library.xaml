@@ -62,6 +62,8 @@
                                         Command="{MainViewModel UpdateGameInstallSizeWithDialogCommand}" />
                                 <Button x:Name="HeliumCharlo_RemoveGame" Visibility="Collapsed"
                                         Command="{MainViewModel RemoveGameCommand}" />
+                                <Button x:Name="HeliumCharlo_UninstallGame" Visibility="Collapsed"
+                                        Command="{MainViewModel UninstallGameCommand}" />
                                 <FilterPanel x:Name="PART_FilterPanel"
                                          DockPanel.Dock="{Settings FilterPanelPosition}"
                                          Width="{Settings FilterPanelWitdh}"

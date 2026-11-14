@@ -16,7 +16,7 @@ A history of changes to Helium (charlo fork), from the original Navigator protot
 - Game actions reuse the active Playnite theme's menu icons.
 - The game menu offers web links and delegates shortcuts, installation folders, install size, local manuals, and removal to Playnite where available.
 
-Native uninstall and Friendly Set Playtime integration remain under review.
+- Installed library games can use Playnite's native uninstall action. Compatible actions from loaded extensions appear under Extensions.
 
 ## v0.3.2 — Library Filters & Native Organization
 
