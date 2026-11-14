@@ -16,7 +16,7 @@ The idea is to bring some of Steam's library navigation into Playnite without re
 
 ## Why I Started This
 
-I've been using Playnite for a while, and one thing I kept missing from Steam was its library sidebar.
+I've been using Playnite for a while, and one thing I kept missing from Steam was its library sidebar.  
 
 I wanted to have a compact list of games on the left while browsing covers or reading game details on the right. Being able to jump between games without constantly switching views is such a basic part of how I use Steam that I found myself missing it in Playnite.
 
