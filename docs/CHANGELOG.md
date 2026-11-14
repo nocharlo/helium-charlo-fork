@@ -7,7 +7,7 @@ A history of changes to Helium (charlo fork), from the original Navigator protot
 - Move Library Filters by its title and resize it from the bottom-right corner. The Navigator remembers the manual size and offers automatic sizing in Filters settings.
 - The Library Filters launcher highlights while the popup is open.
 - Escape returns to Grid from Full Details opened through the Navigator, using the same selection and scroll restoration as Home.
-- In Grid with the Details Panel open, Escape clears the current selection. Use Up or Down in the Navigator to resume browsing.
+- In Grid with the Details Panel open, Escape clears the current selection and closes the panel so covers use the full Grid width. Use Up or Down in the Navigator to resume browsing.
 - Up and Down navigate visible Navigator rows. Left and Right collapse and expand the focused group.
 - Game titles retain their installed or uninstalled color on hover and selection. Favorite stars are easier to see at the same row height.
 - The Navigator game menu offers Play or Install for the chosen game. Edit Game and the Navigator's F3 shortcut open Playnite's native editor on hosts with SDK 6.13 or later.
