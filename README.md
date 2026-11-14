@@ -101,15 +101,25 @@ I don't consider this a substitute for programming expertise. It's an experiment
 
 ## Roadmap
 
-- **v0.3.3 — Contextual Actions (Planned):** Expands the Navigator's game context menu with useful actions such as Play/Install, Edit, Set Category, and Set Completion Status. Additional integrations, including Friendly Set Playtime, may be explored depending on compatibility and available public Playnite APIs.
+### Navigator development
 
-### Beyond v0.3.x
+- **v0.3.3 — Navigator Controls (Release candidate):** Extends the Navigator with native-style contextual actions, including Play/Install, Edit, Favorites, categories, completion status, links, file actions, and compatible extension contributions. Also improves keyboard navigation, selection handling, Grid/Details transitions, and the floating Library Filters workspace. Testing is ongoing; **v0.3.2 remains the latest public release**.
+- **v0.3.4 — Architecture & Performance (Planned):** Review and gradually simplify Navigator internals, isolate theme-specific assumptions, establish performance baselines, and address measured bottlenecks while preserving established behavior.
+- **v0.4.0 — Adaptive Navigator (Exploratory):** Move toward a more independent Navigator with a defined theme-integration layer, adaptive palettes, and support for selected additional Desktop themes. Compatibility depends on each theme's integration capabilities; universal plug-and-play support is not promised.
 
-- **Theme Evolution:** Further refinements to the Grid and Details views, with a stronger visual identity and improved consistency across the Helium experience.
-- **Helium Home:** An experimental Steam-inspired library homepage featuring ideas such as Continue Playing and customizable game shelves. The earlier prototype remains archived, and its inclusion in a future release depends on technical feasibility and design quality.
+### Theme evolution — proposed v0.5.x series
 
-**This roadmap represents the project's current direction, not a commitment to specific features or release dates.** Priorities and scope may change as development progresses.
+After stabilizing the Navigator, shift more development toward the Helium theme itself:
 
+- **Full Details redesign:** Preserve the cinematic header while making genres and tags central to the game page, consolidating activity information, improving metadata layout, and reducing oversized or repetitive related-game sections.
+- **Grid & Hybrid refinement:** Keep the cover-first Grid and compact Navigator, improve spacing, selection feedback, and visual consistency, and redesign the optional side details panel without sacrificing library density.
+- **Genre & Tag Icon System:** Explore a consistent vector icon language for classifications, with aliases for common terms, configurable icon assignments, reusable packs, and graceful fallbacks. The system should accommodate each user's own taxonomy rather than impose a fixed list of genres or tags.
+
+### Longer-term ideas
+
+- **Helium Home:** An experimental Steam-inspired library homepage with ideas such as Continue Playing and customizable game shelves. The earlier prototype remains archived; implementation depends on technical feasibility and design quality.
+
+**This roadmap describes the project's current direction, not a commitment to specific features, supported themes, or release dates.** Scope and priorities may change as development progresses.
 
 ## Known Limitations
 
