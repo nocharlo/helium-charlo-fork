@@ -327,10 +327,16 @@
           <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
           <Setter Property="MinHeight" Value="26"/>
           <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
+            <Grid>
             <Border x:Name="RowBorder" Background="Transparent" BorderBrush="Transparent" BorderThickness="2,0,0,0" Padding="2,0,4,0">
               <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
             </Border>
+            <Border x:Name="ContextOutline" BorderBrush="#FFA8CFEF" BorderThickness="1" Visibility="Collapsed" IsHitTestVisible="False"/>
+            </Grid>
             <ControlTemplate.Triggers>
+              <DataTrigger Binding="{Binding IsContextTarget}" Value="True">
+                <Setter TargetName="ContextOutline" Property="Visibility" Value="Visible"/>
+              </DataTrigger>
               <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="RowBorder" Property="Background" Value="#FF303E4D"/></Trigger>
               <Trigger Property="IsSelected" Value="True">
                 <Setter TargetName="RowBorder" Property="Background" Value="#FF303E4D"/>

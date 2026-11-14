@@ -194,7 +194,7 @@ internal static class NavigatorOrganizationTests
         var row = (Grid)VisualTreeHelper.GetChild(content, 0);
         var title = (TextBlock)row.Children[1];
         var star = (TextBlock)row.Children[2];
-        var container = new ListBoxItem { Style = list.ItemContainerStyle, Content = content };
+        var container = new ListBoxItem { Style = list.ItemContainerStyle, Content = content, DataContext = model };
         container.Measure(new Size(200, 100));
         var border = (Border)container.Template.FindName("RowBorder", container);
         var uninstalled = ((SolidColorBrush)title.Foreground).Color;
@@ -207,6 +207,16 @@ internal static class NavigatorOrganizationTests
             "An installed game uses the installed title color while selected");
         Check(star.FontSize == 16 && star.Visibility == Visibility.Visible && container.DesiredSize.Height == 26,
             "The larger favorite star fits the compact row");
+        var outline = (Border)container.Template.FindName("ContextOutline", container);
+        Check(outline.Visibility == Visibility.Collapsed, "A selected row starts without a context outline");
+        model.IsContextTarget = true;
+        Check(outline.Visibility == Visibility.Visible && container.IsSelected && !outline.IsHitTestVisible &&
+            container.DesiredSize.Height == 26, "The contextual outline is independent of selection and row height");
+        container.DataContext = new GameRow();
+        Check(outline.Visibility == Visibility.Collapsed, "Recycling the container clears the old outline");
+        container.DataContext = model;
+        model.IsContextTarget = false;
+        Check(outline.Visibility == Visibility.Collapsed && container.IsSelected, "Closing the menu clears only the outline");
         model.Favorite = false;
         Check(star.Visibility == Visibility.Collapsed, "The star follows the favorite state");
     }
@@ -625,15 +635,20 @@ internal static class NavigatorOrganizationTests
             "Popup placement respects the work area including negative monitor coordinates");
         var sizeSerializer = new XmlSerializer(typeof(Preferences));
         using (var writer = new StringWriter()) {
-            var manual = new Preferences { FilterPopupWidth = 560, FilterPopupHeight = 480 };
+            var manual = new Preferences { FilterPopupWidth = 560, FilterPopupHeight = 480, FilterPopupX = -42, FilterPopupY = 80 };
             sizeSerializer.Serialize(writer, manual);
             manual = (Preferences)sizeSerializer.Deserialize(new StringReader(writer.ToString()));
             manual.MigrateNavigation();
             Check(manual.HasFilterPopupSize && manual.FilterPopupWidth == 560 && manual.FilterPopupHeight == 480,
                 "Chosen width and height survive XML reload");
+            Check(manual.HasFilterPopupPosition && manual.FilterPopupX == -42 && manual.FilterPopupY == 80,
+                "The popup anchor survives settings serialization");
+            manual.FilterPopupX = double.PositiveInfinity;
             manual.FilterPopupHeight = double.NaN;
             manual.MigrateNavigation();
             Check(manual.FilterPopupWidth == 0 && manual.FilterPopupHeight == 0, "Invalid saved size restores automatic sizing");
+            Check(!manual.HasFilterPopupPosition && manual.FilterPopupX == null && manual.FilterPopupY == null,
+                "An invalid saved anchor restores automatic placement");
         }
         Check(FilterWorkspaceCatalog.Groups.Select(group => group.Id).SequenceEqual(
                 new[] { "ownership", "classification", "identity", "activity", "ratings" }) &&

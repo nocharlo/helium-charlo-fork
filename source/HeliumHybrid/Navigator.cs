@@ -29,6 +29,7 @@ namespace HeliumHybrid
         private readonly NavigatorGameActions gameActions;
         private readonly Grid root;
         private readonly ListBox list;
+        private GameRow contextTargetRow;
         private readonly TextBox search;
         private readonly ComboBox grouping;
         private readonly Popup sortGroupPopup;
@@ -299,6 +300,9 @@ namespace HeliumHybrid
             menu.Items.Add(extensions);
             list.ContextMenu = menu;
 
+            GameRow menuRow = null;
+            menu.Opened += (s, e) => SetContextTarget(menuRow);
+            menu.Closed += (s, e) => { menuRow = null; SetContextTarget(null); };
             Guid target = Guid.Empty;
             var offered = NavigatorLaunchAction.Unavailable;
             bool setFavorite = false, setHidden = false;
@@ -311,7 +315,7 @@ namespace HeliumHybrid
                 new { Item = installSize, Name = "HeliumCharlo_CalculateInstallSize", Icon = "InstallSizeIcon", Available = (Func<Game, bool>)CanOpenInstallDirectory },
                 new { Item = remove, Name = "HeliumCharlo_RemoveGame", Icon = "RemoveGameIcon",
                     Available = (Func<Game, bool>)CanManageGame },
-                new { Item = uninstall, Name = "HeliumCharlo_UninstallGame", Icon = "RemoveGameIcon",
+                new { Item = uninstall, Name = "HeliumCharlo_UninstallGame", Icon = "HeliumCharlo_UninstallIcon",
                     Available = (Func<Game, bool>)(g => g.IsInstalled && !g.IsCustomGame && CanManageGame(g)) }
             };
             foreach (var action in nativeActions)
@@ -333,6 +337,7 @@ namespace HeliumHybrid
                     e.Handled = true;
                     return;
                 }
+                menuRow = row;
                 target = row.Id;
                 offered = gameActions.LaunchAction(target);
                 launch.Header = offered == NavigatorLaunchAction.Install ? "Install" : "Play";
@@ -402,6 +407,14 @@ namespace HeliumHybrid
                 }
             };
         }
+        private void SetContextTarget(GameRow row)
+        {
+            if (contextTargetRow == row) return;
+            if (contextTargetRow != null) contextTargetRow.IsContextTarget = false;
+            contextTargetRow = row;
+            if (row != null) row.IsContextTarget = true;
+        }
+
         private ICommand NativeGameCommand(string name) => (FindNamed(window, name) as Button)?.Command;
 
         private static bool CanManageGame(Game game) =>
@@ -664,6 +677,8 @@ namespace HeliumHybrid
         {
             sortGroupPopup.IsOpen = false;
             filtersPopup.IsOpen = false;
+            if (list.ContextMenu != null) list.ContextMenu.IsOpen = false;
+            SetContextTarget(null);
             if (!active) return; active = false; timer.Stop(); searchTimer.Stop(); coverClickTimer.Stop(); sidebarClickTimer.Stop(); sidebarDownItem = null; panelRequested = false; UnbindGridClicks();
             EndNeutralSelection();
             plugin.SelectionChanged -= NativeSelectionChanged;
@@ -799,6 +814,13 @@ namespace HeliumHybrid
         private void BeforeOrganizationInput(object sender, PreProcessInputEventArgs args)
         {
             var input = args.StagingItem.Input.RoutedEvent;
+            if (input == Mouse.PreviewMouseDownEvent && args.StagingItem.Input is MouseButtonEventArgs back &&
+                back.ChangedButton == MouseButton.XButton1 && window?.IsActive == true && IsVisible) {
+                var handled = false;
+                Safe(() => handled = DismissMouseBack());
+                if (handled) args.Cancel();
+                return;
+            }
             if (input != Mouse.PreviewMouseDownEvent && input != Keyboard.PreviewKeyDownEvent) return;
             if (filtersPopup.IsOpen && args.StagingItem.Input is MouseButtonEventArgs mouse &&
                 mouse.ChangedButton == MouseButton.Left &&
@@ -859,6 +881,7 @@ namespace HeliumHybrid
                 lastIds = ids;
                 lastOrderIds = orderIds;
                 lastViewState = viewState;
+                if (list.ContextMenu?.IsOpen == true) list.ContextMenu.IsOpen = false;
                 var selectedRow = list.SelectedItem as GameRow;
                 var scrollOffset = FindScroll(list)?.VerticalOffset ?? 0;
                 var effectiveGrouping = EffectiveGrouping;
@@ -970,6 +993,7 @@ namespace HeliumHybrid
             syncing = true;
             try { view.Filter = obj => NavigatorProjection.Matches(((GameRow)obj).Key, key); view.Refresh(); }
             finally { syncing = wasSyncing; }
+            if (contextTargetRow != null && !view.Contains(contextTargetRow)) list.ContextMenu.IsOpen = false;
             count.Text = NavigatorProjection.DistinctGameCount(view.Cast<GameRow>().Select(r => r.Id)) + " games";
             status.Text = view.IsEmpty ? "No games found. Check the global filters too." : "";
             SyncSelection(false);
@@ -1074,9 +1098,21 @@ namespace HeliumHybrid
         {
             // Focused controls and Playnite get the first opportunity to handle Escape.
             if (args.Key != Key.Escape || !CanHandleWindowKey(args)) return;
-            Safe(() => args.Handled = library.ActiveDesktopView == DesktopView.Details
-                ? navigatedDetails && ReturnToGrid()
-                : ClearGridDetailsSelection());
+            Safe(() => args.Handled = BackToLibrary());
+        }
+        private bool BackToLibrary() => library.ActiveDesktopView == DesktopView.Details
+            ? navigatedDetails && ReturnToGrid()
+            : ClearGridDetailsSelection();
+
+        private bool DismissMouseBack()
+        {
+            if (list.ContextMenu?.IsOpen == true) { list.ContextMenu.IsOpen = false; return true; }
+            if (sortGroupPopup.IsOpen) { DismissSortGroupLevel(); return true; }
+            if (filtersPopup.IsOpen) { filtersPopup.IsOpen = false; return true; }
+            // The staged event has not been routed yet. Use the mouse hit instead of OriginalSource.
+            if (Mouse.DirectlyOver is Visual source && PresentationSource.FromVisual(source) == PresentationSource.FromVisual(window) &&
+                CanHandleWindowInput(Keyboard.FocusedElement)) return BackToLibrary();
+            return false;
         }
         private bool ClearGridDetailsSelection()
         {
@@ -1141,11 +1177,14 @@ namespace HeliumHybrid
         }
         private bool CanHandleWindowKey(KeyEventArgs args)
         {
-            if (!active || args.Handled || args.IsRepeat || Keyboard.Modifiers != ModifierKeys.None ||
+            return !args.Handled && !args.IsRepeat && CanHandleWindowInput(Keyboard.FocusedElement ?? args.OriginalSource as IInputElement);
+        }
+        private bool CanHandleWindowInput(IInputElement focused)
+        {
+            if (!active || Keyboard.Modifiers != ModifierKeys.None ||
                 window?.IsActive != true || filtersPopup.IsOpen || sortGroupPopup.IsOpen ||
                 list.ContextMenu?.IsOpen == true || Mouse.Captured != null) return false;
 
-            var focused = Keyboard.FocusedElement ?? args.OriginalSource as IInputElement;
             return focused is Visual visual && PresentationSource.FromVisual(visual) == PresentationSource.FromVisual(window) &&
                 !(focused is TextBoxBase || focused is PasswordBox || focused is MenuItem);
         }
@@ -1164,13 +1203,14 @@ namespace HeliumHybrid
         private void CloseSortGroupOnEscape(KeyEventArgs args)
         {
             if (!sortGroupPopup.IsOpen || args.Key != Key.Escape) return;
-            if (groupOptions.IsDropDownOpen || sortOptions.IsDropDownOpen) {
-                groupOptions.IsDropDownOpen = sortOptions.IsDropDownOpen = false;
-                args.Handled = true;
-                return;
-            }
-            DismissSortGroup();
+            DismissSortGroupLevel();
             args.Handled = true;
+        }
+        private void DismissSortGroupLevel()
+        {
+            if (groupOptions.IsDropDownOpen || sortOptions.IsDropDownOpen)
+                groupOptions.IsDropDownOpen = sortOptions.IsDropDownOpen = false;
+            else DismissSortGroup();
         }
         private void DismissSortGroup()
         {
@@ -1273,7 +1313,7 @@ namespace HeliumHybrid
             }
             Visibility = Visibility.Visible;
             bool collapsed = IsCollapsed();
-            if (collapsed) { sortGroupPopup.IsOpen = false; filtersPopup.IsOpen = false; }
+            if (collapsed) { sortGroupPopup.IsOpen = false; filtersPopup.IsOpen = false; list.ContextMenu.IsOpen = false; }
             Width = collapsed ? 0 : prefs.Width;
             tools.Visibility = status.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
             list.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;

@@ -108,6 +108,8 @@ namespace HeliumHybrid
             if (ownerArea.IsEmpty) ownerArea = workArea;
             verticalScale = source.CompositionTarget.TransformToDevice.M22;
             popup.PlacementTarget = window;
+            movedPosition = preferences.HasFilterPopupPosition
+                ? new Point(preferences.FilterPopupX.Value, preferences.FilterPopupY.Value) : (Point?)null;
             ApplyDimensions(popup);
         }
 
@@ -144,7 +146,15 @@ namespace HeliumHybrid
                 sizeChanged = true;
                 ApplyDimensions(popup);
             };
-            resize.DragCompleted += (s, e) => { if (sizeChanged) save(); };
+            void SavePosition()
+            {
+                if (!movedPosition.HasValue) return;
+                preferences.FilterPopupX = movedPosition.Value.X;
+                preferences.FilterPopupY = movedPosition.Value.Y;
+                save();
+            }
+            title.DragCompleted += (s, e) => { if (!e.Canceled && movedPosition.HasValue) SavePosition(); };
+            resize.DragCompleted += (s, e) => { if (sizeChanged) SavePosition(); };
         }
 
         // WPF restricts a Popup to 75% of the screen area. Both manual dimensions stay within that limit.

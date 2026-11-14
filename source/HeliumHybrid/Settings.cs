@@ -27,6 +27,12 @@ namespace HeliumHybrid
         internal const double MinFilterWidth = 320, MaxFilterWidth = 1200, MinFilterHeight = 260, MaxFilterHeight = 900;
         public double FilterPopupWidth { get; set; }
         public double FilterPopupHeight { get; set; }
+        public double? FilterPopupX { get; set; }
+        public double? FilterPopupY { get; set; }
+        [XmlIgnore] internal bool HasFilterPopupPosition => FilterPopupX.HasValue && FilterPopupY.HasValue &&
+            Math.Abs(FilterPopupX.Value) <= 100000 && Math.Abs(FilterPopupY.Value) <= 100000;
+        public bool ShouldSerializeFilterPopupX() => HasFilterPopupPosition;
+        public bool ShouldSerializeFilterPopupY() => HasFilterPopupPosition;
         [XmlIgnore] internal bool HasFilterPopupSize => FilterPopupWidth >= MinFilterWidth && FilterPopupWidth <= MaxFilterWidth &&
             FilterPopupHeight >= MinFilterHeight && FilterPopupHeight <= MaxFilterHeight;
         public bool ShouldSerializeFilterPopupWidth() => HasFilterPopupSize;
@@ -65,6 +71,7 @@ namespace HeliumHybrid
             VisibleGroupingModesSpecified = VisibleSortingModesSpecified = true;
             FilterWorkspace = FilterWorkspaceSettings.Normalize(FilterWorkspace);
             if (!HasFilterPopupSize) FilterPopupWidth = FilterPopupHeight = 0;
+            if (!HasFilterPopupPosition) FilterPopupX = FilterPopupY = null;
         }
         public bool PreserveGridScroll { get; set; } = true;
         public bool AutomaticallyRevealSelectedGame { get; set; } = true;
@@ -106,6 +113,7 @@ namespace HeliumHybrid
             VisibleSortingModes = VisibleSortingModes == null ? null : new List<int>(VisibleSortingModes),
             FilterWorkspace = FilterWorkspace?.ConvertAll(group => group?.Copy()),
             FilterPopupWidth = FilterPopupWidth, FilterPopupHeight = FilterPopupHeight,
+            FilterPopupX = FilterPopupX, FilterPopupY = FilterPopupY,
             VisibleGroupingModesSpecified = VisibleGroupingModesSpecified, VisibleSortingModesSpecified = VisibleSortingModesSpecified,
             LayoutMode = LayoutMode,
             SteamMode = SteamMode, OpenFromGridCover = OpenFromGridCover,
@@ -122,6 +130,7 @@ namespace HeliumHybrid
             VisibleSortingModes = value.VisibleSortingModes == null ? null : new List<int>(value.VisibleSortingModes);
             FilterWorkspace = value.FilterWorkspace?.ConvertAll(group => group?.Copy());
             FilterPopupWidth = value.FilterPopupWidth; FilterPopupHeight = value.FilterPopupHeight;
+            FilterPopupX = value.FilterPopupX; FilterPopupY = value.FilterPopupY;
             VisibleGroupingModesSpecified = value.VisibleGroupingModesSpecified;
             VisibleSortingModesSpecified = value.VisibleSortingModesSpecified;
             LayoutMode = value.LayoutMode;
