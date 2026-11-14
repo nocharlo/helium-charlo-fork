@@ -372,7 +372,9 @@ namespace HeliumHybrid
             var next = groupState.NextVisibleOccurrence(mode, view.Cast<GameRow>(), item => item.GroupIdentity,
                 row, header == null ? null : group, key == Key.Down);
             if (next == null) return true;
+            var reopenPanel = neutralOrganization != null && prefs.SidebarClickAction == 1;
             list.SelectedItem = next;
+            if (reopenPanel) OpenGridPanel(next.Id);
             list.ScrollIntoView(next);
             if (list.ItemContainerGenerator.ContainerFromItem(next) is ListBoxItem container) container.Focus();
             else Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
@@ -976,6 +978,8 @@ namespace HeliumHybrid
             if (library.ActiveDesktopView != DesktopView.Grid || IsCollapsed() ||
                 detailsBorder?.IsVisible != true || nativeGridList?.IsVisible != true ||
                 nativeGridList.SelectedItems.Count == 0) return false;
+            var closePanel = (FindNamed(window, "HeliumCharlo_CloseGridDetails") as Button)?.Command;
+            if (closePanel?.CanExecute(null) != true) return false;
 
             pendingViewSelection?.Abort();
             pendingViewSelection = null;
@@ -993,6 +997,9 @@ namespace HeliumHybrid
             neutralOrganization = library.ViewState(NavigatorGrouping);
             neutralFilters = api.MainView.GetCurrentFilterSettings();
             nativeGridList.UnselectAll();
+            panelRequested = false;
+            closePanel.Execute(null);
+            RecomputeLayout();
             SyncSelection(false);
             return true;
         }

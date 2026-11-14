@@ -50,6 +50,8 @@
                                         Command="{MainViewModel SwitchDetailsViewCommand}" />
                                 <Button x:Name="HeliumCharlo_SwitchGrid" Visibility="Collapsed"
                                         Command="{MainViewModel SwitchGridViewCommand}" />
+                                <Button x:Name="HeliumCharlo_CloseGridDetails" Visibility="Collapsed"
+                                        Command="{MainViewModel CloseGameSideBarCommand}" />
                                 <FilterPanel x:Name="PART_FilterPanel"
                                          DockPanel.Dock="{Settings FilterPanelPosition}"
                                          Width="{Settings FilterPanelWitdh}"
