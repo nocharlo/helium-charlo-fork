@@ -12,6 +12,7 @@ using System.Windows.Media.Imaging;
 using System.Xml.Serialization;
 using HeliumHybrid;
 using Playnite.SDK.Models;
+using Playnite.SDK.Plugins;
 
 internal static class NavigatorOrganizationTests
 {
@@ -24,6 +25,14 @@ internal static class NavigatorOrganizationTests
         public event EventHandler CanExecuteChanged { add { } remove { } }
         public bool CanExecute(object parameter) => Allowed && parameter is Game;
         public void Execute(object parameter) => Executed = (Game)parameter;
+    }
+    private sealed class MenuProvider : GenericPlugin
+    {
+        private readonly Func<GetGameMenuItemsArgs, IEnumerable<GameMenuItem>> discover;
+        public MenuProvider(Func<GetGameMenuItemsArgs, IEnumerable<GameMenuItem>> discover) : base(null)
+        { this.discover = discover; }
+        public override Guid Id { get; } = Guid.NewGuid();
+        public override IEnumerable<GameMenuItem> GetGameMenuItems(GetGameMenuItemsArgs args) => discover(args);
     }
     private static void Check(bool value, string message) { checks++; if (!value) throw new Exception(message); }
     private static NavigatorSource Game(int id, string name = "Synthetic") => new NavigatorSource { Id = new Guid(id, 0, 0, new byte[8]), Name = name };
@@ -203,6 +212,7 @@ internal static class NavigatorOrganizationTests
     }
     private static void OrganizationControls()
     {
+        PluginMenuActions();
         var glyph = new TextBlock { Text = "Synthetic icon", Foreground = Brushes.Yellow };
         var firstIcon = (TextBlock)NavigatorMenuIcons.Create(glyph);
         var secondIcon = (TextBlock)NavigatorMenuIcons.Create(glyph);
@@ -354,6 +364,41 @@ internal static class NavigatorOrganizationTests
             Check(visible().SequenceEqual(NavigatorOrganization.Normalize(null, grouping)), "Restore Defaults restores only its list");
             Check((grouping ? prefs.VisibleSortingModes : prefs.VisibleGroupingModes).SequenceEqual(other), "Management actions preserve the other panel");
         }
+    }
+
+    private static void PluginMenuActions()
+    {
+        var game = new Game("Synthetic menu game") { Id = Guid.NewGuid() };
+        var fresh = game.GetCopy();
+        GameMenuItemActionArgs result = null;
+        GetGameMenuItemsArgs discovery = null;
+        var contribution = new GameMenuItem { Description = "Test action", MenuSection = "Example|Nested", Action = args => result = args };
+        var provider = new MenuProvider(args => {
+            discovery = args;
+            return new[] { contribution, contribution };
+        });
+        var broken = new MenuProvider(_ => throw new InvalidOperationException());
+        var loaded = new List<Plugin> { broken, provider };
+        var errors = 0;
+        var menu = new MenuItem();
+        void Populate() => NavigatorPluginMenu.Populate(menu, new Grid(), game,
+            () => loaded, id => id == fresh.Id ? fresh : null, _ => errors++);
+        Populate();
+        var section = (MenuItem)menu.Items[0];
+        var nested = (MenuItem)section.Items[0];
+        var item = (MenuItem)nested.Items[0];
+        Check(errors == 1 && menu.Visibility == Visibility.Visible && nested.Items.Count == 1 &&
+            discovery.Games.SequenceEqual(new[] { game }) && !discovery.IsGlobalSearchRequest,
+            "Contribution discovery uses the target and isolates a failing provider");
+        item.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Check(result?.SourceItem == contribution && result.Games.SequenceEqual(new[] { fresh }),
+            "A contribution receives its source item and the fresh target");
+        loaded.Clear();
+        result = null;
+        item.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Populate();
+        Check(result == null && menu.Visibility == Visibility.Collapsed,
+            "An unloaded extension cannot execute and an empty menu stays hidden");
     }
     private static void CatalogAndGroups()
     {

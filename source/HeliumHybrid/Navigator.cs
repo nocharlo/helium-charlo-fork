@@ -270,6 +270,9 @@ namespace HeliumHybrid
             var manual = new MenuItem { Header = "Open Manual" };
             var installSize = new MenuItem { Header = "Calculate Install Size" };
             var remove = new MenuItem { Header = "Remove" };
+            var uninstall = new MenuItem { Header = "Uninstall" };
+            var extensions = new MenuItem { Header = "Extensions" };
+            var extensionsSeparator = new Separator();
             menu.Items.Add(launch);
             menu.Items.Add(links);
             menu.Items.Add(filesSeparator);
@@ -287,6 +290,9 @@ namespace HeliumHybrid
             var removeSeparator = new Separator();
             menu.Items.Add(removeSeparator);
             menu.Items.Add(remove);
+            menu.Items.Add(uninstall);
+            menu.Items.Add(extensionsSeparator);
+            menu.Items.Add(extensions);
             list.ContextMenu = menu;
 
             Guid target = Guid.Empty;
@@ -300,7 +306,9 @@ namespace HeliumHybrid
                 new { Item = manual, Name = "HeliumCharlo_OpenManual", Icon = "ManualIcon", Available = (Func<Game, bool>)CanOpenManual },
                 new { Item = installSize, Name = "HeliumCharlo_CalculateInstallSize", Icon = "InstallSizeIcon", Available = (Func<Game, bool>)CanOpenInstallDirectory },
                 new { Item = remove, Name = "HeliumCharlo_RemoveGame", Icon = "RemoveGameIcon",
-                    Available = (Func<Game, bool>)(g => !g.IsRunning && !g.IsLaunching && !g.IsInstalling && !g.IsUninstalling) }
+                    Available = (Func<Game, bool>)CanManageGame },
+                new { Item = uninstall, Name = "HeliumCharlo_UninstallGame", Icon = "RemoveGameIcon",
+                    Available = (Func<Game, bool>)(g => g.IsInstalled && !g.IsCustomGame && CanManageGame(g)) }
             };
             foreach (var action in nativeActions)
                 action.Item.Click += (s, e) => Safe(() => gameActions.RunNative(target, NativeGameCommand(action.Name), action.Available));
@@ -338,10 +346,14 @@ namespace HeliumHybrid
                     if (action.Item.Visibility == Visibility.Visible)
                         NavigatorMenuIcons.Set(this, action.Item, action.Icon);
                 }
+                NavigatorPluginMenu.Populate(extensions, this, game, () => api.Addons.Plugins,
+                    database.Games.Get, error => LogManager.GetLogger().Warn("Navigator extension menu error: " + error.GetType().Name));
+                extensionsSeparator.Visibility = extensions.Visibility;
                 filesSeparator.Visibility = links.Visibility == Visibility.Visible ? Visibility.Visible : Visibility.Collapsed;
                 manageSeparator.Visibility = nativeActions.Take(4).Any(action => action.Item.Visibility == Visibility.Visible)
                     || links.Visibility == Visibility.Visible ? Visibility.Visible : Visibility.Collapsed;
-                removeSeparator.Visibility = remove.Visibility;
+                removeSeparator.Visibility = remove.Visibility == Visibility.Visible || uninstall.Visibility == Visibility.Visible
+                    ? Visibility.Visible : Visibility.Collapsed;
                 setFavorite = game?.Favorite != true;
                 setHidden = game?.Hidden != true;
                 favorite.Header = setFavorite ? "Add to Favorites" : "Remove from Favorites";
@@ -388,6 +400,9 @@ namespace HeliumHybrid
             };
         }
         private ICommand NativeGameCommand(string name) => (FindNamed(window, name) as Button)?.Command;
+
+        private static bool CanManageGame(Game game) =>
+            !game.IsRunning && !game.IsLaunching && !game.IsInstalling && !game.IsUninstalling;
 
         private bool CanOpenInstallDirectory(Game game) =>
             game.IsInstalled && !string.IsNullOrWhiteSpace(game.InstallDirectory) &&

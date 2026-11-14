@@ -12,6 +12,7 @@
     <Compile Include="NavigatorOrganizationTests.cs"/>
     <Compile Include="../source/HeliumHybrid/NavigatorGameActions.cs"/>
     <Compile Include="../source/HeliumHybrid/NavigatorMenuIcons.cs"/>
+    <Compile Include="../source/HeliumHybrid/NavigatorPluginMenu.cs"/>
     <Compile Include="../source/HeliumHybrid/NavigatorOrganization.cs"/>
     <Compile Include="../source/HeliumHybrid/NavigatorNativeOrganization.cs"/>
     <Compile Include="../source/HeliumHybrid/NavigatorFilterComposer.cs"/>
