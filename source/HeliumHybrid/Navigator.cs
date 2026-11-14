@@ -262,14 +262,31 @@ namespace HeliumHybrid
             var hidden = new MenuItem();
             var categories = new MenuItem { Header = "Set Category" };
             var completion = new MenuItem { Header = "Set Completion Status" };
+            var links = new MenuItem { Header = "Links" };
+            var filesSeparator = new Separator();
+            var manageSeparator = new Separator();
+            var shortcut = new MenuItem { Header = "Create Desktop Shortcut" };
+            var folder = new MenuItem { Header = "Open Installation Location" };
+            var manual = new MenuItem { Header = "Open Manual" };
+            var installSize = new MenuItem { Header = "Calculate Install Size" };
+            var remove = new MenuItem { Header = "Remove" };
             menu.Items.Add(launch);
-            menu.Items.Add(new Separator());
+            menu.Items.Add(links);
+            menu.Items.Add(filesSeparator);
+            menu.Items.Add(folder);
+            menu.Items.Add(shortcut);
+            menu.Items.Add(installSize);
+            menu.Items.Add(manual);
+            menu.Items.Add(manageSeparator);
             menu.Items.Add(favorite);
             menu.Items.Add(hidden);
             menu.Items.Add(new Separator());
             if (gameActions.HasNativeEditor) menu.Items.Add(edit);
             menu.Items.Add(categories);
             menu.Items.Add(completion);
+            var removeSeparator = new Separator();
+            menu.Items.Add(removeSeparator);
+            menu.Items.Add(remove);
             list.ContextMenu = menu;
 
             Guid target = Guid.Empty;
@@ -277,6 +294,16 @@ namespace HeliumHybrid
             bool setFavorite = false, setHidden = false;
             launch.Click += (s, e) => Safe(() => gameActions.Launch(target, offered));
             edit.Click += (s, e) => Safe(() => EditGame(target));
+            var nativeActions = new[] {
+                new { Item = shortcut, Name = "HeliumCharlo_CreateShortcut", Icon = "DesktopShortcutIcon", Available = (Func<Game, bool>)(_ => true) },
+                new { Item = folder, Name = "HeliumCharlo_OpenInstallLocation", Icon = "OpenFolderIcon", Available = (Func<Game, bool>)CanOpenInstallDirectory },
+                new { Item = manual, Name = "HeliumCharlo_OpenManual", Icon = "ManualIcon", Available = (Func<Game, bool>)CanOpenManual },
+                new { Item = installSize, Name = "HeliumCharlo_CalculateInstallSize", Icon = "InstallSizeIcon", Available = (Func<Game, bool>)CanOpenInstallDirectory },
+                new { Item = remove, Name = "HeliumCharlo_RemoveGame", Icon = "RemoveGameIcon",
+                    Available = (Func<Game, bool>)(g => !g.IsRunning && !g.IsLaunching && !g.IsInstalling && !g.IsUninstalling) }
+            };
+            foreach (var action in nativeActions)
+                action.Item.Click += (s, e) => Safe(() => gameActions.RunNative(target, NativeGameCommand(action.Name), action.Available));
             favorite.Click += (s, e) => Safe(() => {
                 var id = target;
                 ApplyGameMetadataChange(id, () => gameActions.SetFavorite(id, setFavorite));
@@ -302,6 +329,19 @@ namespace HeliumHybrid
                 NavigatorMenuIcons.Set(this, launch, offered == NavigatorLaunchAction.Install ? "InstallIcon" : "PlayIcon");
                 var gameId = target;
                 var game = database.Games.Get(gameId);
+                PopulateGameLinks(links, game);
+                foreach (var action in nativeActions) {
+                    var command = NativeGameCommand(action.Name);
+                    action.Item.Visibility = game != null && command != null && action.Available(game)
+                        ? Visibility.Visible : Visibility.Collapsed;
+                    action.Item.IsEnabled = action.Item.Visibility == Visibility.Visible && command.CanExecute(game);
+                    if (action.Item.Visibility == Visibility.Visible)
+                        NavigatorMenuIcons.Set(this, action.Item, action.Icon);
+                }
+                filesSeparator.Visibility = links.Visibility == Visibility.Visible ? Visibility.Visible : Visibility.Collapsed;
+                manageSeparator.Visibility = nativeActions.Take(4).Any(action => action.Item.Visibility == Visibility.Visible)
+                    || links.Visibility == Visibility.Visible ? Visibility.Visible : Visibility.Collapsed;
+                removeSeparator.Visibility = remove.Visibility;
                 setFavorite = game?.Favorite != true;
                 setHidden = game?.Hidden != true;
                 favorite.Header = setFavorite ? "Add to Favorites" : "Remove from Favorites";
@@ -346,6 +386,40 @@ namespace HeliumHybrid
                     Safe(() => EditGame(row.Id));
                 }
             };
+        }
+        private ICommand NativeGameCommand(string name) => (FindNamed(window, name) as Button)?.Command;
+
+        private bool CanOpenInstallDirectory(Game game) =>
+            game.IsInstalled && !string.IsNullOrWhiteSpace(game.InstallDirectory) &&
+            NavigatorGameActions.HasExistingDirectory(api.ExpandGameVariables(game, game.InstallDirectory));
+
+        private bool CanOpenManual(Game game) =>
+            !string.IsNullOrWhiteSpace(game.Manual) &&
+            NavigatorGameActions.HasExistingManual(api.ExpandGameVariables(game, game.Manual));
+
+        private void PopulateGameLinks(MenuItem menu, Game game)
+        {
+            menu.Items.Clear();
+            if (game != null && game.Links != null) {
+                var id = game.Id;
+                foreach (var link in game.Links) {
+                    if (link == null || string.IsNullOrWhiteSpace(link.Name) || string.IsNullOrWhiteSpace(link.Url) ||
+                        NavigatorGameActions.WebLink(api.ExpandGameVariables(game, link.Url)) == null) continue;
+                    var name = link.Name;
+                    var url = link.Url;
+                    var item = new MenuItem { Header = name.Replace("_", "__") };
+                    item.Click += (s, e) => Safe(() => {
+                        var current = api.Database.Games.Get(id);
+                        if (current?.Links?.Any(entry => entry != null && entry.Name == name && entry.Url == url) != true) return;
+                        var destination = NavigatorGameActions.WebLink(api.ExpandGameVariables(current, url));
+                        if (destination != null)
+                            Process.Start(new ProcessStartInfo(destination.AbsoluteUri) { UseShellExecute = true });
+                    });
+                    menu.Items.Add(item);
+                }
+            }
+            menu.Visibility = menu.Items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (menu.Items.Count > 0) NavigatorMenuIcons.Set(this, menu, "LinksIcon");
         }
         private bool HandleNavigatorArrow(Key key)
         {

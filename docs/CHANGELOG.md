@@ -14,8 +14,9 @@ A history of changes to Helium (charlo fork), from the original Navigator protot
 - Set Category toggles individual category memberships, and Set Completion Status selects or clears the game's status using Playnite's library metadata. A selected game that moves to another Navigator group is revealed there if it still matches the active filters.
 - The Navigator game menu can add or remove a favorite and hide or unhide a game.
 - Game actions reuse the active Playnite theme's menu icons.
+- The game menu offers web links and delegates shortcuts, installation folders, install size, local manuals, and removal to Playnite where available.
 
-Native removal and uninstall and Friendly Set Playtime integration are outside this increment.
+Native uninstall and Friendly Set Playtime integration remain under review.
 
 ## v0.3.2 — Library Filters & Native Organization
 

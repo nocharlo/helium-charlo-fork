@@ -52,6 +52,16 @@
                                         Command="{MainViewModel SwitchGridViewCommand}" />
                                 <Button x:Name="HeliumCharlo_CloseGridDetails" Visibility="Collapsed"
                                         Command="{MainViewModel CloseGameSideBarCommand}" />
+                                <Button x:Name="HeliumCharlo_CreateShortcut" Visibility="Collapsed"
+                                        Command="{MainViewModel CreateDesktopShortcutCommand}" />
+                                <Button x:Name="HeliumCharlo_OpenInstallLocation" Visibility="Collapsed"
+                                        Command="{MainViewModel OpenGameLocationCommand}" />
+                                <Button x:Name="HeliumCharlo_OpenManual" Visibility="Collapsed"
+                                        Command="{MainViewModel OpenManualCommand}" />
+                                <Button x:Name="HeliumCharlo_CalculateInstallSize" Visibility="Collapsed"
+                                        Command="{MainViewModel UpdateGameInstallSizeWithDialogCommand}" />
+                                <Button x:Name="HeliumCharlo_RemoveGame" Visibility="Collapsed"
+                                        Command="{MainViewModel RemoveGameCommand}" />
                                 <FilterPanel x:Name="PART_FilterPanel"
                                          DockPanel.Dock="{Settings FilterPanelPosition}"
                                          Width="{Settings FilterPanelWitdh}"
