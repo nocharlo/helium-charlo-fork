@@ -12,11 +12,28 @@ using System.Windows.Media.Imaging;
 using System.Xml.Serialization;
 using HeliumHybrid;
 using Playnite.SDK.Models;
+using Playnite.SDK.Plugins;
 
 internal static class NavigatorOrganizationTests
 {
     private static int checks;
     private static readonly DateTime Now = new DateTime(2026, 10, 20, 12, 0, 0);
+    private sealed class RecordingGameCommand : System.Windows.Input.ICommand
+    {
+        public Game Executed { get; private set; }
+        public bool Allowed { get; set; } = true;
+        public event EventHandler CanExecuteChanged { add { } remove { } }
+        public bool CanExecute(object parameter) => Allowed && parameter is Game;
+        public void Execute(object parameter) => Executed = (Game)parameter;
+    }
+    private sealed class MenuProvider : GenericPlugin
+    {
+        private readonly Func<GetGameMenuItemsArgs, IEnumerable<GameMenuItem>> discover;
+        public MenuProvider(Func<GetGameMenuItemsArgs, IEnumerable<GameMenuItem>> discover) : base(null)
+        { this.discover = discover; }
+        public override Guid Id { get; } = Guid.NewGuid();
+        public override IEnumerable<GameMenuItem> GetGameMenuItems(GetGameMenuItemsArgs args) => discover(args);
+    }
     private static void Check(bool value, string message) { checks++; if (!value) throw new Exception(message); }
     private static NavigatorSource Game(int id, string name = "Synthetic") => new NavigatorSource { Id = new Guid(id, 0, 0, new byte[8]), Name = name };
     private static List<NavigatorProjectedRow> Build(IEnumerable<NavigatorSource> games, int group, NavigatorSortMode sort = NavigatorSortMode.Name, bool descending = false) =>
@@ -25,8 +42,110 @@ internal static class NavigatorOrganizationTests
     [STAThread]
     private static void Main()
     {
-        CatalogAndGroups(); Sorting(); Settings(); RemovedDefaultModes(); NativeOrganization(); OrganizationControls(); FilterWorkspace(); Presentation(); Campaign(); Benchmarks();
+        CatalogAndGroups(); Sorting(); Settings(); RemovedDefaultModes(); NativeOrganization(); OrganizationControls(); FilterWorkspace(); GameActions(); GameMetadataActions(); Presentation(); Campaign(); Benchmarks();
         Console.WriteLine("PASS: " + checks + " Navigator organization, settings and WPF model checks.");
+    }
+    private static void GameActions()
+    {
+        var installed = new Game { Id = Guid.NewGuid(), IsInstalled = true };
+        var uninstalled = new Game { Id = Guid.NewGuid() };
+        var games = new Dictionary<Guid, Game> { { installed.Id, installed }, { uninstalled.Id, uninstalled } };
+        Game Find(Guid id) => games.TryGetValue(id, out var game) ? game : null;
+        var played = new List<Guid>();
+        var installs = new List<Guid>();
+        var edited = new List<Guid>();
+        var actions = new NavigatorGameActions(Find, played.Add, installs.Add, id => { edited.Add(id); return false; },
+            game => { throw new InvalidOperationException("Launch and edit must not write metadata"); });
+
+        Check(actions.LaunchAction(installed.Id) == NavigatorLaunchAction.Play &&
+            actions.LaunchAction(uninstalled.Id) == NavigatorLaunchAction.Install, "Menu labels follow native game state");
+        actions.Launch(installed.Id, NavigatorLaunchAction.Play);
+        actions.Launch(uninstalled.Id, NavigatorLaunchAction.Install);
+        Check(played.SequenceEqual(new[] { installed.Id }) && installs.SequenceEqual(new[] { uninstalled.Id }),
+            "Launch dispatch uses the offered action and the captured game ID");
+        uninstalled.IsInstalled = true;
+        actions.Launch(uninstalled.Id, NavigatorLaunchAction.Install);
+        installed.IsRunning = true;
+        actions.Launch(installed.Id, NavigatorLaunchAction.Play);
+        Check(actions.LaunchAction(installed.Id) == NavigatorLaunchAction.Unavailable &&
+            played.Count == 1 && installs.Count == 1, "Stale and disabled launch actions cannot run");
+        actions.Edit(uninstalled.Id);
+        games.Remove(uninstalled.Id);
+        actions.Edit(uninstalled.Id);
+        Check(actions.HasNativeEditor && edited.SequenceEqual(new[] { uninstalled.Id }),
+            "Editor receives exactly the requested existing game");
+        var legacy = new NavigatorGameActions(Find, played.Add, installs.Add, null,
+            game => { throw new InvalidOperationException("Launch and edit must not write metadata"); });
+        legacy.Edit(installed.Id);
+        Check(!legacy.HasNativeEditor && edited.Count == 1 &&
+            legacy.LaunchAction(Guid.NewGuid()) == NavigatorLaunchAction.Unavailable, "Legacy SDK and missing games degrade safely");
+        var native = new RecordingGameCommand();
+        var fresh = installed.GetCopy();
+        games[installed.Id] = fresh;
+        Check(actions.RunNative(installed.Id, native, game => game.IsInstalled) &&
+            ReferenceEquals(native.Executed, fresh), "Native commands receive the fresh game for the captured ID");
+        native.Allowed = false;
+        Check(!actions.RunNative(installed.Id, native, game => true) &&
+            !actions.RunNative(uninstalled.Id, native, game => true),
+            "Native command availability and deleted games are respected");
+        Check(NavigatorGameActions.WebLink("https://example.com/game") != null &&
+            NavigatorGameActions.WebLink("http://example.com/game") != null &&
+            NavigatorGameActions.WebLink("file:///game.exe") == null &&
+            NavigatorGameActions.WebLink("custom://host/game") == null &&
+            NavigatorGameActions.WebLink("game") == null, "Only absolute HTTP and HTTPS links are dispatched");
+    }
+    private static void GameMetadataActions()
+    {
+        var original = new Game("Synthetic target") { Id = Guid.NewGuid(), Favorite = true };
+        var other = new Game("Synthetic other") { Id = Guid.NewGuid() };
+        var games = new Dictionary<Guid, Game> { { original.Id, original }, { other.Id, other } };
+        var first = new Category { Id = Guid.NewGuid(), Name = "First" };
+        var second = new Category { Id = Guid.NewGuid(), Name = "Second" };
+        var backlog = new CompletionStatus { Id = Guid.NewGuid(), Name = "Backlog" };
+        var done = new CompletionStatus { Id = Guid.NewGuid(), Name = "Done" };
+        var writes = 0;
+        var actions = new NavigatorGameActions(id => games.TryGetValue(id, out var game) ? game : null,
+            null, null, null, game => { games[game.Id] = game; writes++; });
+
+        var changed = actions.ToggleCategory(original.Id, first);
+        Check(changed && games[original.Id].CategoryIds.SequenceEqual(new[] { first.Id }) &&
+            original.CategoryIds == null && other.CategoryIds == null, "Assign to the captured uncategorized game only");
+        actions.ToggleCategory(original.Id, second);
+        Check(games[original.Id].CategoryIds.SequenceEqual(new[] { first.Id, second.Id }), "Add a category without replacing existing categories");
+        actions.ToggleCategory(original.Id, first);
+        Check(games[original.Id].CategoryIds.SequenceEqual(new[] { second.Id }), "Remove only the chosen category");
+        actions.ToggleCategory(original.Id, second);
+        Check(games[original.Id].CategoryIds == null && writes == 4, "Remove the last category using the SDK's unassigned representation");
+
+        actions.ToggleCategory(original.Id, first);
+        actions.SetCompletionStatus(original.Id, backlog.Id, backlog);
+        actions.SetCompletionStatus(original.Id, done.Id, done);
+        Check(games[original.Id].CompletionStatusId == done.Id && other.CompletionStatusId == Guid.Empty &&
+            games[original.Id].CategoryIds.SequenceEqual(new[] { first.Id }) && games[original.Id].Favorite,
+            "Replace only the captured game's status while preserving unrelated metadata");
+        var ignored = new[] {
+            actions.SetCompletionStatus(original.Id, done.Id, done),
+            actions.SetCompletionStatus(original.Id, backlog.Id, null),
+            actions.SetCompletionStatus(original.Id, backlog.Id, done),
+            actions.ToggleCategory(original.Id, null),
+            actions.ToggleCategory(Guid.NewGuid(), first),
+            actions.SetCompletionStatus(Guid.NewGuid(), done.Id, done)
+        };
+        Check(ignored.All(result => !result) && writes == 7 && games[original.Id].CompletionStatusId == done.Id,
+            "No writes for unchanged values, stale definitions or missing games");
+        actions.SetCompletionStatus(original.Id, Guid.Empty, null);
+        Check(games[original.Id].CompletionStatusId == Guid.Empty && writes == 8, "None clears the status using Guid.Empty");
+
+        Check(actions.SetFavorite(original.Id, false) && !games[original.Id].Favorite && original.Favorite &&
+            !games[other.Id].Favorite && !actions.SetFavorite(original.Id, false),
+            "Remove from Favorites updates only the target and ignores an already-applied action");
+        Check(actions.SetFavorite(original.Id, true) && games[original.Id].Favorite,
+            "Add to Favorites restores the flag");
+        Check(actions.SetHidden(other.Id, true) && games[other.Id].Hidden && !games[original.Id].Hidden &&
+            !actions.SetHidden(other.Id, true), "Hide updates only the target and ignores an already-applied action");
+        Check(actions.SetHidden(other.Id, false) && !games[other.Id].Hidden &&
+            !actions.SetHidden(Guid.Empty, true) && !actions.SetFavorite(Guid.Empty, true) && writes == 12,
+            "Unhide restores visibility and missing games cannot be changed");
     }
     private static void Campaign()
     {
@@ -67,16 +186,65 @@ internal static class NavigatorOrganizationTests
         Check(prefs.VisibleGroupingModes.Distinct().Count() == initial.Length && list.Items.Count == NavigatorOrganization.Groups.Length,
             "Clearing search keeps every choice without duplicates");
     }
+    private static void NavigatorRowAppearance(ListBox list)
+    {
+        var model = new GameRow { Name = "Synthetic title", Favorite = true };
+        var content = new ContentPresenter { Content = model, ContentTemplate = list.ItemTemplate };
+        content.ApplyTemplate();
+        var row = (Grid)VisualTreeHelper.GetChild(content, 0);
+        var title = (TextBlock)row.Children[1];
+        var star = (TextBlock)row.Children[2];
+        var container = new ListBoxItem { Style = list.ItemContainerStyle, Content = content, DataContext = model };
+        container.Measure(new Size(200, 100));
+        var border = (Border)container.Template.FindName("RowBorder", container);
+        var uninstalled = ((SolidColorBrush)title.Foreground).Color;
+        container.IsSelected = true;
+        Check(uninstalled == Color.FromRgb(163, 170, 185) && ((SolidColorBrush)title.Foreground).Color == uninstalled &&
+            ((SolidColorBrush)border.BorderBrush).Color == Color.FromRgb(103, 179, 255),
+            "An uninstalled game keeps its muted title and gets a separate selection accent");
+        model.IsInstalled = true;
+        Check(container.IsSelected && ((SolidColorBrush)title.Foreground).Color == Color.FromRgb(241, 247, 255),
+            "An installed game uses the installed title color while selected");
+        Check(star.FontSize == 16 && star.Visibility == Visibility.Visible && container.DesiredSize.Height == 26,
+            "The larger favorite star fits the compact row");
+        var outline = (Border)container.Template.FindName("ContextOutline", container);
+        Check(outline.Visibility == Visibility.Collapsed, "A selected row starts without a context outline");
+        model.IsContextTarget = true;
+        Check(outline.Visibility == Visibility.Visible && container.IsSelected && !outline.IsHitTestVisible &&
+            container.DesiredSize.Height == 26, "The contextual outline is independent of selection and row height");
+        container.DataContext = new GameRow();
+        Check(outline.Visibility == Visibility.Collapsed, "Recycling the container clears the old outline");
+        container.DataContext = model;
+        model.IsContextTarget = false;
+        Check(outline.Visibility == Visibility.Collapsed && container.IsSelected, "Closing the menu clears only the outline");
+        model.Favorite = false;
+        Check(star.Visibility == Visibility.Collapsed, "The star follows the favorite state");
+    }
     private static void OrganizationControls()
     {
+        PluginMenuActions();
+        var glyph = new TextBlock { Text = "Synthetic icon", Foreground = Brushes.Yellow };
+        var firstIcon = (TextBlock)NavigatorMenuIcons.Create(glyph);
+        var secondIcon = (TextBlock)NavigatorMenuIcons.Create(glyph);
+        Check(!ReferenceEquals(firstIcon, glyph) && !ReferenceEquals(firstIcon, secondIcon) &&
+            firstIcon.FontSize == 16 && firstIcon.Width == 16 && firstIcon.Foreground == Brushes.Yellow,
+            "Theme icons are independently parentable and preserve the theme accent");
+        Check(NavigatorMenuIcons.Create(null) == null &&
+            ((TextBlock)NavigatorMenuIcons.Create(new TextBlock())).ReadLocalValue(TextBlock.ForegroundProperty) ==
+                DependencyProperty.UnsetValue, "Missing icons fall back to text and monochrome glyphs inherit menu foreground");
         var assembly = typeof(NavigatorOrganizationTests).Assembly;
         using (var stream = assembly.GetManifestResourceStream("Navigator.xaml"))
         using (var reader = new StreamReader(stream)) {
             var root = (Grid)XamlReader.Parse(reader.ReadToEnd().Replace("assembly=HeliumCharlo", "assembly=" + assembly.GetName().Name));
+            NavigatorRowAppearance((ListBox)root.FindName("Games"));
             var filterPopup = (System.Windows.Controls.Primitives.Popup)root.FindName("FiltersPopup");
             var filterBorder = (Border)filterPopup.Child;
             var filterLayout = (Grid)filterBorder.Child;
             var filterScroll = (ScrollViewer)root.FindName("FilterSectionsScroll");
+            var titleGrip = (System.Windows.Controls.Primitives.Thumb)root.FindName("FilterTitleGrip");
+            var sizeGrip = (System.Windows.Controls.Primitives.Thumb)root.FindName("FilterSizeGrip");
+            Check(!filterPopup.StaysOpen && !titleGrip.Focusable && !sizeGrip.Focusable && Grid.GetRow(sizeGrip) == 4,
+                "Window gestures stay inside the popup without adding tab stops");
             Check(double.IsNaN(filterBorder.Height) && filterBorder.MaxHeight == 610 &&
                 filterLayout.RowDefinitions.Count == 5 && filterLayout.RowDefinitions[3].Height.IsStar,
                 "Filter popup gives metadata sections a bounded star row");
@@ -131,6 +299,18 @@ internal static class NavigatorOrganizationTests
         var tabs = (TabControl)settings.Content;
         Check(tabs.Items.Cast<TabItem>().Select(tab => tab.Header.ToString())
             .SequenceEqual(new[] { "Navigation", "Appearance", "Organization", "Filters" }), "Settings tab structure");
+        var filters = (StackPanel)((ScrollViewer)((TabItem)tabs.Items[3]).Content).Content;
+        var automaticSize = filters.Children.OfType<Button>().Single();
+        Check(automaticSize.Visibility == Visibility.Collapsed, "Automatic layout needs no reset control");
+        var sized = new Preferences { FilterPopupWidth = 760, FilterPopupHeight = 500 };
+        settings.DataContext = sized;
+        sized.BeginEdit();
+        Check(automaticSize.Visibility == Visibility.Visible, "Manual size can be reset in Filters settings");
+        automaticSize.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Check(!sized.HasFilterPopupSize, "Reset selects automatic sizing");
+        sized.CancelEdit();
+        Check(sized.HasFilterPopupSize, "Cancel restores the original manual size");
+        settings.DataContext = prefs;
         tabs.SelectedIndex = 2;
         var page = (StackPanel)((ScrollViewer)((TabItem)tabs.SelectedItem).Content).Content;
         var style = (ListBox)((GroupBox)page.Children[0]).Content;
@@ -194,6 +374,41 @@ internal static class NavigatorOrganizationTests
             Check(visible().SequenceEqual(NavigatorOrganization.Normalize(null, grouping)), "Restore Defaults restores only its list");
             Check((grouping ? prefs.VisibleSortingModes : prefs.VisibleGroupingModes).SequenceEqual(other), "Management actions preserve the other panel");
         }
+    }
+
+    private static void PluginMenuActions()
+    {
+        var game = new Game("Synthetic menu game") { Id = Guid.NewGuid() };
+        var fresh = game.GetCopy();
+        GameMenuItemActionArgs result = null;
+        GetGameMenuItemsArgs discovery = null;
+        var contribution = new GameMenuItem { Description = "Test action", MenuSection = "Example|Nested", Action = args => result = args };
+        var provider = new MenuProvider(args => {
+            discovery = args;
+            return new[] { contribution, contribution };
+        });
+        var broken = new MenuProvider(_ => throw new InvalidOperationException());
+        var loaded = new List<Plugin> { broken, provider };
+        var errors = 0;
+        var menu = new MenuItem();
+        void Populate() => NavigatorPluginMenu.Populate(menu, new Grid(), game,
+            () => loaded, id => id == fresh.Id ? fresh : null, _ => errors++);
+        Populate();
+        var section = (MenuItem)menu.Items[0];
+        var nested = (MenuItem)section.Items[0];
+        var item = (MenuItem)nested.Items[0];
+        Check(errors == 1 && menu.Visibility == Visibility.Visible && nested.Items.Count == 1 &&
+            discovery.Games.SequenceEqual(new[] { game }) && !discovery.IsGlobalSearchRequest,
+            "Contribution discovery uses the target and isolates a failing provider");
+        item.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Check(result?.SourceItem == contribution && result.Games.SequenceEqual(new[] { fresh }),
+            "A contribution receives its source item and the fresh target");
+        loaded.Clear();
+        result = null;
+        item.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Populate();
+        Check(result == null && menu.Visibility == Visibility.Collapsed,
+            "An unloaded extension cannot execute and an empty menu stays hidden");
     }
     private static void CatalogAndGroups()
     {
@@ -414,6 +629,27 @@ internal static class NavigatorOrganizationTests
     }
     private static void FilterWorkspace()
     {
+        var workArea = new Rect(-1000, -20, 1000, 650);
+        Check(NavigatorFilterPanel.KeepOnScreen(new Point(50, 400), workArea, new Size(500, 450)) == new Point(-500, 180) &&
+            NavigatorFilterPanel.KeepOnScreen(new Point(-1500, -50), workArea, new Size(500, 450)) == new Point(-1000, -20),
+            "Popup placement respects the work area including negative monitor coordinates");
+        var sizeSerializer = new XmlSerializer(typeof(Preferences));
+        using (var writer = new StringWriter()) {
+            var manual = new Preferences { FilterPopupWidth = 560, FilterPopupHeight = 480, FilterPopupX = -42, FilterPopupY = 80 };
+            sizeSerializer.Serialize(writer, manual);
+            manual = (Preferences)sizeSerializer.Deserialize(new StringReader(writer.ToString()));
+            manual.MigrateNavigation();
+            Check(manual.HasFilterPopupSize && manual.FilterPopupWidth == 560 && manual.FilterPopupHeight == 480,
+                "Chosen width and height survive XML reload");
+            Check(manual.HasFilterPopupPosition && manual.FilterPopupX == -42 && manual.FilterPopupY == 80,
+                "The popup anchor survives settings serialization");
+            manual.FilterPopupX = double.PositiveInfinity;
+            manual.FilterPopupHeight = double.NaN;
+            manual.MigrateNavigation();
+            Check(manual.FilterPopupWidth == 0 && manual.FilterPopupHeight == 0, "Invalid saved size restores automatic sizing");
+            Check(!manual.HasFilterPopupPosition && manual.FilterPopupX == null && manual.FilterPopupY == null,
+                "An invalid saved anchor restores automatic placement");
+        }
         Check(FilterWorkspaceCatalog.Groups.Select(group => group.Id).SequenceEqual(
                 new[] { "ownership", "classification", "identity", "activity", "ratings" }) &&
             FilterWorkspaceCatalog.Groups.Select(group => group.Label).SequenceEqual(
