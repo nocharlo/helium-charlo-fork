@@ -243,6 +243,10 @@ namespace HeliumHybrid
                 sidebarClickTimer.Stop();
                 if (RowUnderPointer(e.OriginalSource as DependencyObject) != null) StartSelected();
             };
+            list.PreviewMouseRightButtonDown += (s, e) => {
+                // A WPF ListBoxItem selects on right-button down. The menu opens on release.
+                if (RowUnderPointer(e.OriginalSource as DependencyObject) != null) e.Handled = true;
+            };
             ConfigureGameActions();
             Loaded += OnLoaded; Unloaded += OnUnloaded;
             UpdateSortGroupUi();
@@ -330,7 +334,6 @@ namespace HeliumHybrid
                     return;
                 }
                 target = row.Id;
-                list.SelectedItem = row;
                 offered = gameActions.LaunchAction(target);
                 launch.Header = offered == NavigatorLaunchAction.Install ? "Install" : "Play";
                 launch.IsEnabled = offered != NavigatorLaunchAction.Unavailable;
@@ -797,6 +800,15 @@ namespace HeliumHybrid
         {
             var input = args.StagingItem.Input.RoutedEvent;
             if (input != Mouse.PreviewMouseDownEvent && input != Keyboard.PreviewKeyDownEvent) return;
+            if (filtersPopup.IsOpen && args.StagingItem.Input is MouseButtonEventArgs mouse &&
+                mouse.ChangedButton == MouseButton.Left &&
+                filtersButton.InputHitTest(mouse.GetPosition(filtersButton)) != null &&
+                filtersPopup.Child is UIElement panel && panel.InputHitTest(mouse.GetPosition(panel)) == null) {
+                // Consume this press before Popup auto-dismissal can turn it into an opener click.
+                args.Cancel();
+                filtersPopup.IsOpen = false;
+                return;
+            }
             // Native toolbar menus also run on this Dispatcher. A new gesture owns the selection.
             organizationSelection.Cancel();
             pendingMetadataSelection?.Abort();
