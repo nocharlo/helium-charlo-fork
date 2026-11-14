@@ -8,9 +8,9 @@ Helium (charlo fork) is a modified version of [Helium](https://github.com/darkli
 
 The idea is to bring some of Steam's library navigation into Playnite without replacing the library system underneath it.
 
-**Latest release: v0.3.2 — Library Filters & Native Organization**
+**Latest release: v0.3.3 — Navigator Controls**
 
-[Download v0.3.2](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.3.2) · [Changelog](docs/CHANGELOG.md) · [Report an Issue](https://github.com/nocharlo/helium-charlo-fork/issues)
+[Download v0.3.3](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.3.3) · [Changelog](docs/CHANGELOG.md) · [Report an Issue](https://github.com/nocharlo/helium-charlo-fork/issues)
 
 ---
 
@@ -113,6 +113,14 @@ You can also hide and reorder fields and groups under **Navigator Settings → F
 
 The Ready to Play shortcut and the Navigator's local search remain available alongside these controls.
 
+You can drag Library Filters by its title and resize it from the corner. The panel remembers where you left it and how large you made it. You can switch back to automatic sizing in the Navigator settings.
+
+### Navigator Controls
+
+Right-click a game to play or install it, edit it, change its categories or completion status, or toggle favorites and visibility. The menu also offers native file and library actions where available, along with compatible actions from loaded extensions. The right-clicked row gets an outline while your current selection and Grid position stay put.
+
+Use the arrow keys to move through the sidebar and open or close groups. Escape and the mouse's Back button can dismiss Navigator popups, close the side details panel, or return to the Grid from Full Details opened through the Navigator.
+
 ## Screenshots
 
 Click a screenshot to open it at full resolution.
@@ -129,12 +137,12 @@ Click a screenshot to open it at full resolution.
 
 Download both packages from the latest release:
 
-- [Helium Theme (.pthm)](https://github.com/nocharlo/helium-charlo-fork/releases/download/v0.3.2/Helium-charlo-fork-v0.3.2.pthm)
-- [Helium Navigator (.pext)](https://github.com/nocharlo/helium-charlo-fork/releases/download/v0.3.2/Helium-Navigator-v0.3.2.pext)
+- [Helium Theme (.pthm)](https://github.com/nocharlo/helium-charlo-fork/releases/download/v0.3.3/Helium-charlo-fork-v0.3.3.pthm)
+- [Helium Navigator (.pext)](https://github.com/nocharlo/helium-charlo-fork/releases/download/v0.3.3/Helium-Navigator-v0.3.3.pext)
 
 Open each package with Playnite and confirm the installation.
 
-Restart Playnite, then select **Helium (charlo fork) v0.3.2** under **Settings → Appearance → Desktop**.
+Restart Playnite, then select **Helium (charlo fork) v0.3.3** under **Settings → Appearance → Desktop**.
 
 Make sure the theme and Navigator extension are on matching versions. The Navigator currently depends on the theme for its integrated sidebar layout, so installing the extension alone won't give you the same experience.
 
@@ -176,16 +184,6 @@ Most development so far has focused on the Navigator. Once it's stable enough, I
 The roadmap is subject to change. Some ideas are still being explored, and I'd rather revise the scope than force a feature into a release before it's ready.
 
 ### Navigator
-
-**v0.3.3 — Navigator Controls (Release Candidate)**
-
-This update expands what you can do directly from the Navigator.
-
-The context menu gains more native Playnite actions, including Play/Install, Edit Game, categories, completion status, favorites, links, file operations, and supported extension contributions.
-
-It also improves keyboard navigation, selection handling, transitions between Grid and Details, and the floating Library Filters panel.
-
-The current candidate is undergoing final testing before release.
 
 **v0.3.4 — Architecture & Performance (Planned)**
 
@@ -247,10 +245,9 @@ There are still a few rough edges:
 
 - The details panel can briefly appear blank while Playnite rebuilds the library view and restores selection.
 - Some unusual mouse interactions haven't been tested thoroughly across different configurations.
-- Uninstalled game titles can appear brighter than intended on hover.
 - The layout can feel cramped at smaller window sizes.
 - Compatibility with every Playnite extension, theme configuration, or library setup hasn't been established.
-- Performance in very large libraries still needs broader testing.
+- The v0.3.3 performance checks used portable libraries with 1,250 and 2,500 games, mostly synthetic entries without artwork or provider integrations. The menu timings include automation overhead. Larger real libraries and different extension setups still need broader testing.
 
 I develop and test primarily on my own setup, so issues that don't show up there may behave differently elsewhere.
 

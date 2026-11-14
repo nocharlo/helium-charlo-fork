@@ -2,7 +2,7 @@
 
 A history of changes to Helium (charlo fork), from the original Navigator prototype to the current release.
 
-## v0.3.3 — Navigator Controls (in development)
+## v0.3.3 — Navigator Controls
 
 - Move Library Filters by its title and resize it from the bottom-right corner. The Navigator remembers the position and manual size and offers automatic sizing in Filters settings.
 - The Library Filters launcher highlights while the popup is open and closes it on a second click.
@@ -15,10 +15,15 @@ A history of changes to Helium (charlo fork), from the original Navigator protot
 - The Navigator game menu can add or remove a favorite and hide or unhide a game.
 - Game actions reuse the active Playnite theme's menu icons.
 - The game menu offers web links and delegates shortcuts, installation folders, install size, local manuals, and removal to Playnite where available.
-
 - Opening a Navigator game menu outlines its target while preserving the Grid selection and scroll position. Remove and Uninstall use distinct icons.
 - Mouse Back dismisses Navigator menus and popups or uses the same Grid and Details navigation as Escape.
 - Installed library games can use Playnite's native uninstall action. Compatible actions from loaded extensions appear under Extensions.
+
+### Validation
+
+- The Release build completed without errors or warnings. All 378 targeted automated checks and all 14 maintainer acceptance scenarios passed.
+- In portable Playnite, the first context menu after restart was detected in 519 ms with 1,250 total games and 472 ms with 2,500. Three subsequent openings at each size ranged from 431 to 501 ms. Right-click preserved Grid selection and scroll in both cases.
+- Timings include automated input and accessibility detection. Synthetic entries had no artwork or provider integrations, and each library size had one restart sample. These results cover the tested setup.
 
 ## v0.3.2 — Library Filters & Native Organization
 
