@@ -4,10 +4,6 @@ A history of changes to Helium (charlo fork), from the original Navigator protot
 
 ## Unreleased
 
-### Documentation
-
-- Condensed the README, moved installation instructions closer to the top, and retained the library overview and feature screenshots.
-
 ## v0.3.3 — Navigator Controls
 
 - Move Library Filters by its title and resize it from the bottom-right corner. The Navigator remembers the position and manual size and offers automatic sizing in Filters settings.
