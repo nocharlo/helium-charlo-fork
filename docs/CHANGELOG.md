@@ -4,6 +4,11 @@ A history of changes to Helium (charlo fork), from the original Navigator protot
 
 ## Unreleased
 
+### Maintenance
+
+- Renamed the Navigator source folder, C# project, namespace, and plugin class without changing the extension ID, packaged DLL, theme bindings, or settings location.
+- Updated the active documentation index and archived the v0.3.0 validation record.
+
 ## v0.3.3 — Navigator Controls
 
 - Move Library Filters by its title and resize it from the bottom-right corner. The Navigator remembers the position and manual size and offers automatic sizing in Filters settings.
