@@ -2,21 +2,21 @@
 
 **A Steam-inspired library sidebar for Playnite Desktop, built around Playnite's existing views.**
 
-![Helium library overview](docs/images/library-overview.webp)
+Helium (charlo fork) is a modified version of [Helium](https://github.com/darklinkpower/Helium), based on the [KKCD fork](https://github.com/kushagr-m/Helium).
 
-Helium (charlo fork) is a modified version of [Helium](https://github.com/darklinkpower/Helium), based on the [KKCD fork](https://github.com/kushagr-m/Helium). Its main addition is the **Helium Navigator**, a custom sidebar that lets you browse and organize your games while keeping Playnite's Grid and Details views accessible.
+Its main addition is **Helium Navigator**, a customizable sidebar for browsing, organizing, and launching games alongside Playnite's Grid and Details views.
 
 The idea is to bring some of Steam's library navigation into Playnite without replacing the library system underneath it.
 
 **Latest release: v0.3.3 — Navigator Controls**
 
-[Download v0.3.3](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.3.3) · [Changelog](docs/CHANGELOG.md) · [Report an Issue](https://github.com/nocharlo/helium-charlo-fork/issues)
+[Download](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.3.3) · [Changelog](docs/CHANGELOG.md) · [Documentation](docs/README.md) · [Report an Issue](https://github.com/nocharlo/helium-charlo-fork/issues)
 
 ---
 
 ## Why I Started This
 
-I've been using Playnite for a while, and one thing I kept missing from Steam was its library sidebar.  
+I've been using Playnite for a while, and one thing I kept missing from Steam was its library sidebar.
 
 I wanted to have a compact list of games on the left while browsing covers or reading game details on the right. Being able to jump between games without constantly switching views is such a basic part of how I use Steam that I found myself missing it in Playnite.
 
@@ -30,96 +30,61 @@ That's how this fork came about.
 
 I'm sharing it because I figured I probably wasn't the only person who wanted something like this. It's still a personal project, but I'm working toward making it reliable enough for other people's libraries, too.
 
+## Installation
+
+**Requires Playnite 10 Desktop on Windows.**
+
+Download both packages from the [latest release](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.3.3):
+
+- [Helium Theme (.pthm)](https://github.com/nocharlo/helium-charlo-fork/releases/download/v0.3.3/Helium-charlo-fork-v0.3.3.pthm)
+- [Helium Navigator (.pext)](https://github.com/nocharlo/helium-charlo-fork/releases/download/v0.3.3/Helium-Navigator-v0.3.3.pext)
+
+Open both packages with Playnite, confirm the installation, and restart the application. Then select **Helium (charlo fork) v0.3.3** under **Settings → Appearance → Desktop**.
+
+The theme and Navigator extension must be on matching versions. The Navigator currently depends on the theme for its integrated layout.
+
+For the Grid Details Panel experience, you'll also need [Details to Grid View Converter](https://playnite.link/addons.html#ThemesDetailsViewToGridViewConverter_ef8a7226-eedc-478d-a506-92ee6c088aa3).
+
+If you're updating from an older version, back up your existing theme and Navigator settings first.
+
 ## Features
 
 ### Helium Navigator
 
-The Navigator adds a compact, scrollable game list alongside Playnite's library views.
+A compact, resizable game list that works alongside Playnite's existing library views.
 
-- Search for games directly from the sidebar without replacing the main library search.
-- Browse expandable groups based on platforms, categories, series, and other library properties.
-- Keep game icons visible, with separate styling for installed and uninstalled titles.
-- See favorite indicators without opening a game's details.
-- Resize or collapse the sidebar to give the Grid more room.
-- Keep your preferred width, grouping, sorting, and other settings between sessions.
+- **Search:** Find games directly from the sidebar without replacing Playnite's main search.
+- **Sort & Group:** Organize games by series, platform, category, recent activity, and other metadata. Follow Playnite's current organization or configure the Navigator independently.
+- **Recent Activity:** Browse recently played games using hybrid or detailed chronological groups.
+- **Library Filters:** A floating panel with 27 native filter fields, searchable metadata, multiselection, and removable active-filter chips.
+- **Game Indicators:** See installed status, favorites, and game icons directly in the list.
+- **Context Menu:** Play, install, edit, and manage games without changing the Grid selection or scroll position.
+- **Navigation:** Move between games and groups using the keyboard, and use Escape or the mouse's Back button to return from supported views and panels.
+- **Customization:** Adjust sidebar width, visible sorting and grouping modes, filter layout, and other preferences.
 
-The Navigator uses your existing Playnite library. It doesn't create another game database or require you to reorganize your metadata.
+The Navigator uses your existing Playnite library. It doesn't create a separate database or require changes to your metadata.
 
 ### Working With Playnite's Views
 
-I didn't want to replace the Grid or Full Details View just to have a sidebar.
+The Navigator is designed to complement Playnite's interface rather than replace it.
 
-The Navigator works alongside Playnite's existing library interface:
+You can browse covers in **Grid View**, open the **Grid Details Panel**, or switch to **Full Details View** while keeping the Navigator available. Playnite's native List View remains accessible as well.
 
-- **Grid View:** Browse covers with the Navigator beside them.
-- **Grid Details Panel:** Select a game and view its information alongside the Grid.
-- **Full Details View:** Open the full game page while keeping the Navigator available.
-- **List View:** Continue using Playnite's native list without an unnecessary second sidebar.
-
-You can configure what happens when you click a game in the Navigator or a cover in the Grid, independently.
+You can configure what happens when clicking a game in the Navigator or a cover in the Grid independently.
 
 For example, I use the Navigator to open the Grid Details Panel and the covers to open Full Details View.
 
-Selection is synchronized between supported views, with handling for returning to the Grid, restoring scroll positions, and revealing games that move between groups.
+Selection and navigation are synchronized between supported views, including handling for scroll restoration and games moving between groups.
 
-A lot of development time has gone into making those transitions behave consistently. They turned out to be considerably more complicated than adding the sidebar itself.
+### Library Organization
 
-### Sort & Group
+The Navigator supports its own sorting and grouping preferences while retaining the option to follow Playnite's native organization.
 
-The Navigator has its own sorting and grouping controls.
+Library Filters provides access to Playnite's existing filtering system from a separate floating panel. It supports multiple selections, searchable values, customizable fields, and persistent panel settings.
 
-You can follow Playnite's current organization or configure the Navigator independently. Supported sorting, direction, and grouping changes can also be synchronized back to Playnite when you want both views to use the same organization.
+The **Ready to Play** shortcut, Recent Activity, and local Navigator search can be used alongside these controls.
 
-Recent versions have added more sorting and grouping options, improved handling of missing metadata, and made the available modes customizable.
-
-You can hide modes you don't use and rearrange their order in the Navigator settings.
-
-When following Playnite, the Navigator respects the native sorting order rather than trying to reproduce it separately.
-
-### Recent Activity
-
-Recent Activity organizes games according to when they were last played.
-
-There are two presentation modes:
-
-- **Hybrid:** More detailed groups for recent activity, with older entries organized by year.
-- **Detailed:** A more granular chronological history, including monthly groups.
-
-Each mode keeps its own expanded and collapsed groups.
-
-Recent Activity works with the existing library filters and Navigator search, so you can narrow the results without losing the chronological organization.
-
-### Library Filters
-
-Library Filters is a floating panel for working with Playnite's native filters without leaving the Navigator.
-
-It currently exposes **27 filter fields**, organized into five groups:
-
-- Library & Status
-- Classification
-- Game Information
-- Activity & History
-- Ratings
-
-The panel adjusts between one, two, and three columns depending on its width. Sections can expand, and the contents become scrollable when they exceed the available height.
-
-You can search for fields or metadata values, select multiple values, and load additional entries in batches when a field contains a long list.
-
-Active filters appear as removable chips, making it easier to see what's affecting the library.
-
-The **Clear filters** action removes conditions managed by Library Filters while preserving unrelated native filter conditions and Playnite's existing AND/OR mode.
-
-You can also hide and reorder fields and groups under **Navigator Settings → Filters**. Hiding a field doesn't remove its active condition.
-
-The Ready to Play shortcut and the Navigator's local search remain available alongside these controls.
-
-You can drag Library Filters by its title and resize it from the corner. The panel remembers where you left it and how large you made it. You can switch back to automatic sizing in the Navigator settings.
-
-### Navigator Controls
-
-Right-click a game to play or install it, edit it, change its categories or completion status, or toggle favorites and visibility. The menu also offers native file and library actions where available, along with compatible actions from loaded extensions. The right-clicked row gets an outline while your current selection and Grid position stay put.
-
-Use the arrow keys to move through the sidebar and open or close groups. Escape and the mouse's Back button can dismiss Navigator popups, close the side details panel, or return to the Grid from Full Details opened through the Navigator.
+More detailed information about the implementation and settings is available in the [documentation](docs/README.md).
 
 ## Screenshots
 
@@ -131,127 +96,53 @@ Click a screenshot to open it at full resolution.
 | **Recent Activity + Details** | **Native Full Details View** |
 | [![Recent Activity alongside Silksong details](docs/images/recent-activity.webp)](docs/images/recent-activity.webp) | [![Full Details View showing DOOM Eternal](docs/images/full-details.webp)](docs/images/full-details.webp) |
 
-## Installation
-
-**Requires Playnite 10 Desktop on Windows.**
-
-Download both packages from the latest release:
-
-- [Helium Theme (.pthm)](https://github.com/nocharlo/helium-charlo-fork/releases/download/v0.3.3/Helium-charlo-fork-v0.3.3.pthm)
-- [Helium Navigator (.pext)](https://github.com/nocharlo/helium-charlo-fork/releases/download/v0.3.3/Helium-Navigator-v0.3.3.pext)
-
-Open each package with Playnite and confirm the installation.
-
-Restart Playnite, then select **Helium (charlo fork) v0.3.3** under **Settings → Appearance → Desktop**.
-
-Make sure the theme and Navigator extension are on matching versions. The Navigator currently depends on the theme for its integrated sidebar layout, so installing the extension alone won't give you the same experience.
-
-If you're updating from an older version, back up your existing theme and Navigator settings first.
-
-The Grid Details Panel experience also relies on [Details to Grid View Converter](https://playnite.link/addons.html#ThemesDetailsViewToGridViewConverter_ef8a7226-eedc-478d-a506-92ee6c088aa3).
-
 ## Development
 
-The project currently has two main components:
+The project consists of two components:
 
-- **Helium Theme:** The modified XAML/WPF theme, including the layout that hosts the Navigator.
-- **Helium Navigator:** A C# extension responsible for the game list, sorting, grouping, selection, navigation, and settings.
+- **Helium Theme:** The modified XAML/WPF theme and Navigator integration.
+- **Helium Navigator:** A C# extension handling the sidebar, library organization, navigation, and settings.
 
-The current codebase targets .NET Framework 4.6.2 and PlayniteSDK 6.11.0.
+The current codebase targets **.NET Framework 4.6.2** and **PlayniteSDK 6.11.0**.
 
-The repository includes automated tests and tooling for building, packaging, and validating releases. I also use an isolated portable installation of Playnite to test changes without risking my main library.
+Development includes automated tests, regression checks, release validation, and testing in an isolated portable Playnite installation.
 
-Development documentation is available in the [docs directory](docs/README.md), along with the project's [development guidelines](AGENTS.md).
+Technical documentation and development guidelines are available in [docs](docs/README.md) and [AGENTS.md](AGENTS.md).
 
 ### A Note on AI-Assisted Development
 
-I don't have a traditional programming background. I started this project using AI tools, mainly ChatGPT and Codex, to help me write and modify code that I wouldn't have been able to produce on my own.
+I don't have a traditional programming background. I started this project using AI tools, mainly ChatGPT and Codex, to help me write and modify code.
 
-I handle the design, requirements, feature decisions, testing, and quality control. I also spend a fair amount of time investigating bugs, reviewing behavior, and figuring out how different parts of Playnite interact.
+I handle the design, requirements, feature decisions, testing, and quality control, while much of the code has been written with AI assistance.
 
-The code itself has largely been written with AI assistance.
+I think it's important to be upfront about that. AI-generated code can introduce problems that aren't immediately obvious, and I'm aware of the technical limitations and broader environmental and social concerns surrounding these tools.
 
-I think it's worth being upfront about that, especially for an open-source project. AI-generated code can introduce problems that aren't immediately obvious, and I'm aware that relying on these tools comes with technical limitations as well as broader environmental and social concerns.
+I've been improving the project's testing and validation practices as it grows, but I don't consider that a replacement for experienced developers reviewing the code.
 
-I've been putting more effort into automated tests, isolated testing environments, regression checks, and documentation as the project has grown. I'm learning along the way, but I don't consider that a replacement for experienced developers reviewing the code.
-
-If you know Playnite or C# and spot something questionable, feel free to open an issue or suggest a better implementation. I'm not particularly attached to how a piece of code was written if there's a more reliable way to do it.
+If you know Playnite or C# and spot something questionable, feel free to open an issue or suggest a better implementation. I'm always open to improving how things work.
 
 ## Roadmap
 
-Most development so far has focused on the Navigator. Once it's stable enough, I want to spend more time improving the Helium theme itself.
+Development is currently focused on stabilizing and improving the Navigator before moving on to larger changes to the Helium theme.
 
-The roadmap is subject to change. Some ideas are still being explored, and I'd rather revise the scope than force a feature into a release before it's ready.
+- **v0.3.4 — Architecture & Performance:** Refactor tightly coupled components, investigate performance bottlenecks, and improve reliability in larger libraries.
+- **v0.4.0 — Adaptive Navigator (Exploratory):** Investigate making Navigator less dependent on Helium and potentially compatible with other Desktop themes.
+- **v0.5.x — Theme Redesign (Proposed):** Revisit Full Details, Grid, Hybrid layouts, and explore a customizable genre and tag icon system.
+- **Longer-term — Helium Home:** Explore a more complete library homepage with features such as Continue Playing and customizable game shelves.
 
-### Navigator
-
-**v0.3.4 — Architecture & Performance (Planned)**
-
-The Navigator has grown quite a bit since the original prototype, and some of its internal architecture needs attention before I keep adding features.
-
-This update will focus on investigating performance bottlenecks, reducing unnecessary work during library updates, simplifying tightly coupled components, and improving the testing workflow.
-
-Performance in larger libraries is a particular concern. Most of my testing has been done with a relatively small personal library, so broader testing is needed to understand how well the Navigator scales.
-
-**v0.4.0 — Adaptive Navigator (Exploratory)**
-
-I'd eventually like the Navigator to work more independently from Helium.
-
-The idea is to separate its core behavior from theme-specific presentation, allowing it to work with other compatible Desktop themes where technically possible.
-
-That doesn't necessarily mean every theme will support the same integrated sidebar layout. The Playnite theme and extension APIs impose some limitations, and I'll need to investigate those before deciding what a standalone release can realistically offer.
-
-### Theme Redesign — Proposed v0.5.x Series
-
-Once the Navigator is in better shape, I want to revisit the rest of Helium.
-
-The theme already supports a fair number of Playnite extensions, which is one of the reasons I use it. But its layout has accumulated features over time, and some parts could really use a more thorough redesign.
-
-The intention is to keep those integrations while making the interface easier to navigate and less cluttered.
-
-**Full Details**
-
-Rework the game details page while keeping the existing banner and artwork presentation.
-
-I want genres and tags to be more visible, activity information to be better organized, and related-game sections to take up less space.
-
-The goal is to make better use of the information already available, including data supplied by other extensions.
-
-**Grid & Hybrid**
-
-Improve the Grid and the optional side details panel without turning the covers into oversized information cards.
-
-Cover artwork should remain the focus. The Navigator and details panel should fit around it without wasting space or making the library unnecessarily cramped.
-
-**Genre & Tag Icon System**
-
-I'm also exploring a set of icons for genres and tags.
-
-Rather than requiring everyone to use the same names or classifications, the system would support aliases, custom assignments, reusable icon packs, and fallbacks for anything it doesn't recognize.
-
-It would be a visual layer over Playnite's existing metadata, not a replacement for it.
-
-### Longer-Term Ideas
-
-**Helium Home**
-
-I've experimented with the idea of a more complete library homepage, with features such as Continue Playing and customizable game shelves.
-
-An earlier prototype is archived. I still want to revisit the idea, but it needs more design and technical work before becoming part of the release roadmap.
+These plans are subject to change as technical limitations and development priorities become clearer.
 
 ## Known Limitations
 
-There are still a few rough edges:
+- The Grid Details Panel may briefly appear blank while Playnite rebuilds its view.
+- Some mouse interactions and smaller window configurations still need broader testing.
+- Compatibility with every extension and library setup hasn't been established.
+- Custom per-game Actions cannot currently be executed from Navigator's context menu through the public Playnite 10 SDK.
+- Performance testing has included synthetic libraries with up to 2,500 games, but larger real libraries with artwork and store integrations need further testing.
 
-- The details panel can briefly appear blank while Playnite rebuilds the library view and restores selection.
-- Some unusual mouse interactions haven't been tested thoroughly across different configurations.
-- The layout can feel cramped at smaller window sizes.
-- Compatibility with every Playnite extension, theme configuration, or library setup hasn't been established.
-- The v0.3.3 performance checks used portable libraries with 1,250 and 2,500 games, mostly synthetic entries without artwork or provider integrations. The menu timings include automation overhead. Larger real libraries and different extension setups still need broader testing.
+I primarily develop and test on my own setup, so feedback from other configurations is particularly useful.
 
-I develop and test primarily on my own setup, so issues that don't show up there may behave differently elsewhere.
-
-If you run into a problem, please [open an issue](https://github.com/nocharlo/helium-charlo-fork/issues). Reproduction steps, screenshots, Playnite version, and relevant library details are especially helpful.
+If something doesn't work as expected, please [open an issue](https://github.com/nocharlo/helium-charlo-fork/issues) with reproduction steps, screenshots, and relevant Playnite or library details.
 
 ## Credits
 
