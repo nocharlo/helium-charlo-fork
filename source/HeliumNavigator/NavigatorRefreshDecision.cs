@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace HeliumHybrid
+namespace HeliumNavigator
 {
     // Describes the native view for diagnostics; it does not control Navigator ordering.
     internal sealed class NavigatorViewSnapshot

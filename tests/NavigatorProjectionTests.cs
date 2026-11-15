@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
-using HeliumHybrid;
+using HeliumNavigator;
 
 class NavigatorProjectionTests
 {

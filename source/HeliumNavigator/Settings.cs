@@ -7,7 +7,7 @@ using System.Windows.Data;
 using System.Xml.Serialization;
 using Playnite.SDK;
 
-namespace HeliumHybrid
+namespace HeliumNavigator
 {
     public sealed class Preferences : ISettings
     {

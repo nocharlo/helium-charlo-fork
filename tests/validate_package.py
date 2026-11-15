@@ -13,19 +13,19 @@ root = Path(__file__).resolve().parents[1]
 build = args.build_dir.resolve()
 install = build / 'verify-extension'
 packages = build / 'packages'
-source_manifest = (root / 'source/HeliumHybrid/extension.yaml').read_text()
+source_manifest = (root / 'source/HeliumNavigator/extension.yaml').read_text()
 theme_manifest = (root / 'theme/theme.yaml').read_text()
 version = re.search(r'(?m)^Version:\s*(\S+)', source_manifest).group(1)
 assert re.search(r'(?m)^Version:\s*(\S+)', theme_manifest).group(1) == version
-assert f'AssemblyVersion("{version}.0")' in (root / 'source/HeliumHybrid/Plugin.cs').read_text()
+assert f'AssemblyVersion("{version}.0")' in (root / 'source/HeliumNavigator/Plugin.cs').read_text()
 assert f'Name: Helium Navigator v{version}' in source_manifest
 assert f'Name: Helium (charlo fork) v{version}' in theme_manifest
 
-xaml = list((root / 'theme').rglob('*.xaml')) + [root / 'source/HeliumHybrid/Navigator.xaml']
+xaml = list((root / 'theme').rglob('*.xaml')) + [root / 'source/HeliumNavigator/Navigator.xaml']
 for file in xaml:
     ET.parse(file)
 xname = '{http://schemas.microsoft.com/winfx/2006/xaml}Name'
-nav = ET.parse(root / 'source/HeliumHybrid/Navigator.xaml')
+nav = ET.parse(root / 'source/HeliumNavigator/Navigator.xaml')
 names = {n.attrib[xname] for n in nav.iter() if xname in n.attrib}
 assert {'CollapseButton','Search','Grouping','Count','Status','Games','ResizeGrip',
         'HomeButton','SortGroupButton','SortGroupPopup','SortSummary',
@@ -60,12 +60,12 @@ overlays = [n for n in lib.iter() if n.attrib.get(xname) == 'HeliumCharlo_Reopen
 assert len(overlays) == 1 and overlays[0].attrib['Visibility'] == 'Collapsed'
 details = ET.parse(root / 'theme/Views/LibraryDetailsView.xaml')
 assert [n for n in details.iter() if n.attrib.get(xname) == 'HeliumCharlo_NativeDetailsList']
-source = (root / 'source/HeliumHybrid/Navigator.cs').read_text()
+source = (root / 'source/HeliumNavigator/Navigator.cs').read_text()
 assert all(f'FindName("{name}")' in source for name in contract)
 assert 'OpenNativeDetails(id)' in source and 'homeButton.Click' in source
-assert 'GetSettingsView' in (root / 'source/HeliumHybrid/Plugin.cs').read_text()
-assert 'Settings.MigrateNavigation();' in (root / 'source/HeliumHybrid/Plugin.cs').read_text()
-settings = (root / 'source/HeliumHybrid/Settings.cs').read_text()
+assert 'GetSettingsView' in (root / 'source/HeliumNavigator/Plugin.cs').read_text()
+assert 'Settings.MigrateNavigation();' in (root / 'source/HeliumNavigator/Plugin.cs').read_text()
+settings = (root / 'source/HeliumNavigator/Settings.cs').read_text()
 assert 'SidebarClickAction' in settings and 'GridCoverClickAction' in settings
 assert 'SteamMode ? 0 : 1' in settings and 'OpenFromGridCover ? 0 : 1' in settings
 assert 'ShouldSerializeSteamMode() => false' in settings and 'ShouldSerializeOpenFromGridCover() => false' in settings
@@ -84,7 +84,7 @@ assert binary[:2] == b'MZ'
 pe = struct.unpack_from('<I', binary, 0x3c)[0]
 assert binary[pe:pe+4] == b'PE\x00\x00'
 assert struct.unpack_from('<H', binary, pe+24)[0] == 0x10b
-assert b'HeliumHybrid.Navigator.xaml' in binary
+assert b'HeliumNavigator.Navigator.xaml' in binary
 for name, manifest in [(f'Helium-Navigator-v{version}.pext','extension.yaml'), (f'Helium-charlo-fork-v{version}.pthm','theme.yaml')]:
     with zipfile.ZipFile(packages / name) as z:
         assert z.testzip() is None

@@ -9,7 +9,7 @@ on:
       - "tests/ArtifactOpsecTests.py"
       - "tests/**"
       - "scripts/Test-Navigator.ps1"
-      - "source/HeliumHybrid/**"
+      - "source/HeliumNavigator/**"
       - "theme/**"
   workflow_dispatch:
 

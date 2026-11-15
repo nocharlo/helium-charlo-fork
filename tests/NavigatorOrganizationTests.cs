@@ -10,7 +10,7 @@ using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Xml.Serialization;
-using HeliumHybrid;
+using HeliumNavigator;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
 

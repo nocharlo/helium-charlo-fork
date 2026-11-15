@@ -8,9 +8,9 @@ using Playnite.SDK.Plugins;
 using System.Reflection;
 [assembly: AssemblyVersion("0.3.3.0")]
 [assembly: AssemblyFileVersion("0.3.3.0")]
-namespace HeliumHybrid
+namespace HeliumNavigator
 {
-    public sealed class HybridPlugin : GenericPlugin
+    public sealed class NavigatorPlugin : GenericPlugin
     {
         public override Guid Id { get; } = new Guid("b59e3c9f-9c52-4582-a332-0716b56cf023");
         internal event Action<OnGameSelectedEventArgs> SelectionChanged;
@@ -18,7 +18,7 @@ namespace HeliumHybrid
         internal string DataDirectory => GetPluginUserDataPath();
         internal Preferences Settings { get; }
         private readonly bool canSaveSettings;
-        public HybridPlugin(IPlayniteAPI api) : base(api)
+        public NavigatorPlugin(IPlayniteAPI api) : base(api)
         {
             Properties = new GenericPluginProperties { HasSettings = true };
             Settings = SettingsFile.Load<Preferences>(Path.Combine(DataDirectory, "navigator.xml"),

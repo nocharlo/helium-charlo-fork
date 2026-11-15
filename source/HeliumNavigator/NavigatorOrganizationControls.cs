@@ -7,7 +7,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Data;
 
-namespace HeliumHybrid
+namespace HeliumNavigator
 {
     internal static class NavigatorOrganizationControls
     {

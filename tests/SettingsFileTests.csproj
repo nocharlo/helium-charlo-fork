@@ -7,7 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="SettingsFileTests.cs" />
-    <Compile Include="../source/HeliumHybrid/SettingsFile.cs" Link="SettingsFile.cs" />
-    <Compile Include="../source/HeliumHybrid/Logic.cs" Link="Logic.cs" />
+    <Compile Include="../source/HeliumNavigator/SettingsFile.cs" Link="SettingsFile.cs" />
+    <Compile Include="../source/HeliumNavigator/Logic.cs" Link="Logic.cs" />
   </ItemGroup>
 </Project>

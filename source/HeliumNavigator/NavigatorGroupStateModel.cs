@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace HeliumHybrid
+namespace HeliumNavigator
 {
     // Kept outside WPF containers so virtualization and view replacement cannot erase it.
     internal sealed class NavigatorGroupState

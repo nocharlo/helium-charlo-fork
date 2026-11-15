@@ -4,7 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
 
-namespace HeliumHybrid
+namespace HeliumNavigator
 {
     public sealed class NavigatorGroupExpander : Expander
     {

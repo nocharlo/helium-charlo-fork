@@ -5,7 +5,7 @@ using Playnite.SDK;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
 
-namespace HeliumHybrid
+namespace HeliumNavigator
 {
     // The only place where Navigator reads live games and view state from Playnite.
     internal sealed class LibraryStateAdapter

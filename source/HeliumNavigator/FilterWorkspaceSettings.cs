@@ -6,7 +6,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 
-namespace HeliumHybrid
+namespace HeliumNavigator
 {
     public sealed class FilterGroupPreference
     {

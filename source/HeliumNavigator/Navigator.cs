@@ -18,14 +18,14 @@ using Playnite.SDK;
 using Playnite.SDK.Controls;
 using Playnite.SDK.Events;
 using Playnite.SDK.Models;
-namespace HeliumHybrid
+namespace HeliumNavigator
 {
     public sealed class Navigator : PluginUserControl
     {
         private readonly IPlayniteAPI api;
         private readonly LibraryStateAdapter library;
         private readonly NavigatorDiagnostics diagnostics;
-        private readonly HybridPlugin plugin;
+        private readonly NavigatorPlugin plugin;
         private readonly NavigatorGameActions gameActions;
         private readonly Grid root;
         private readonly ListBox list;
@@ -106,7 +106,7 @@ namespace HeliumHybrid
         private NavigatorSortMode SortMode => NavigatorSortPolicy.ValidMode(prefs.SortMode);
         private int EffectiveGrouping => NavigatorRefreshDecision.EffectiveGrouping(NavigatorGrouping, library.Grouping, prefs.RecentActivityGroupingStyle);
         private readonly NavigatorGroupState groupState = new NavigatorGroupState();
-        public Navigator(IPlayniteAPI api, HybridPlugin plugin)
+        public Navigator(IPlayniteAPI api, NavigatorPlugin plugin)
         {
             this.api = api; this.plugin = plugin; library = new LibraryStateAdapter(api);
             gameActions = new NavigatorGameActions(api.Database.Games.Get, api.StartGame, api.InstallGame,
@@ -115,7 +115,7 @@ namespace HeliumHybrid
                 message => LogManager.GetLogger().Info(message));
             prefs = plugin.Settings;
             prefs.Width = Logic.ClampWidth(prefs.Width);
-            using (var stream = typeof(Navigator).Assembly.GetManifestResourceStream("HeliumHybrid.Navigator.xaml"))
+            using (var stream = typeof(Navigator).Assembly.GetManifestResourceStream("HeliumNavigator.Navigator.xaml"))
                 root = (Grid)XamlReader.Load(stream);
             Content = root;
             list = (ListBox)root.FindName("Games"); search = (TextBox)root.FindName("Search");

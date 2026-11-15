@@ -143,7 +143,7 @@ switch($Action){
   $out=Full $OutputRoot;Guard $out $repo
   if($ProductionRoot){Guard $out $ProductionRoot}
   if(Test-Path -LiteralPath $out){throw "Output must be a new directory: $out"}
-  $version=Pair (Join-Path $repo 'theme\theme.yaml') (Join-Path $repo 'source\HeliumHybrid\extension.yaml')
+  $version=Pair (Join-Path $repo 'theme\theme.yaml') (Join-Path $repo 'source\HeliumNavigator\extension.yaml')
   $dotnet=if($DotnetExe){Get-Item -LiteralPath $DotnetExe -ErrorAction SilentlyContinue}else{$command=Get-Command dotnet -ErrorAction SilentlyContinue;if($command){Get-Item -LiteralPath $command.Source}}
   $env:DOTNET_CLI_HOME=Join-Path $out 'dotnet-home';New-Item -ItemType Directory -Path $env:DOTNET_CLI_HOME -Force|Out-Null
   $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1';$env:DOTNET_CLI_TELEMETRY_OPTOUT='1';$env:DOTNET_ADD_GLOBAL_TOOLS_TO_PATH='false'
@@ -152,7 +152,7 @@ switch($Action){
   $env:NUGET_PACKAGES=if($NugetPackagesRoot){Full $NugetPackagesRoot}else{Join-Path $out 'nuget'}
   if($NugetPackagesRoot -and -not(Test-Path -LiteralPath $env:NUGET_PACKAGES -PathType Container)){throw 'NuGet package cache is missing'}
   $env:NUGET_HTTP_CACHE_PATH=Join-Path $out 'nuget-http';$env:NUGET_SCRATCH=Join-Path $out 'nuget-scratch'
-  $project=Join-Path $repo 'source\HeliumHybrid\HeliumHybrid.csproj'
+  $project=Join-Path $repo 'source\HeliumNavigator\HeliumNavigator.csproj'
   $buildArgs=@($project,'--configuration','Release',"-p:BaseOutputPath=$out\bin\","-p:BaseIntermediateOutputPath=$out\obj\")
   if($NugetConfig){
    if(-not(Test-Path -LiteralPath $NugetConfig -PathType Leaf)){throw 'NuGet configuration is missing'}
@@ -166,7 +166,7 @@ switch($Action){
   if($dlls.Count -ne 1){throw "Expected one DLL, got $($dlls.Count)"}
   $install=Join-Path $out 'install';New-Item -ItemType Directory -Path $install|Out-Null
   Copy-Item $dlls[0].FullName (Join-Path $install 'HeliumCharlo.dll')
-  Copy-Item (Join-Path $repo 'source\HeliumHybrid\extension.yaml') (Join-Path $install 'extension.yaml')
+  Copy-Item (Join-Path $repo 'source\HeliumNavigator\extension.yaml') (Join-Path $install 'extension.yaml')
   $pext=Join-Path $out "packages\Helium-Navigator-v$version.pext"
   $pthm=Join-Path $out "packages\Helium-charlo-fork-v$version.pthm"
   [IO.Compression.ZipFile]::CreateFromDirectory($install,$pext)

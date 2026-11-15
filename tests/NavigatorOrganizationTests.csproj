@@ -10,24 +10,24 @@
     <Reference Include="WindowsBase"/><Reference Include="System.Xaml"/>
     <Reference Include="System.Windows.Forms"/><Reference Include="System.Drawing"/>
     <Compile Include="NavigatorOrganizationTests.cs"/>
-    <Compile Include="../source/HeliumHybrid/NavigatorGameActions.cs"/>
-    <Compile Include="../source/HeliumHybrid/NavigatorMenuIcons.cs"/>
-    <Compile Include="../source/HeliumHybrid/NavigatorPluginMenu.cs"/>
-    <Compile Include="../source/HeliumHybrid/NavigatorOrganization.cs"/>
-    <Compile Include="../source/HeliumHybrid/NavigatorNativeOrganization.cs"/>
-    <Compile Include="../source/HeliumHybrid/NavigatorFilterComposer.cs"/>
-    <Compile Include="../source/HeliumHybrid/FilterWorkspaceCatalog.cs"/>
-    <Compile Include="../source/HeliumHybrid/FilterWorkspaceSettings.cs"/>
-    <Compile Include="../source/HeliumHybrid/NavigatorFilterPanel.cs"/>
-    <Compile Include="../source/HeliumHybrid/NavigatorOrganizationControls.cs"/>
-    <Compile Include="../source/HeliumHybrid/NavigatorProjection.cs"/>
-    <Compile Include="../source/HeliumHybrid/NavigatorPresentation.cs"/>
-    <Compile Include="../source/HeliumHybrid/NavigatorGroupStateModel.cs"/>
-    <Compile Include="../source/HeliumHybrid/NavigatorGroupState.cs"/>
-    <EmbeddedResource Include="../source/HeliumHybrid/Navigator.xaml" LogicalName="Navigator.xaml"/>
-    <Compile Include="../source/HeliumHybrid/NavigatorRefreshDecision.cs"/>
-    <Compile Include="../source/HeliumHybrid/Settings.cs"/>
-    <Compile Include="../source/HeliumHybrid/SettingsFile.cs"/>
-    <Compile Include="../source/HeliumHybrid/Logic.cs"/>
+    <Compile Include="../source/HeliumNavigator/NavigatorGameActions.cs"/>
+    <Compile Include="../source/HeliumNavigator/NavigatorMenuIcons.cs"/>
+    <Compile Include="../source/HeliumNavigator/NavigatorPluginMenu.cs"/>
+    <Compile Include="../source/HeliumNavigator/NavigatorOrganization.cs"/>
+    <Compile Include="../source/HeliumNavigator/NavigatorNativeOrganization.cs"/>
+    <Compile Include="../source/HeliumNavigator/NavigatorFilterComposer.cs"/>
+    <Compile Include="../source/HeliumNavigator/FilterWorkspaceCatalog.cs"/>
+    <Compile Include="../source/HeliumNavigator/FilterWorkspaceSettings.cs"/>
+    <Compile Include="../source/HeliumNavigator/NavigatorFilterPanel.cs"/>
+    <Compile Include="../source/HeliumNavigator/NavigatorOrganizationControls.cs"/>
+    <Compile Include="../source/HeliumNavigator/NavigatorProjection.cs"/>
+    <Compile Include="../source/HeliumNavigator/NavigatorPresentation.cs"/>
+    <Compile Include="../source/HeliumNavigator/NavigatorGroupStateModel.cs"/>
+    <Compile Include="../source/HeliumNavigator/NavigatorGroupState.cs"/>
+    <EmbeddedResource Include="../source/HeliumNavigator/Navigator.xaml" LogicalName="Navigator.xaml"/>
+    <Compile Include="../source/HeliumNavigator/NavigatorRefreshDecision.cs"/>
+    <Compile Include="../source/HeliumNavigator/Settings.cs"/>
+    <Compile Include="../source/HeliumNavigator/SettingsFile.cs"/>
+    <Compile Include="../source/HeliumNavigator/Logic.cs"/>
   </ItemGroup>
 </Project>

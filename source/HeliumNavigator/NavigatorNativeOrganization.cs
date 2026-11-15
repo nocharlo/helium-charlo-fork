@@ -1,6 +1,6 @@
 using Playnite.SDK.Models;
 
-namespace HeliumHybrid
+namespace HeliumNavigator
 {
     // Explicit SDK 6.11.0 mappings. A missing mapping leaves that native axis alone.
     internal static class NavigatorNativeOrganization

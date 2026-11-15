@@ -1,7 +1,7 @@
 using System;
 using System.Diagnostics;
 
-namespace HeliumHybrid
+namespace HeliumNavigator
 {
     // Disabled unless the local process has HELIUM_NAVIGATOR_DIAGNOSTICS=1.
     // Messages contain state names, booleans, counts and timings only: never game or preset IDs.

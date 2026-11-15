@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Xml.Serialization;
 
-namespace HeliumHybrid
+namespace HeliumNavigator
 {
     // Keep the settings format and path stable. Never replace an unreadable file
     // unless a separate copy of its original bytes has been preserved.

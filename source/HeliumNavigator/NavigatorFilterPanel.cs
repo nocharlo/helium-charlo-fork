@@ -10,7 +10,7 @@ using System.Windows.Interop;
 using System.Windows.Threading;
 using Playnite.SDK.Models;
 
-namespace HeliumHybrid
+namespace HeliumNavigator
 {
     public sealed class FilterWorkspaceColumns : Panel
     {
