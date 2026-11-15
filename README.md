@@ -2,6 +2,8 @@
 
 **A Steam-inspired library sidebar for Playnite Desktop, built around Playnite's existing views.**
 
+![Helium library overview](docs/images/library-overview.webp)
+
 Helium (charlo fork) is a modified version of [Helium](https://github.com/darklinkpower/Helium), based on the [KKCD fork](https://github.com/kushagr-m/Helium).
 
 Its main addition is **Helium Navigator**, a customizable sidebar for browsing, organizing, and launching games alongside Playnite's Grid and Details views.
