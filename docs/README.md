@@ -1,53 +1,39 @@
 # Documentation
 
-I've kept this directory focused on the current release. The older design notes, test reports, and development experiments are still available under `archive/`, organized by milestone.
+For installation, current features and known limitations, start with the [project README](../README.md).
 
-## Current release — v0.3.2
+## Current release — v0.3.3
 
-- [Changelog](CHANGELOG.md) — what changed between versions.
-- [v0.3.2 release notes](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.3.2) — highlights and downloads.
-- [Project README](../README.md) — installation, features, limitations, and credits.
+- [Release and downloads](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.3.3)
+- [Changelog](CHANGELOG.md)
+- [Navigator UX conventions](NAVIGATOR-UX.md)
+- [Development guidelines](../AGENTS.md)
 
-## Development
+## Source and testing
 
-The theme is in `theme/`, the Navigator extension is in `source/HeliumHybrid/`, and the tests are in `tests/`. The build and isolated Playnite tooling lives in `scripts/Helium-TestHarness.ps1`.
+- `theme/` — Desktop theme and WPF integration.
+- `source/HeliumNavigator/` — Navigator C# extension.
+- `tests/` — automated checks.
+- `scripts/` — build, packaging, OPSEC and isolated Playnite test tooling.
 
-To compile and package the current checkout on Windows with PowerShell 7 and the .NET SDK installed, run this from the repository root:
+To build and package the current checkout on Windows with PowerShell 7 and the .NET SDK installed, run:
 
 ```powershell
 pwsh -NoProfile -File .\scripts\Helium-TestHarness.ps1 -Action Build -OutputRoot "$env:TEMP\helium-build"
 ```
 
-The build and package checks do not replace testing interactions in Playnite Desktop. Use a separate portable Playnite installation for runtime checks, and keep personal library data and test logs outside the repository.
+Use a separate portable Playnite installation for interactive tests. A successful build or automated test run does not establish runtime compatibility with every library and extension configuration.
 
-## Historical documentation
+The extension's internal namespace and source directory are now `HeliumNavigator`. Its shipped `HeliumCharlo.dll`, plugin ID, theme bindings and settings location remain unchanged for compatibility.
 
-These files record specific older versions. Some descriptions, package names, and commands refer to the version documented in each file.
+## Versioned records
 
-### v0.3.0 — Navigator Experience
+Older reports are retained under `archive/` and describe their original versions; their paths, terminology and technical assumptions should not be read as current instructions.
 
-- [Validation record](VALIDATION-v0.3.0.md)
+- **v0.3.0:** [Testing and validation](archive/v0.3.0/VALIDATION-v0.3.0.md).
+- **v0.2.6:** [Navigator Essentials investigation](archive/v0.2.6/NAVIGATOR-ESSENTIALS-v0.2.6.md).
+- **v0.2.5:** [Architecture](archive/v0.2.5/NAVIGATOR-ARCHITECTURE.md), [infrastructure audit](archive/v0.2.5/INFRASTRUCTURE-AUDIT.md), [test harness](archive/v0.2.5/TEST-HARNESS.md) and [validation](archive/v0.2.5/VALIDATION-v0.2.5.md).
+- **v0.2.4:** [Architecture](archive/v0.2.4/ARCHITECTURE.md), [technical report](archive/v0.2.4/TECHNICAL-REPORT.md), [Windows testing](archive/v0.2.4/WINDOWS-TESTING.md) and [validation data](archive/v0.2.4/VALIDATION.json).
+- **Historical release maintenance:** [Release asset repair notes](archive/RELEASE-REPAIR.md).
 
-### v0.2.4 — Stability hotfix
-
-- [Architecture and native integration](archive/v0.2.4/ARCHITECTURE.md)
-- [Technical report](archive/v0.2.4/TECHNICAL-REPORT.md)
-- [Windows testing checklist](archive/v0.2.4/WINDOWS-TESTING.md)
-- [Validation record (JSON)](archive/v0.2.4/VALIDATION.json)
-
-### v0.2.5 — Architecture foundation
-
-- [Navigator architecture and extraction notes](archive/v0.2.5/NAVIGATOR-ARCHITECTURE.md)
-- [Infrastructure audit](archive/v0.2.5/INFRASTRUCTURE-AUDIT.md)
-- [Portable test harness notes](archive/v0.2.5/TEST-HARNESS.md)
-- [Validation record](archive/v0.2.5/VALIDATION-v0.2.5.md)
-
-### v0.2.6 — Navigator Essentials
-
-- [Preset synchronization and ordering investigation](archive/v0.2.6/NAVIGATOR-ESSENTIALS-v0.2.6.md)
-
-### Release maintenance
-
-- [Historical release asset repair notes](archive/RELEASE-REPAIR.md)
-
-The archived documents are retained for reference rather than rewritten to describe newer behavior.
+Historical release rebuilds continue to reference the original tagged source layout. These references are intentional and do not affect current builds.
