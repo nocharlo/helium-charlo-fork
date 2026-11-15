@@ -5,7 +5,7 @@ using System.Windows.Input;
 using Playnite.SDK;
 using Playnite.SDK.Models;
 
-namespace HeliumHybrid
+namespace HeliumNavigator
 {
     internal enum NavigatorLaunchAction { Unavailable, Play, Install }
 

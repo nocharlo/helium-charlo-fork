@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace HeliumHybrid
+namespace HeliumNavigator
 {
     // Persisted IDs 0-4 are the v0.3.0 contract. Effective IDs are a separate namespace.
     internal enum NavigatorGroupingMode

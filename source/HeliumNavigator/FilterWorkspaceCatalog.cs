@@ -7,7 +7,7 @@ using Playnite.SDK;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
 
-namespace HeliumHybrid
+namespace HeliumNavigator
 {
     internal sealed class FilterWorkspaceGroup
     {

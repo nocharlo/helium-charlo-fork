@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
-namespace HeliumHybrid
+namespace HeliumNavigator
 {
     // Plain data used between the Playnite API and the Navigator's WPF view.
     internal sealed class NavigatorSource

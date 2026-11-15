@@ -1,6 +1,6 @@
 <Grid xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      xmlns:local="clr-namespace:HeliumHybrid;assembly=HeliumCharlo" Background="#FF202731">
+      xmlns:local="clr-namespace:HeliumNavigator;assembly=HeliumCharlo" Background="#FF202731">
   <Grid.Resources>
     <SolidColorBrush x:Key="SteamIconBrush" Color="#FF9B9DA1"/>
     <SolidColorBrush x:Key="SteamActiveBrush" Color="#FFB7CBE0"/>

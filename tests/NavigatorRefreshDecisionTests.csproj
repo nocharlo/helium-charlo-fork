@@ -6,11 +6,11 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="NavigatorRefreshDecisionTests.cs" />
-    <Compile Include="../source/HeliumHybrid/NavigatorOrganization.cs" Link="NavigatorOrganization.cs" />
-    <Compile Include="../source/HeliumHybrid/NavigatorRefreshDecision.cs" Link="NavigatorRefreshDecision.cs" />
-    <Compile Include="../source/HeliumHybrid/NavigatorGroupStateModel.cs" Link="NavigatorGroupStateModel.cs" />
-    <Compile Include="../source/HeliumHybrid/NavigatorProjection.cs" Link="NavigatorProjection.cs" />
-    <Compile Include="../source/HeliumHybrid/Logic.cs" Link="Logic.cs" />
-    <Compile Include="../source/HeliumHybrid/NavigatorDiagnostics.cs" Link="NavigatorDiagnostics.cs" />
+    <Compile Include="../source/HeliumNavigator/NavigatorOrganization.cs" Link="NavigatorOrganization.cs" />
+    <Compile Include="../source/HeliumNavigator/NavigatorRefreshDecision.cs" Link="NavigatorRefreshDecision.cs" />
+    <Compile Include="../source/HeliumNavigator/NavigatorGroupStateModel.cs" Link="NavigatorGroupStateModel.cs" />
+    <Compile Include="../source/HeliumNavigator/NavigatorProjection.cs" Link="NavigatorProjection.cs" />
+    <Compile Include="../source/HeliumNavigator/Logic.cs" Link="Logic.cs" />
+    <Compile Include="../source/HeliumNavigator/NavigatorDiagnostics.cs" Link="NavigatorDiagnostics.cs" />
   </ItemGroup>
 </Project>

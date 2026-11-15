@@ -6,7 +6,7 @@ using System.Windows.Controls;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
 
-namespace HeliumHybrid
+namespace HeliumNavigator
 {
     internal static class NavigatorPluginMenu
     {

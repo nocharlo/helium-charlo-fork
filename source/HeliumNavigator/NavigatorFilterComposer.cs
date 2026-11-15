@@ -4,7 +4,7 @@ using System.Linq;
 using System.Reflection;
 using Playnite.SDK.Models;
 
-namespace HeliumHybrid
+namespace HeliumNavigator
 {
     internal enum NavigatorFilterField
     {
