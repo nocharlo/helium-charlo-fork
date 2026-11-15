@@ -2,6 +2,12 @@
 
 A history of changes to Helium (charlo fork), from the original Navigator prototype to the current release.
 
+## Unreleased
+
+### Documentation
+
+- Condensed the README, moved installation instructions closer to the top, and retained the library overview and feature screenshots.
+
 ## v0.3.3 — Navigator Controls
 
 - Move Library Filters by its title and resize it from the bottom-right corner. The Navigator remembers the position and manual size and offers automatic sizing in Filters settings.
@@ -24,6 +30,10 @@ A history of changes to Helium (charlo fork), from the original Navigator protot
 - The Release build completed without errors or warnings. All 378 targeted automated checks and all 14 maintainer acceptance scenarios passed.
 - In portable Playnite, the first context menu after restart was detected in 519 ms with 1,250 total games and 472 ms with 2,500. Three subsequent openings at each size ranged from 431 to 501 ms. Right-click preserved Grid selection and scroll in both cases.
 - Timings include automated input and accessibility detection. Synthetic entries had no artwork or provider integrations, and each library size had one restart sample. These results cover the tested setup.
+
+### Known limitations
+
+- Manually configured auxiliary game Actions can be listed through the Playnite 10 SDK but cannot currently be executed individually through its public API. Navigator does not reproduce Playnite's internal Action executor. See [Playnite #2943](https://github.com/JosefNemec/Playnite/issues/2943) for the upstream SDK request.
 
 ## v0.3.2 — Library Filters & Native Organization
 
