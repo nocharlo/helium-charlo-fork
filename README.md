@@ -273,4 +273,4 @@ Helium (charlo fork) is an unofficial community project and is not affiliated wi
 
 ---
 
-*Made by someone who apparently enjoys organizing and developing his game library almost as much as actually playing the games.*
+*Made by someone who enjoys organizing their games as much as playing them.*
