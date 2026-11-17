@@ -113,15 +113,20 @@ Technical documentation and development guidelines are available in [docs](docs/
 
 ### A Note on AI-Assisted Development
 
-I don't have a traditional programming background. I started this project using AI tools, mainly ChatGPT and Codex, to help me write and modify code.
+I don't have a traditional programming background. I started this project using Codex to help me write and modify code.
 
-I handle the design, requirements, feature decisions, testing, and quality control, while much of the code has been written with AI assistance.
+I handle the design, requirements, feature decisions, debugging, testing, and quality control, while much of the code has been written with AI assistance.
 
-I think it's important to be upfront about that. AI-generated code can introduce problems that aren't immediately obvious, and I'm aware of the technical limitations and broader environmental and social concerns surrounding these tools.
+That doesn't mean development has been straightforward. Getting things to work reliably has involved a lot of iteration, troubleshooting, and correcting mistakes, including those introduced by AI-generated code. Some features have required multiple attempts, substantial rework, or changes in approach before reaching a stable implementation. AI assistance has made this project possible for me in my limited spare time, but it certainly hasn't eliminated the work involved.
+
+I'm also using Helium as an opportunity to learn C# and better understand Playnite's architecture. I want to become increasingly capable of reading, evaluating, and reviewing the code independently, rather than relying entirely on the same tools that helped generate it. There's still a lot I don't know, and learning how the existing code works is a part of the process.
+
+I think it's important to be upfront about all of this. AI-generated code can introduce problems that aren't immediately obvious, and I'm aware of the technical limitations and broader environmental and social concerns surrounding these tools.
 
 I've been improving the project's testing and validation practices as it grows, but I don't consider that a replacement for experienced developers reviewing the code.
 
-If you know Playnite or C# and spot something questionable, feel free to open an issue or suggest a better implementation. I'm always open to improving how things work.
+So, if you know Playnite or C# and spot something questionable, feel free to open an issue or suggest a better implementation. I'm always open to feedback and learning from people with more experience.
+
 
 ## Roadmap
 
