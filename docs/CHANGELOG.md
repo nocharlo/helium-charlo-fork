@@ -4,6 +4,16 @@ A history of changes to Helium (charlo fork), from the original Navigator protot
 
 ## Unreleased
 
+### v0.3.3.1 — Navigator maintenance candidate
+
+- Added an Actions submenu for auxiliary per-game actions using the public Playnite SDK 6.19 execution pipeline. Names, duplicates and order are preserved. A changed action list invalidates its open menu instead of executing a replacement.
+- Requires Playnite 10.65 or newer. Existing theme and extension IDs and settings are preserved.
+- Preserve a visible cover as the Grid Details Panel closes and the native Grid changes its number of columns.
+- Refined Navigator row states and its context menus with scoped blue-gray resources.
+- Truncated game titles expand beside their row on hover or keyboard focus. The non-interactive label closes on scrolling, resizing, menu opening, recycling and loss of highlight. Exceptionally long titles wrap within the screen bounds.
+
+Candidate checks passed six C# suites, including 398 organization/settings/WPF checks, and 29 Python tests. Portable Playnite verified an auxiliary script action with duplicate names against a non-selected target, full-title expansion, and Grid anchoring on Escape and the native close button. Other action types, Mouse Back, alternative DPI settings and grouped/zoomed Grid layouts still need broader runtime acceptance.
+
 ### Maintenance
 
 - Renamed the Navigator source folder, C# project, namespace, and plugin class without changing the extension ID, packaged DLL, theme bindings, or settings location.
