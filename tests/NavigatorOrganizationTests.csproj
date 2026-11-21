@@ -4,6 +4,7 @@
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="../theme/CustomControls/GameMenu.xaml" LogicalName="GameMenu.xaml"/>
     <PackageReference Include="PlayniteSDK" Version="6.19.0" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net462" Version="1.0.3" PrivateAssets="all" />
     <Reference Include="PresentationCore"/><Reference Include="PresentationFramework"/>

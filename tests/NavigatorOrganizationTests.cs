@@ -6,6 +6,8 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Controls.Primitives;
 using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -371,6 +373,113 @@ internal static class NavigatorOrganizationTests
             list.ItemsSource = null;
         }
     }
+    private static void NavigatorTitleExpansion(Grid root)
+    {
+        var list = (ListBox)root.FindName("Games");
+        list.ItemsSource = new[] {
+            new GameRow { Name = "Short" },
+            new GameRow { Name = new string('W', 160), Favorite = true }
+        }.Concat(Enumerable.Range(0, 30).Select(i => new GameRow { Name = "Other " + i })).ToArray();
+        var host = new Grid();
+        host.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
+        host.ColumnDefinitions.Add(new ColumnDefinition());
+        var neighbor = new Border { Background = Brushes.Black };
+        Grid.SetColumn(neighbor, 1);
+        host.Children.Add(root);
+        host.Children.Add(neighbor);
+        var decorator = new AdornerDecorator { Child = host };
+        var window = new Window { Content = decorator, Width = 450, Height = 360, ShowInTaskbar = false };
+        window.Show();
+        try {
+            window.UpdateLayout();
+            var layer = AdornerLayer.GetAdornerLayer(decorator) ?? decorator.AdornerLayer;
+            var shortRow = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex(0);
+            var longRow = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex(1);
+            var shortTitle = Descendant<NavigatorGameTitle>(shortRow);
+            var longTitle = Descendant<NavigatorGameTitle>(longRow);
+            var originalSize = longRow.RenderSize;
+            var originalPosition = longRow.TranslatePoint(new Point(), list);
+            shortTitle.ShowExpansion();
+            Check(!NavigatorGameTitle.IsTruncated(shortTitle) && layer.GetAdorners(list) == null,
+                "Fitting titles leave the row and adorner layer unchanged");
+
+            longTitle.ShowExpansion();
+            window.UpdateLayout();
+            var expansion = layer.GetAdorners(list)?.SingleOrDefault();
+            Check(expansion != null && !expansion.IsHitTestVisible,
+                "Long titles expand on the outer layer and allow input through");
+            var drawing = VisualTreeHelper.GetDrawing(expansion).Bounds;
+            Check(Math.Abs(drawing.Left - originalPosition.X) < 1 &&
+                Math.Abs(drawing.Top - originalPosition.Y) < 1 &&
+                Math.Abs(drawing.Height - originalSize.Height) < 1 &&
+                drawing.Width > originalSize.Width &&
+                drawing.Right <= decorator.ActualWidth - list.TranslatePoint(new Point(), decorator).X + 1,
+                "The expansion starts at the row, retains its height, and stops at the window edge");
+            Check(longRow.RenderSize == originalSize && longRow.TranslatePoint(new Point(), list) == originalPosition &&
+                window.InputHitTest(list.TranslatePoint(new Point(drawing.Right - 10, drawing.Top + 5), window)) == neighbor,
+                "Showing the continuation leaves layout and neighboring hit targets intact");
+            list.SelectedIndex = 0;
+            Check(layer.GetAdorners(list) == null, "A selection change dismisses the old expansion");
+            longTitle.ShowExpansion();
+            var scroll = Descendant<ScrollViewer>(list);
+            scroll.ScrollToVerticalOffset(1);
+            window.UpdateLayout();
+            Check(layer.GetAdorners(list) == null, "Scrolling removes the expansion");
+            longTitle.ShowExpansion();
+            list.ItemsSource = null;
+            window.UpdateLayout();
+            Check(layer.GetAdorners(list) == null, "Removing or recycling a row removes its expansion");
+        } finally {
+            host.Children.Remove(root);
+            window.Close();
+            list.ItemsSource = null;
+        }
+    }
+
+    private static void ThemeGameMenu()
+    {
+        // Substitute only the Playnite-specific ContextMenu subclass so WPF can exercise the theme in isolation.
+        using (var stream = typeof(NavigatorOrganizationTests).Assembly.GetManifestResourceStream("GameMenu.xaml"))
+        using (var reader = new StreamReader(stream)) {
+            var dictionary = (ResourceDictionary)XamlReader.Parse(reader.ReadToEnd().Replace("{x:Type GameMenu}", "{x:Type ContextMenu}"));
+            var menu = new ContextMenu { Style = (Style)dictionary[typeof(ContextMenu)] };
+            var submenu = new MenuItem { Header = "Synthetic submenu" };
+            var icon = new TextBlock { Text = "+" };
+            var command = new RecordingGameCommand { Allowed = false };
+            var child = new MenuItem { Header = "Synthetic extension action", Icon = icon, InputGestureText = "F3",
+                Command = command, CommandParameter = new Game() };
+            var separator = new Separator();
+            submenu.Items.Add(child);
+            submenu.Items.Add(separator);
+            menu.Items.Add(submenu);
+            var anchor = new Border { ContextMenu = menu };
+            var window = new Window { Content = anchor, Width = 380, Height = 300, ShowInTaskbar = false };
+            window.Show();
+            try {
+                menu.PlacementTarget = anchor;
+                menu.IsOpen = true;
+                window.Dispatcher.Invoke(new Action(() => { }), System.Windows.Threading.DispatcherPriority.Loaded);
+                submenu.ApplyTemplate();
+                var popup = submenu.Template.FindName("PART_Popup", submenu) as Popup;
+                Check(menu.Padding == new Thickness(3) && submenu.MinHeight == 26 &&
+                    popup?.Placement == PlacementMode.Right &&
+                    ((UIElement)submenu.Template.FindName("SubmenuArrow", submenu)).Visibility == Visibility.Visible,
+                    "Native game menu style sets density and keeps the submenu popup and arrow");
+                submenu.IsSubmenuOpen = true;
+                window.Dispatcher.Invoke(new Action(() => { }), System.Windows.Threading.DispatcherPriority.Loaded);
+                Check(popup.IsOpen, "Opening a submenu opens the WPF popup");
+                child.ApplyTemplate();
+                Check(child.Icon == icon && child.Command == command && child.InputGestureText == "F3" && !child.IsEnabled,
+                    "Nested items retain command availability, icon and shortcut");
+                Check(((Border)child.Template.FindName("MenuFace", child)).Opacity == 0.45,
+                    "Nested disabled items use the scoped style");
+                Check(separator.DesiredSize.Height == 9, "Nested separators use the scoped divider spacing");
+            } finally {
+                menu.IsOpen = false;
+                window.Close();
+            }
+        }
+    }
     private static void OrganizationControls()
     {
         PluginMenuActions();
@@ -389,15 +498,8 @@ internal static class NavigatorOrganizationTests
             var root = (Grid)XamlReader.Parse(reader.ReadToEnd().Replace("assembly=HeliumCharlo", "assembly=" + assembly.GetName().Name));
             NavigatorRowAppearance((ListBox)root.FindName("Games"));
             NavigatorIconDimming(root);
-            var title = new NavigatorGameTitle { Text = new string('W', 100), Width = 90, TextTrimming = TextTrimming.CharacterEllipsis };
-            var titleWindow = new Window { Content = title, Width = 200, Height = 80, ShowInTaskbar = false };
-            titleWindow.Show();
-            try {
-                titleWindow.UpdateLayout();
-                Check(NavigatorGameTitle.IsTruncated(title), "An oversized game title requests the expanded label");
-                title.Text = "Short"; titleWindow.UpdateLayout();
-                Check(!NavigatorGameTitle.IsTruncated(title), "A fitting title does not open an expanded label");
-            } finally { titleWindow.Close(); }
+            NavigatorTitleExpansion(root);
+            ThemeGameMenu();
             var context = new ContextMenu { Style = (Style)root.FindResource("NavigatorContextMenuStyle") };
             context.Resources.MergedDictionaries.Add(root.Resources);
             var item = new MenuItem { Header = "Synthetic submenu" };
