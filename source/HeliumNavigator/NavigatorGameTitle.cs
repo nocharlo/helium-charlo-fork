@@ -4,17 +4,26 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Screen = System.Windows.Forms.Screen;
 
 namespace HeliumNavigator
 {
     public sealed class NavigatorGameTitle : TextBlock
     {
+        private static readonly DependencyProperty ActiveTitleProperty = DependencyProperty.RegisterAttached(
+            "ActiveTitle", typeof(NavigatorGameTitle), typeof(NavigatorGameTitle));
+        public static readonly DependencyProperty IsExpandedProperty = DependencyProperty.RegisterAttached(
+            "IsExpanded", typeof(bool), typeof(NavigatorGameTitle));
+
+        public static bool GetIsExpanded(DependencyObject element) => (bool)element.GetValue(IsExpandedProperty);
+
         private ListBoxItem row;
         private ListBox list;
         private Window window;
         private AdornerLayer layer;
         private ExpandedRow expanded;
+        private DispatcherTimer hoverTimer;
 
         public NavigatorGameTitle()
         {
@@ -62,20 +71,33 @@ namespace HeliumNavigator
             return decorator;
         }
 
-        private void Highlight(object sender, MouseEventArgs e) => ShowExpansion();
+        private void Highlight(object sender, MouseEventArgs e)
+        {
+            if (expanded != null || list == null || window == null || !IsVisible ||
+                list.ContextMenu?.IsOpen == true || Mouse.Captured != null || !IsTruncated(this)) return;
+            if (hoverTimer == null) {
+                hoverTimer = new DispatcherTimer(DispatcherPriority.Input, Dispatcher) {
+                    Interval = TimeSpan.FromMilliseconds(275)
+                };
+                hoverTimer.Tick += HoverElapsed;
+            }
+            TrackInteraction();
+            hoverTimer.Start();
+        }
+
+        private void HoverElapsed(object sender, EventArgs e)
+        {
+            hoverTimer.Stop();
+            if (row?.IsMouseOver == true) ShowExpansion();
+            if (expanded == null) Close();
+        }
 
         private void FocusChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (row.IsKeyboardFocusWithin) ShowExpansion(); else Close();
         }
 
-        internal static void Dismiss(ListBox list)
-        {
-            var adorners = WindowDecorator(list)?.AdornerLayer.GetAdorners(list);
-            if (adorners == null) return;
-            foreach (var adorner in adorners)
-                if (adorner is ExpandedRow expansion) expansion.Owner.Close();
-        }
+        internal static void Dismiss(ListBox list) => (list.GetValue(ActiveTitleProperty) as NavigatorGameTitle)?.Close();
 
         internal void ShowExpansion()
         {
@@ -105,17 +127,24 @@ namespace HeliumNavigator
             var visible = Rect.Intersect(bounds, new Rect(bounds.Left, viewportBounds.Top, bounds.Width, viewportBounds.Height));
             if (visible.IsEmpty || visible.Height <= 0) return;
 
-            var background = face.Background;
-            if (background == null || background.Opacity == 0 ||
-                (background is SolidColorBrush color && color.Color.A == 0))
-                background = (Brush)FindResource("NavigatorHoverBrush");
+            TrackInteraction();
+            hoverTimer?.Stop();
+            row.SetValue(IsExpandedProperty, true);
             var outline = row.Template.FindName("ContextOutline", row) as Border;
-
-            Dismiss(list);
+            var favorite = (Parent as Grid)?.FindName("FavoriteStar") as TextBlock;
             layer = decorator.AdornerLayer;
-            expanded = new ExpandedRow(this, list, row, bounds, visible, titleOrigin, titleRight,
-                textWidth, text, background, outline?.Visibility == Visibility.Visible ? outline.BorderBrush : null);
+            expanded = new ExpandedRow(list, bounds, visible, titleOrigin, textWidth, text, face.Background,
+                outline?.Visibility == Visibility.Visible ? outline.BorderBrush : null,
+                favorite?.IsVisible == true ? MeasureTitle(favorite) : null,
+                favorite?.TranslatePoint(new Point(), row) ?? new Point(), textWidth - ActualWidth);
             layer.Add(expanded);
+        }
+
+        private void TrackInteraction()
+        {
+            if (ReferenceEquals(list.GetValue(ActiveTitleProperty), this)) return;
+            Dismiss(list);
+            list.SetValue(ActiveTitleProperty, this);
             list.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler(Scrolled));
             list.SelectionChanged += CloseOnInput;
             list.ContextMenuOpening += CloseOnInput;
@@ -131,7 +160,7 @@ namespace HeliumNavigator
 
         private void PointerMoved(object sender, MouseEventArgs e)
         {
-            if (!expanded.Bounds.Contains(e.GetPosition(list))) Close();
+            if (expanded == null ? !row.IsMouseOver : !expanded.Bounds.Contains(e.GetPosition(list))) Close();
         }
 
         private void Scrolled(object sender, ScrollChangedEventArgs e) => Close();
@@ -139,10 +168,15 @@ namespace HeliumNavigator
 
         private void Close()
         {
-            if (expanded == null) return;
-            layer.Remove(expanded);
-            expanded = null;
-            layer = null;
+            hoverTimer?.Stop();
+            if (!ReferenceEquals(list?.GetValue(ActiveTitleProperty), this)) return;
+            list.ClearValue(ActiveTitleProperty);
+            if (expanded != null) {
+                layer.Remove(expanded);
+                expanded = null;
+                layer = null;
+                row.ClearValue(IsExpandedProperty);
+            }
             list.RemoveHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler(Scrolled));
             list.SelectionChanged -= CloseOnInput;
             list.ContextMenuOpening -= CloseOnInput;
@@ -170,35 +204,27 @@ namespace HeliumNavigator
 
         private sealed class ExpandedRow : Adorner
         {
-            internal NavigatorGameTitle Owner { get; }
             internal Rect Bounds { get; }
             private readonly Rect rowBounds;
             private readonly Point sourceTitle;
-            private readonly double sourceTitleRight;
-            private readonly double textWidth;
             private readonly FormattedText text;
             private readonly Brush background;
             private readonly Brush outline;
-            private readonly VisualBrush source;
+            private readonly FormattedText favorite;
+            private readonly Point favoriteOrigin;
 
-            internal ExpandedRow(NavigatorGameTitle owner, ListBox list, ListBoxItem row, Rect bounds,
-                Rect visible, Point titleOrigin, double titleRight, double textWidth, FormattedText text,
-                Brush background, Brush outline) : base(list)
+            internal ExpandedRow(ListBox list, Rect bounds, Rect visible, Point titleOrigin, double textWidth,
+                FormattedText text, Brush background, Brush outline, FormattedText favorite, Point favoriteOrigin,
+                double addedWidth) : base(list)
             {
-                Owner = owner;
                 Bounds = visible;
                 rowBounds = bounds;
                 sourceTitle = titleOrigin;
-                sourceTitleRight = titleRight;
-                this.textWidth = textWidth;
                 this.text = text;
                 this.background = background;
                 this.outline = outline;
-                source = new VisualBrush(row) {
-                    ViewboxUnits = BrushMappingMode.Absolute,
-                    Viewbox = new Rect(row.RenderSize),
-                    Stretch = Stretch.Fill
-                };
+                this.favorite = favorite;
+                this.favoriteOrigin = new Point(favoriteOrigin.X + addedWidth, favoriteOrigin.Y);
                 IsHitTestVisible = false;
                 text.MaxLineCount = 1;
                 text.MaxTextWidth = textWidth;
@@ -207,26 +233,17 @@ namespace HeliumNavigator
 
             protected override void OnRender(DrawingContext dc)
             {
-                var originalWidth = source.Viewbox.Width;
-                var extraWidth = rowBounds.Width - originalWidth;
                 var titleLeft = rowBounds.Left + sourceTitle.X;
-                var titleRight = titleLeft + textWidth;
-
+                var paint = new Rect(titleLeft, rowBounds.Top, rowBounds.Right - titleLeft, rowBounds.Height);
                 dc.PushClip(new RectangleGeometry(Bounds));
-                dc.DrawRectangle(background, null, rowBounds);
-
-                // Repaint the existing icon and trailing badge without copying the row's ellipsized title.
-                dc.PushClip(new RectangleGeometry(new Rect(rowBounds.Left, rowBounds.Top, sourceTitle.X, rowBounds.Height)));
-                dc.DrawRectangle(source, null, new Rect(rowBounds.TopLeft, source.Viewbox.Size));
-                dc.Pop();
-                dc.PushClip(new RectangleGeometry(new Rect(titleRight, rowBounds.Top, originalWidth - sourceTitleRight, rowBounds.Height)));
-                dc.DrawRectangle(source, null, new Rect(rowBounds.Left + extraWidth, rowBounds.Top, originalWidth, rowBounds.Height));
-                dc.Pop();
-
+                // The real icon and leading highlight remain visible in the original row.
+                dc.DrawRectangle(background, null, paint);
                 dc.DrawText(text, new Point(titleLeft, rowBounds.Top + sourceTitle.Y));
+                if (favorite != null) dc.DrawText(favorite, rowBounds.TopLeft + (Vector)favoriteOrigin);
                 if (outline != null) {
-                    dc.DrawRectangle(outline, null, new Rect(titleLeft, rowBounds.Top, textWidth, 1));
-                    dc.DrawRectangle(outline, null, new Rect(titleLeft, rowBounds.Bottom - 1, textWidth, 1));
+                    dc.DrawRectangle(outline, null, new Rect(titleLeft, rowBounds.Top, paint.Width, 1));
+                    dc.DrawRectangle(outline, null, new Rect(titleLeft, rowBounds.Bottom - 1, paint.Width, 1));
+                    dc.DrawRectangle(outline, null, new Rect(rowBounds.Right - 1, rowBounds.Top, 1, rowBounds.Height));
                 }
                 dc.Pop();
             }

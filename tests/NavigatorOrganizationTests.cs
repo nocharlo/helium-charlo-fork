@@ -376,6 +376,8 @@ internal static class NavigatorOrganizationTests
     private static void NavigatorTitleExpansion(Grid root)
     {
         var list = (ListBox)root.FindName("Games");
+        var oldDataContext = list.DataContext;
+        list.DataContext = new Preferences { DimUninstalledGameIcons = true };
         list.ItemsSource = new[] {
             new GameRow { Name = "Short" },
             new GameRow { Name = new string('W', 160), Favorite = true }
@@ -397,29 +399,49 @@ internal static class NavigatorOrganizationTests
             var longRow = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex(1);
             var shortTitle = Descendant<NavigatorGameTitle>(shortRow);
             var longTitle = Descendant<NavigatorGameTitle>(longRow);
+            var gameIcon = Descendant<Image>(longRow);
+            gameIcon.Source = new DrawingImage(new GeometryDrawing(Brushes.Red, null,
+                new RectangleGeometry(new Rect(0, 0, 20, 20))));
+            window.UpdateLayout();
             var originalSize = longRow.RenderSize;
             var originalPosition = longRow.TranslatePoint(new Point(), list);
             shortTitle.ShowExpansion();
             Check(!NavigatorGameTitle.IsTruncated(shortTitle) && layer.GetAdorners(list) == null,
                 "Fitting titles leave the row and adorner layer unchanged");
 
+            longRow.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0) {
+                RoutedEvent = System.Windows.Input.Mouse.MouseEnterEvent
+            });
+            Check(layer.GetAdorners(list) == null, "Pointer entry does not immediately open the expansion");
+            NavigatorGameTitle.Dismiss(list);
             longTitle.ShowExpansion();
             window.UpdateLayout();
             var expansion = layer.GetAdorners(list)?.SingleOrDefault();
             Check(expansion != null && !expansion.IsHitTestVisible,
                 "Long titles expand on the outer layer and allow input through");
             var drawing = VisualTreeHelper.GetDrawing(expansion).Bounds;
-            Check(Math.Abs(drawing.Left - originalPosition.X) < 1 &&
+            Check(Math.Abs(drawing.Left - longTitle.TranslatePoint(new Point(), list).X) < 1 &&
                 Math.Abs(drawing.Top - originalPosition.Y) < 1 &&
                 Math.Abs(drawing.Height - originalSize.Height) < 1 &&
                 drawing.Width > originalSize.Width &&
                 drawing.Right <= decorator.ActualWidth - list.TranslatePoint(new Point(), decorator).X + 1,
-                "The expansion starts at the row, retains its height, and stops at the window edge");
+                "The expansion paints from the title, retains row height, and stops at the window edge");
+            var surface = (FrameworkElement)VisualTreeHelper.GetParent(layer);
+            var iconCenter = gameIcon.TranslatePoint(new Point(gameIcon.ActualWidth / 2, gameIcon.ActualHeight / 2), surface);
+            var frame = new RenderTargetBitmap((int)Math.Ceiling(surface.ActualWidth),
+                (int)Math.Ceiling(surface.ActualHeight), 96, 96, PixelFormats.Pbgra32);
+            frame.Render(surface);
+            var pixel = new byte[4];
+            frame.CopyPixels(new Int32Rect((int)iconCenter.X, (int)iconCenter.Y, 1, 1), pixel, 4, 0);
+            Check(pixel[2] > 160 && pixel[2] < 200 && pixel[1] < 32 && pixel[0] < 32 && pixel[3] == 255 &&
+                gameIcon.Opacity == 0.65 && NavigatorGameTitle.GetIsExpanded(longRow),
+                "The rendered expansion leaves the original dimmed game icon visible");
             Check(longRow.RenderSize == originalSize && longRow.TranslatePoint(new Point(), list) == originalPosition &&
                 window.InputHitTest(list.TranslatePoint(new Point(drawing.Right - 10, drawing.Top + 5), window)) == neighbor,
                 "Showing the continuation leaves layout and neighboring hit targets intact");
             list.SelectedIndex = 0;
-            Check(layer.GetAdorners(list) == null, "A selection change dismisses the old expansion");
+            Check(layer.GetAdorners(list) == null && !NavigatorGameTitle.GetIsExpanded(longRow),
+                "A selection change dismisses the expansion and clears its row highlight");
             longTitle.ShowExpansion();
             var scroll = Descendant<ScrollViewer>(list);
             scroll.ScrollToVerticalOffset(1);
@@ -433,6 +455,7 @@ internal static class NavigatorOrganizationTests
             host.Children.Remove(root);
             window.Close();
             list.ItemsSource = null;
+            list.DataContext = oldDataContext;
         }
     }
 
