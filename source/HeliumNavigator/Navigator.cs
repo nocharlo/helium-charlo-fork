@@ -121,6 +121,7 @@ namespace HeliumNavigator
                 root = (Grid)XamlReader.Load(stream);
             Content = root;
             list = (ListBox)root.FindName("Games"); search = (TextBox)root.FindName("Search");
+            list.DataContext = prefs;
             list.Tag = groupState;
             grouping = (ComboBox)root.FindName("Grouping"); count = (TextBlock)root.FindName("Count");
             sortGroupPopup = (Popup)root.FindName("SortGroupPopup");

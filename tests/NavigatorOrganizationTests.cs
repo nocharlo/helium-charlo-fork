@@ -319,6 +319,58 @@ internal static class NavigatorOrganizationTests
         model.Favorite = false;
         Check(star.Visibility == Visibility.Collapsed, "The star follows the favorite state");
     }
+    private static void NavigatorIconDimming(Grid root)
+    {
+        var list = (ListBox)root.FindName("Games");
+        var serializer = new XmlSerializer(typeof(Preferences));
+        var prefs = (Preferences)serializer.Deserialize(new StringReader("<Preferences />"));
+        var installed = new GameRow { Name = "Installed", IsInstalled = true };
+        var uninstalled = new GameRow { Name = "Uninstalled", Favorite = true };
+        list.DataContext = prefs;
+        list.ItemsSource = new[] { installed, uninstalled };
+        var window = new Window { Content = root, Width = 320, Height = 300, ShowInTaskbar = false };
+        window.Show();
+        try {
+            window.UpdateLayout();
+            var installedRow = (ListBoxItem)list.ItemContainerGenerator.ContainerFromItem(installed);
+            var uninstalledRow = (ListBoxItem)list.ItemContainerGenerator.ContainerFromItem(uninstalled);
+            var installedIcon = Descendant<Image>(installedRow);
+            var uninstalledIcon = Descendant<Image>(uninstalledRow);
+            var title = Descendant<NavigatorGameTitle>(uninstalledRow);
+            var foreground = title.Foreground;
+            Check(!prefs.DimUninstalledGameIcons && installedIcon.Opacity == 1 && uninstalledIcon.Opacity == 1,
+                "Older settings keep both icons at full opacity");
+            prefs.BeginEdit();
+            prefs.DimUninstalledGameIcons = true;
+            list.SelectedItem = uninstalled;
+            uninstalled.IsContextTarget = true;
+            uninstalledIcon.Width = 24;
+            Check(installedIcon.Opacity == 1 && uninstalledIcon.Opacity == 0.65 && uninstalledRow.Opacity == 1 &&
+                title.Opacity == 1 && ReferenceEquals(title.Foreground, foreground) && uninstalledRow.IsSelected,
+                "Only the uninstalled icon dims across icon widths, selection and context targeting");
+            uninstalled.IsInstalled = true;
+            Check(uninstalledIcon.Opacity == 1 && ReferenceEquals(uninstalledRow, list.ItemContainerGenerator.ContainerFromItem(uninstalled)),
+                "An installation update restores opacity on the existing row");
+            uninstalled.IsInstalled = false;
+            Check(uninstalledIcon.Opacity == 0.65 && installedIcon.Opacity == 1,
+                "An uninstall update dims only the affected icon");
+            prefs.CancelEdit();
+            Check(!prefs.DimUninstalledGameIcons && uninstalledIcon.Opacity == 1,
+                "Cancel restores the previous preference and icon opacity");
+            prefs.BeginEdit();
+            prefs.DimUninstalledGameIcons = true;
+            prefs.EndEdit();
+            using (var writer = new StringWriter()) {
+                serializer.Serialize(writer, prefs);
+                var reloaded = (Preferences)serializer.Deserialize(new StringReader(writer.ToString()));
+                Check(reloaded.DimUninstalledGameIcons, "Enabled icon dimming survives settings reload");
+            }
+        } finally {
+            window.Content = null;
+            window.Close();
+            list.ItemsSource = null;
+        }
+    }
     private static void OrganizationControls()
     {
         PluginMenuActions();
@@ -336,6 +388,7 @@ internal static class NavigatorOrganizationTests
         using (var reader = new StreamReader(stream)) {
             var root = (Grid)XamlReader.Parse(reader.ReadToEnd().Replace("assembly=HeliumCharlo", "assembly=" + assembly.GetName().Name));
             NavigatorRowAppearance((ListBox)root.FindName("Games"));
+            NavigatorIconDimming(root);
             var title = new NavigatorGameTitle { Text = new string('W', 100), Width = 90, TextTrimming = TextTrimming.CharacterEllipsis };
             var titleWindow = new Window { Content = title, Width = 200, Height = 80, ShowInTaskbar = false };
             titleWindow.Show();
