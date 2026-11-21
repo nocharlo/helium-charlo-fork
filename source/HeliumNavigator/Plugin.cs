@@ -6,8 +6,8 @@ using Playnite.SDK;
 using Playnite.SDK.Events;
 using Playnite.SDK.Plugins;
 using System.Reflection;
-[assembly: AssemblyVersion("0.3.3.1")]
-[assembly: AssemblyFileVersion("0.3.3.1")]
+[assembly: AssemblyVersion("0.3.4.0")]
+[assembly: AssemblyFileVersion("0.3.4.0")]
 namespace HeliumNavigator
 {
     public sealed class NavigatorPlugin : GenericPlugin

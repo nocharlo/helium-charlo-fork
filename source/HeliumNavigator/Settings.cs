@@ -9,7 +9,7 @@ using Playnite.SDK;
 
 namespace HeliumNavigator
 {
-    public sealed class Preferences : ISettings
+    public sealed class Preferences : ISettings, INotifyPropertyChanged
     {
         public double Width { get; set; } = 230;
         public bool Collapsed { get; set; }
@@ -41,6 +41,18 @@ namespace HeliumNavigator
         [XmlIgnore] public bool RecentActivityGroupingStyleSpecified { get; set; }
         // 0: Automatic, 1: Always hidden, 2: Always visible.
         public int LayoutMode { get; set; }
+        private bool dimUninstalledGameIcons;
+        public bool DimUninstalledGameIcons
+        {
+            get => dimUninstalledGameIcons;
+            set
+            {
+                if (dimUninstalledGameIcons == value) return;
+                dimUninstalledGameIcons = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DimUninstalledGameIcons)));
+            }
+        }
+        public event PropertyChangedEventHandler PropertyChanged;
         // Older XML fields are read for migration but omitted when saving the new format.
         public bool SteamMode { get; set; }
         public bool ShouldSerializeSteamMode() => false;
@@ -115,7 +127,7 @@ namespace HeliumNavigator
             FilterPopupWidth = FilterPopupWidth, FilterPopupHeight = FilterPopupHeight,
             FilterPopupX = FilterPopupX, FilterPopupY = FilterPopupY,
             VisibleGroupingModesSpecified = VisibleGroupingModesSpecified, VisibleSortingModesSpecified = VisibleSortingModesSpecified,
-            LayoutMode = LayoutMode,
+            LayoutMode = LayoutMode, DimUninstalledGameIcons = DimUninstalledGameIcons,
             SteamMode = SteamMode, OpenFromGridCover = OpenFromGridCover,
             SidebarClickAction = SidebarClickAction, GridCoverClickAction = GridCoverClickAction,
             PreserveGridScroll = PreserveGridScroll, AutomaticallyRevealSelectedGame = AutomaticallyRevealSelectedGame,
@@ -134,6 +146,7 @@ namespace HeliumNavigator
             VisibleGroupingModesSpecified = value.VisibleGroupingModesSpecified;
             VisibleSortingModesSpecified = value.VisibleSortingModesSpecified;
             LayoutMode = value.LayoutMode;
+            DimUninstalledGameIcons = value.DimUninstalledGameIcons;
             SteamMode = value.SteamMode;
             OpenFromGridCover = value.OpenFromGridCover; PreserveGridScroll = value.PreserveGridScroll;
             AutomaticallyRevealSelectedGame = value.AutomaticallyRevealSelectedGame;
@@ -191,7 +204,8 @@ namespace HeliumNavigator
             tabs.Items.Add(Page("Navigation", Section("Click actions", clicks), Section("Selection and scroll", selection)));
             tabs.Items.Add(Page("Appearance", Section("Grid details panel",
                 Choice("Display mode", "LayoutMode", "Automatic", "Always hidden", "Always visible")),
-                Section("Sidebar width", width)));
+                Section("Sidebar width", width),
+                Section("Game icons", BoundCheck("Dim uninstalled game icons", nameof(Preferences.DimUninstalledGameIcons)))));
             tabs.Items.Add(Page("Organization", activity, nativeOrganization, organization));
             tabs.Items.Add(Page("Filters", automaticSize, filters));
             Content = tabs;
