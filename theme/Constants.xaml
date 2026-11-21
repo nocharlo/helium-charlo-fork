@@ -239,6 +239,11 @@
     <SolidColorBrush x:Key="HoverBrush1" Color="{DynamicResource HighlightGlyphColor}" />
     <SolidColorBrush x:Key="MenusPopupsHoverBrush" Color="#dcdedf" />
     <SolidColorBrush x:Key="MenusPopupMouseOverForegroundBrush" Color="#3d4450" />
+    <SolidColorBrush x:Key="GameMenuBackgroundBrush" Color="#FF29323F" />
+    <SolidColorBrush x:Key="GameMenuBorderBrush" Color="#FF526B82" />
+    <SolidColorBrush x:Key="GameMenuTextBrush" Color="#FFCDD5DE" />
+    <SolidColorBrush x:Key="GameMenuHighlightBrush" Color="#FF3A4E63" />
+    <SolidColorBrush x:Key="GameMenuSeparatorBrush" Color="#FF3C4856" />
     <LinearGradientBrush x:Key="HoverBrush" StartPoint="0.0, 0.5" EndPoint="1.0, 0.5" >
         <GradientStop Color="#5A6069" Offset="0"/>
         <GradientStop Color="#50555D" Offset="0.5"/>

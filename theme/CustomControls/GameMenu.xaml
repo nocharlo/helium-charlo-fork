@@ -1,20 +1,105 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
+    <!-- Shared by Playnite's native game menus in Grid, List and Details. -->
     <Style TargetType="{x:Type GameMenu}">
+        <Style.Resources>
+            <Style TargetType="{x:Type Separator}" x:Key="GameMenuSeparatorStyle">
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type Separator}">
+                            <Border Height="1" Margin="6,4" SnapsToDevicePixels="True"
+                                    Background="{DynamicResource GameMenuSeparatorBrush}" />
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            <Style TargetType="{x:Type Separator}" BasedOn="{StaticResource GameMenuSeparatorStyle}" />
+            <Style TargetType="{x:Type Separator}" x:Key="{x:Static MenuItem.SeparatorStyleKey}"
+                   BasedOn="{StaticResource GameMenuSeparatorStyle}" />
+
+            <Style TargetType="{x:Type MenuItem}">
+                <Setter Property="SnapsToDevicePixels" Value="True" />
+                <Setter Property="Foreground" Value="{DynamicResource GameMenuTextBrush}" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Padding" Value="6,4" />
+                <Setter Property="MinHeight" Value="26" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type MenuItem}">
+                            <Border x:Name="MenuFace" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="20" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" SharedSizeGroup="GameMenuShortcut" />
+                                        <ColumnDefinition Width="16" />
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter x:Name="MenuIcon" ContentSource="Icon" Width="16" Height="16"
+                                                      VerticalAlignment="Center" Opacity="0.85" />
+                                    <TextBlock x:Name="MenuCheck" Text="✓" VerticalAlignment="Center" Visibility="Collapsed" />
+                                    <ContentPresenter Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True"
+                                                      VerticalAlignment="Center" Margin="4,0,18,0" />
+                                    <TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}" Opacity="0.6"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                    <Path x:Name="SubmenuArrow" Grid.Column="3" Data="M0,0 L4,4 L0,8"
+                                          Stroke="{TemplateBinding Foreground}" StrokeThickness="1.2"
+                                          HorizontalAlignment="Right" VerticalAlignment="Center" Visibility="Collapsed" />
+                                    <Popup x:Name="PART_Popup" AllowsTransparency="True" Focusable="False"
+                                           Placement="Right" PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                                           IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}">
+                                        <Border Background="{DynamicResource GameMenuBackgroundBrush}"
+                                                BorderBrush="{DynamicResource GameMenuBorderBrush}" BorderThickness="1" Padding="3"
+                                                Grid.IsSharedSizeScope="True">
+                                            <ScrollViewer CanContentScroll="True" HorizontalScrollBarVisibility="Disabled"
+                                                          VerticalScrollBarVisibility="Auto">
+                                                <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                                            </ScrollViewer>
+                                        </Border>
+                                    </Popup>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="Role" Value="SubmenuHeader">
+                                    <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible" />
+                                </Trigger>
+                                <Trigger Property="IsHighlighted" Value="True">
+                                    <Setter TargetName="MenuFace" Property="Background" Value="{DynamicResource GameMenuHighlightBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsSubmenuOpen" Value="True">
+                                    <Setter TargetName="MenuFace" Property="Background" Value="{DynamicResource GameMenuHighlightBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="MenuIcon" Property="Visibility" Value="Hidden" />
+                                    <Setter TargetName="MenuCheck" Property="Visibility" Value="Visible" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="MenuFace" Property="Opacity" Value="0.45" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </Style.Resources>
+
         <Setter Property="SnapsToDevicePixels" Value="True" />
-        <Setter Property="Background" Value="{DynamicResource PopupBackgroundBrush}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource PopupBorderBrush}" />
-        <Setter Property="BorderThickness" Value="{DynamicResource PopupBorderThickness}" />
+        <Setter Property="Background" Value="{DynamicResource GameMenuBackgroundBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource GameMenuTextBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource GameMenuBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="3" />
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeSmall}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type GameMenu}">
-                    <Border BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            Background="{TemplateBinding Background}"
-                            Grid.IsSharedSizeScope="True" Padding="0,5,0,5" >
-                        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                    <Border BorderBrush="{TemplateBinding BorderBrush}" Padding="{TemplateBinding Padding}"
+                            BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}"
+                            Grid.IsSharedSizeScope="True">
+                        <ScrollViewer CanContentScroll="True" HorizontalScrollBarVisibility="Disabled"
+                                      VerticalScrollBarVisibility="Auto">
+                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
                         </ScrollViewer>
                     </Border>
                 </ControlTemplate>

@@ -889,6 +889,7 @@ namespace HeliumNavigator
                 lastIds = ids;
                 lastOrderIds = orderIds;
                 lastViewState = viewState;
+                NavigatorGameTitle.Dismiss(list);
                 if (list.ContextMenu?.IsOpen == true) list.ContextMenu.IsOpen = false;
                 var selectedRow = list.SelectedItem as GameRow;
                 var scrollOffset = FindScroll(list)?.VerticalOffset ?? 0;
@@ -996,6 +997,7 @@ namespace HeliumNavigator
         private void ApplySearch()
         {
             if (view == null) return;
+            NavigatorGameTitle.Dismiss(list);
             var key = NavigatorProjection.SearchKey(search.Text);
             var wasSyncing = syncing;
             syncing = true;
