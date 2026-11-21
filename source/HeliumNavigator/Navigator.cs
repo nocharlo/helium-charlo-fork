@@ -78,6 +78,8 @@ namespace HeliumNavigator
         private bool active, syncing, reportedError;
         private bool compact, navigatedDetails;
         private FrameworkElement detailsBorder;
+        private FrameworkElement observedOverview;
+        private DispatcherOperation pendingPanelAnchor;
         private BindingBase detailsVisibilityBinding;
         private FrameworkElement nativeDetailsList;
         private double gridOffset;
@@ -110,7 +112,7 @@ namespace HeliumNavigator
         {
             this.api = api; this.plugin = plugin; library = new LibraryStateAdapter(api);
             gameActions = new NavigatorGameActions(api.Database.Games.Get, api.StartGame, api.InstallGame,
-                NavigatorGameActions.BindNativeEditor(api.MainView), api.Database.Games.Update);
+                NavigatorGameActions.BindNativeEditor(api.MainView), api.Database.Games.Update, api.StartGameAction);
             diagnostics = new NavigatorDiagnostics(NavigatorDiagnostics.Requested(),
                 message => LogManager.GetLogger().Info(message));
             prefs = plugin.Settings;
@@ -260,7 +262,9 @@ namespace HeliumNavigator
         private void ConfigureGameActions()
         {
             var database = api.Database;
-            var menu = new ContextMenu();
+            var menu = new ContextMenu { Style = (Style)root.FindResource("NavigatorContextMenuStyle") };
+            menu.Resources.MergedDictionaries.Add(root.Resources);
+            var customActions = new MenuItem { Header = "Actions" };
             var launch = new MenuItem { Header = "Play" };
             var edit = new MenuItem { Header = "Edit Game", InputGestureText = "F3" };
             var favorite = new MenuItem();
@@ -279,6 +283,7 @@ namespace HeliumNavigator
             var extensions = new MenuItem { Header = "Extensions" };
             var extensionsSeparator = new Separator();
             menu.Items.Add(launch);
+            menu.Items.Add(customActions);
             menu.Items.Add(links);
             menu.Items.Add(filesSeparator);
             menu.Items.Add(folder);
@@ -345,6 +350,8 @@ namespace HeliumNavigator
                 NavigatorMenuIcons.Set(this, launch, offered == NavigatorLaunchAction.Install ? "InstallIcon" : "PlayIcon");
                 var gameId = target;
                 var game = database.Games.Get(gameId);
+                gameActions.PopulateCustomActions(customActions, gameId,
+                    error => LogManager.GetLogger().Warn("Navigator game action error: " + error.GetType().Name));
                 PopulateGameLinks(links, game);
                 foreach (var action in nativeActions) {
                     var command = NativeGameCommand(action.Name);
@@ -1121,6 +1128,7 @@ namespace HeliumNavigator
                 nativeGridList.SelectedItems.Count == 0) return false;
             var closePanel = (FindNamed(window, "HeliumCharlo_CloseGridDetails") as Button)?.Command;
             if (closePanel?.CanExecute(null) != true) return false;
+            PreservePanelAnchor();
 
             pendingViewSelection?.Abort();
             pendingViewSelection = null;
@@ -1413,12 +1421,33 @@ namespace HeliumNavigator
         }
         private void RestoreDetails()
         {
+            if (observedOverview != null) observedOverview.IsVisibleChanged -= PanelVisibilityChanged;
+            observedOverview = null;
+            pendingPanelAnchor?.Abort();
+            pendingPanelAnchor = null;
             if (detailsBorder != null) {
                 detailsBorder.ClearValue(VisibilityProperty);
                 if (detailsVisibilityBinding != null) BindingOperations.SetBinding(detailsBorder, VisibilityProperty, detailsVisibilityBinding);
             }
             detailsBorder = null;
             detailsVisibilityBinding = null;
+        }
+        private void PanelVisibilityChanged(object sender, DependencyPropertyChangedEventArgs args)
+        {
+            if (!(bool)args.NewValue) PreservePanelAnchor();
+        }
+        private void PreservePanelAnchor()
+        {
+            if (!active || !prefs.PreserveGridScroll || library.ActiveDesktopView != DesktopView.Grid ||
+                pendingPanelAnchor != null) return;
+            var games = nativeGridList;
+            var anchor = NavigatorGridAnchor.Capture(games);
+            if (anchor == null) return;
+            pendingPanelAnchor = Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => {
+                pendingPanelAnchor = null;
+                if (active && library.ActiveDesktopView == DesktopView.Grid && ReferenceEquals(games, nativeGridList))
+                    anchor.Restore(games);
+            }));
         }
         private void ShowNativeList()
         {
@@ -1455,6 +1484,11 @@ namespace HeliumNavigator
             var border = overview == null ? null : VisualTreeHelper.GetParent(overview) as FrameworkElement;
             if (border == null) return;
             if (!ReferenceEquals(detailsBorder, border)) { RestoreDetails(); detailsBorder = border; detailsVisibilityBinding = BindingOperations.GetBindingBase(border, VisibilityProperty); }
+            if (!ReferenceEquals(observedOverview, overview)) {
+                if (observedOverview != null) observedOverview.IsVisibleChanged -= PanelVisibilityChanged;
+                observedOverview = overview;
+                overview.IsVisibleChanged += PanelVisibilityChanged;
+            }
             compact = Logic.Compact(prefs.LayoutMode, compact, gridView.ActualWidth);
             if (panelRequested && overview.Visibility == Visibility.Collapsed &&
                 DateTime.UtcNow - panelRequestedAt > TimeSpan.FromSeconds(2)) panelRequested = false;

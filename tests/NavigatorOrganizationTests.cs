@@ -42,7 +42,7 @@ internal static class NavigatorOrganizationTests
     [STAThread]
     private static void Main()
     {
-        CatalogAndGroups(); Sorting(); Settings(); RemovedDefaultModes(); NativeOrganization(); OrganizationControls(); FilterWorkspace(); GameActions(); GameMetadataActions(); Presentation(); Campaign(); Benchmarks();
+        CatalogAndGroups(); Sorting(); Settings(); RemovedDefaultModes(); NativeOrganization(); OrganizationControls(); FilterWorkspace(); GameActions(); CustomGameActions(); GridPanelAnchor(); GameMetadataActions(); Presentation(); Campaign(); Benchmarks();
         Console.WriteLine("PASS: " + checks + " Navigator organization, settings and WPF model checks.");
     }
     private static void GameActions()
@@ -93,6 +93,105 @@ internal static class NavigatorOrganizationTests
             NavigatorGameActions.WebLink("file:///game.exe") == null &&
             NavigatorGameActions.WebLink("custom://host/game") == null &&
             NavigatorGameActions.WebLink("game") == null, "Only absolute HTTP and HTTPS links are dispatched");
+    }
+    private static void CustomGameActions()
+    {
+        var game = new Game("Synthetic action target") { Id = Guid.NewGuid() };
+        var current = game;
+        var executions = new List<GameAction>();
+        var errors = 0;
+        var target = Guid.Empty;
+        var actions = new NavigatorGameActions(id => current?.Id == id ? current : null,
+            null, null, null, _ => { throw new Exception("Actions must not modify metadata"); },
+            (id, action) => { target = id; executions.Add(action); });
+        var menu = new MenuItem();
+        void Populate() => actions.PopulateCustomActions(menu, game.Id, _ => errors++);
+        void Click(int index) => ((MenuItem)menu.Items[index]).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Populate();
+        Check(menu.Items.Count == 0 && menu.Visibility == Visibility.Collapsed, "No auxiliary actions means no empty menu");
+        game.GameActions = new System.Collections.ObjectModel.ObservableCollection<GameAction> {
+            new GameAction { Name = "Play", IsPlayAction = true },
+            new GameAction { Name = "Same", Type = GameActionType.File, Path = "first", Arguments = "{InstallDir}" },
+            new GameAction { Name = "Same", Type = GameActionType.Script, Script = "synthetic" },
+            new GameAction { Name = "Emulator", Type = GameActionType.Emulator },
+            new GameAction { Name = "URL", Type = GameActionType.URL }
+        };
+        Populate();
+        Check(menu.Visibility == Visibility.Visible && menu.Items.Cast<MenuItem>().Select(item => (string)item.Header)
+            .SequenceEqual(new[] { "Same", "Same", "Emulator", "URL" }), "All auxiliary types preserve order and duplicate names");
+        for (var i = 0; i < 4; i++) Click(i);
+        Check(executions.Count == 4 && target == game.Id && ReferenceEquals(executions[1], game.GameActions[2]) &&
+            ReferenceEquals(executions[0], game.GameActions[1]), "Exact game and action instances reach the native executor once");
+        game.GameActions[1].WorkingDir = "changed";
+        Click(0);
+        Check(executions.Count == 4, "An edited action invalidates the open menu");
+        Populate(); Click(0);
+        Check(executions.Count == 5 && executions.Last().WorkingDir == "changed", "Reopening reads current actions");
+        game.GameActions.Move(1, 2);
+        Click(0);
+        Check(executions.Count == 5, "A reordered list cannot execute a different action");
+        Populate(); current = null; Click(0);
+        Check(executions.Count == 5, "Deleted games do not execute stale actions");
+        current = new Game("Another synthetic target") { Id = Guid.NewGuid() };
+        Populate();
+        Check(menu.Items.Count == 0, "Switching to a missing target clears the old menu");
+        current = game;
+        game.GameActions.Clear();
+        game.GameActions.Add(new GameAction { Name = "Only", Type = GameActionType.URL });
+        Populate();
+        Check(menu.Items.Count == 1, "A single auxiliary action is offered");
+        game.IsLaunching = true; Click(0);
+        Check(executions.Count == 5 && errors == 0, "Busy-state changes safely suppress execution");
+        game.IsLaunching = false;
+        game.GameActions.Clear(); Click(0);
+        Check(executions.Count == 5, "Removing the action while the menu is open does not execute a substitute");
+        game.GameActions.Add(new GameAction { Name = "Only", Type = GameActionType.File });
+        var failing = new NavigatorGameActions(_ => game, null, null, null, null,
+            (id, action) => { throw new InvalidOperationException("synthetic failure"); });
+        failing.PopulateCustomActions(menu, game.Id, _ => errors++);
+        Click(0);
+        Check(errors == 1, "An executor failure is contained and reported once");
+    }
+    private static void GridPanelAnchor()
+    {
+        var list = new ListBox { Width = 260, Height = 220 };
+        ScrollViewer.SetCanContentScroll(list, false);
+        ScrollViewer.SetHorizontalScrollBarVisibility(list, ScrollBarVisibility.Disabled);
+        var panel = new FrameworkElementFactory(typeof(WrapPanel));
+        list.ItemsPanel = new ItemsPanelTemplate(panel);
+        var tile = new FrameworkElementFactory(typeof(Border));
+        tile.SetValue(FrameworkElement.WidthProperty, 94.0);
+        tile.SetValue(FrameworkElement.HeightProperty, 70.0);
+        list.ItemTemplate = new DataTemplate { VisualTree = tile };
+        for (var i = 0; i < 100; i++) list.Items.Add(i);
+        var window = new Window { Content = list, Width = 700, Height = 400, ShowInTaskbar = false, WindowStyle = WindowStyle.None };
+        window.Show();
+        try {
+            window.UpdateLayout();
+            var scroll = Descendant<ScrollViewer>(list);
+            scroll.ScrollToVerticalOffset(910); list.UpdateLayout();
+            list.SelectedItem = 60;
+            var anchor = NavigatorGridAnchor.Capture(list);
+            Check(anchor != null, "The first visible tile can be captured in a scrolled Grid");
+            list.Width = 620;
+            list.UpdateLayout();
+            Check(anchor.Restore(list) && Equals(list.SelectedItem, 60), "Width changes restore the visual anchor without selecting it");
+            list.UpdateLayout();
+            Check(scroll.VerticalOffset < 910, "Widening to more columns changes the offset instead of keeping a different row at the top");
+            Check(NavigatorGridAnchor.Capture(null) == null && !anchor.Restore(null), "Unavailable views safely skip anchor restoration");
+            list.Items.Clear();
+            Check(!anchor.Restore(list), "A removed anchor does not restore stale library content");
+        } finally { window.Close(); }
+    }
+    private static T Descendant<T>(DependencyObject node) where T : DependencyObject
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++) {
+            var child = VisualTreeHelper.GetChild(node, i);
+            if (child is T match) return match;
+            var found = Descendant<T>(child);
+            if (found != null) return found;
+        }
+        return null;
     }
     private static void GameMetadataActions()
     {
@@ -199,11 +298,11 @@ internal static class NavigatorOrganizationTests
         var border = (Border)container.Template.FindName("RowBorder", container);
         var uninstalled = ((SolidColorBrush)title.Foreground).Color;
         container.IsSelected = true;
-        Check(uninstalled == Color.FromRgb(163, 170, 185) && ((SolidColorBrush)title.Foreground).Color == uninstalled &&
-            ((SolidColorBrush)border.BorderBrush).Color == Color.FromRgb(103, 179, 255),
+        Check(uninstalled == Color.FromRgb(159, 170, 183) && ((SolidColorBrush)title.Foreground).Color == uninstalled &&
+            ((SolidColorBrush)border.BorderBrush).Color == Color.FromRgb(113, 144, 172),
             "An uninstalled game keeps its muted title and gets a separate selection accent");
         model.IsInstalled = true;
-        Check(container.IsSelected && ((SolidColorBrush)title.Foreground).Color == Color.FromRgb(241, 247, 255),
+        Check(container.IsSelected && ((SolidColorBrush)title.Foreground).Color == Color.FromRgb(225, 230, 235),
             "An installed game uses the installed title color while selected");
         Check(star.FontSize == 16 && star.Visibility == Visibility.Visible && container.DesiredSize.Height == 26,
             "The larger favorite star fits the compact row");
@@ -237,6 +336,25 @@ internal static class NavigatorOrganizationTests
         using (var reader = new StreamReader(stream)) {
             var root = (Grid)XamlReader.Parse(reader.ReadToEnd().Replace("assembly=HeliumCharlo", "assembly=" + assembly.GetName().Name));
             NavigatorRowAppearance((ListBox)root.FindName("Games"));
+            var title = new NavigatorGameTitle { Text = new string('W', 100), Width = 90, TextTrimming = TextTrimming.CharacterEllipsis };
+            var titleWindow = new Window { Content = title, Width = 200, Height = 80, ShowInTaskbar = false };
+            titleWindow.Show();
+            try {
+                titleWindow.UpdateLayout();
+                Check(NavigatorGameTitle.IsTruncated(title), "An oversized game title requests the expanded label");
+                title.Text = "Short"; titleWindow.UpdateLayout();
+                Check(!NavigatorGameTitle.IsTruncated(title), "A fitting title does not open an expanded label");
+            } finally { titleWindow.Close(); }
+            var context = new ContextMenu { Style = (Style)root.FindResource("NavigatorContextMenuStyle") };
+            context.Resources.MergedDictionaries.Add(root.Resources);
+            var item = new MenuItem { Header = "Synthetic submenu" };
+            item.Items.Add(new MenuItem { Header = "Synthetic action" });
+            context.Items.Add(item);
+            item.Style = (Style)root.FindResource(typeof(MenuItem));
+            item.Measure(new Size(300, 100)); item.ApplyTemplate();
+            Check(item.Template.FindName("PART_Popup", item) is System.Windows.Controls.Primitives.Popup &&
+                ((UIElement)item.Template.FindName("SubmenuArrow", item)).Visibility == Visibility.Visible,
+                "The scoped menu retains the native submenu popup contract and disclosure");
             var filterPopup = (System.Windows.Controls.Primitives.Popup)root.FindName("FiltersPopup");
             var filterBorder = (Border)filterPopup.Child;
             var filterLayout = (Grid)filterBorder.Child;

@@ -17,7 +17,9 @@ source_manifest = (root / 'source/HeliumNavigator/extension.yaml').read_text()
 theme_manifest = (root / 'theme/theme.yaml').read_text()
 version = re.search(r'(?m)^Version:\s*(\S+)', source_manifest).group(1)
 assert re.search(r'(?m)^Version:\s*(\S+)', theme_manifest).group(1) == version
-assert f'AssemblyVersion("{version}.0")' in (root / 'source/HeliumNavigator/Plugin.cs').read_text()
+assembly_version = ".".join((version.split(".") + ["0"] * 4)[:4])
+assert f'AssemblyVersion("{assembly_version}")' in (root / 'source/HeliumNavigator/Plugin.cs').read_text()
+assert f'AssemblyFileVersion("{assembly_version}")' in (root / 'source/HeliumNavigator/Plugin.cs').read_text()
 assert f'Name: Helium Navigator v{version}' in source_manifest
 assert f'Name: Helium (charlo fork) v{version}' in theme_manifest
 

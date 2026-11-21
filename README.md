@@ -105,7 +105,9 @@ The project consists of two components:
 - **Helium Theme:** The modified XAML/WPF theme and Navigator integration.
 - **Helium Navigator:** A C# extension handling the sidebar, library organization, navigation, and settings.
 
-The current codebase targets **.NET Framework 4.6.2** and **PlayniteSDK 6.11.0**.
+The current codebase targets **.NET Framework 4.6.2** and **PlayniteSDK 6.19.0**.
+
+The v0.3.3.1 candidate requires **Playnite 10.65 or newer** for its native per-game action execution API. The published v0.3.3 download links above remain available for older Playnite installations.
 
 Development includes automated tests, regression checks, release validation, and testing in an isolated portable Playnite installation.
 
@@ -144,7 +146,7 @@ These plans are subject to change as technical limitations and development prior
 - The Grid Details Panel may briefly appear blank while Playnite rebuilds its view.
 - Some mouse interactions and smaller window configurations still need broader testing.
 - Compatibility with every extension and library setup hasn't been established.
-- Custom per-game Actions cannot currently be executed from Navigator's context menu through the public Playnite 10 SDK.
+- Custom per-game Actions in the v0.3.3.1 candidate use Playnite 10.65's public `StartGameAction` API. Earlier Playnite versions cannot load this candidate.
 - Performance testing has included synthetic libraries with up to 2,500 games, but larger real libraries with artwork and store integrations need further testing.
 
 I primarily develop and test on my own setup, so feedback from other configurations is particularly useful.

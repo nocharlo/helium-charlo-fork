@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Windows.Input;
 using Playnite.SDK;
 using Playnite.SDK.Models;
@@ -15,23 +16,49 @@ namespace HeliumNavigator
         private readonly Action<Guid> play, install;
         private readonly Func<Guid, bool?> edit;
         private readonly Action<Game> update;
+        private readonly Action<Guid, GameAction> startAction;
 
         internal NavigatorGameActions(Func<Guid, Game> findGame, Action<Guid> play, Action<Guid> install,
-            Func<Guid, bool?> edit, Action<Game> update)
+            Func<Guid, bool?> edit, Action<Game> update, Action<Guid, GameAction> startAction = null)
         {
             this.findGame = findGame;
             this.play = play;
             this.install = install;
             this.edit = edit;
             this.update = update;
+            this.startAction = startAction;
         }
 
         internal static Func<Guid, bool?> BindNativeEditor(IMainViewAPI mainView)
         {
-            // The host supplies the SDK interface. OpenEditDialog was added in SDK 6.13.
-            var method = typeof(IMainViewAPI).GetMethod("OpenEditDialog", new[] { typeof(Guid) });
-            return method == null || mainView == null ? null
-                : (Func<Guid, bool?>)Delegate.CreateDelegate(typeof(Func<Guid, bool?>), mainView, method, false);
+            return mainView == null ? null : new Func<Guid, bool?>(mainView.OpenEditDialog);
+        }
+
+        internal void PopulateCustomActions(System.Windows.Controls.MenuItem menu, Guid gameId, Action<Exception> report)
+        {
+            menu.Items.Clear();
+            var offered = findGame(gameId)?.GameActions?.Select(action => action?.GetCopy()).ToArray()
+                ?? new GameAction[0];
+            for (var index = 0; index < offered.Length; index++) {
+                var action = offered[index];
+                if (action == null || action.IsPlayAction || !Enum.IsDefined(typeof(GameActionType), action.Type)) continue;
+                var capturedIndex = index;
+                var item = new System.Windows.Controls.MenuItem { Header = action.Name };
+                item.Click += (s, e) => {
+                    e.Handled = true;
+                    try {
+                        var game = findGame(gameId);
+                        var current = game?.GameActions;
+                        // Actions have no persistent ID. Reject a stale menu instead of matching by name.
+                        if (startAction == null || game == null || game.IsRunning || game.IsLaunching ||
+                            game.IsInstalling || game.IsUninstalling || current == null || current.Count != offered.Length ||
+                            !current.Zip(offered, (left, right) => GameAction.Equals(left, right)).All(equal => equal)) return;
+                        startAction(gameId, current[capturedIndex]);
+                    } catch (Exception error) { report(error); }
+                };
+                menu.Items.Add(item);
+            }
+            menu.Visibility = menu.HasItems ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
         }
 
         internal bool HasNativeEditor => edit != null;
