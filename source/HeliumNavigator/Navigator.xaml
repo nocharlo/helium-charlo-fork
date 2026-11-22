@@ -397,6 +397,8 @@
             <Border x:Name="RowBorder" Background="Transparent" BorderBrush="Transparent" BorderThickness="2,0,0,0" Padding="2,0,4,0">
               <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
             </Border>
+            <Border x:Name="CompletionStatusAccent" Width="3" Margin="3,5,0,5" CornerRadius="1"
+                    HorizontalAlignment="Left" IsHitTestVisible="False" Background="{Binding CompletionStatusBrush}"/>
             <Border x:Name="ContextOutline" BorderBrush="{StaticResource NavigatorOutlineBrush}" BorderThickness="1" Visibility="Collapsed" IsHitTestVisible="False"/>
             </Grid>
             <ControlTemplate.Triggers>

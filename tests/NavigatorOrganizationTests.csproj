@@ -25,6 +25,9 @@
     <Compile Include="../source/HeliumNavigator/NavigatorOrganizationControls.cs"/>
     <Compile Include="../source/HeliumNavigator/NavigatorProjection.cs"/>
     <Compile Include="../source/HeliumNavigator/NavigatorPresentation.cs"/>
+    <Compile Include="../source/HeliumNavigator/CompletionStatusIndicators.cs"/>
+    <Reference Include="System.Windows.Forms"/>
+    <Reference Include="System.Drawing"/>
     <Compile Include="../source/HeliumNavigator/NavigatorGroupStateModel.cs"/>
     <Compile Include="../source/HeliumNavigator/NavigatorGroupState.cs"/>
     <EmbeddedResource Include="../source/HeliumNavigator/Navigator.xaml" LogicalName="Navigator.xaml"/>

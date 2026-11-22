@@ -44,7 +44,7 @@ internal static class NavigatorOrganizationTests
     [STAThread]
     private static void Main()
     {
-        CatalogAndGroups(); Sorting(); Settings(); RemovedDefaultModes(); NativeOrganization(); OrganizationControls(); FilterWorkspace(); GameActions(); CustomGameActions(); GridPanelAnchor(); GameMetadataActions(); Presentation(); Campaign(); Benchmarks();
+        CatalogAndGroups(); Sorting(); Settings(); RemovedDefaultModes(); NativeOrganization(); OrganizationControls(); FilterWorkspace(); GameActions(); CustomGameActions(); GridPanelAnchor(); GameMetadataActions(); CompletionStatusAccents(); Presentation(); Campaign(); Benchmarks();
         Console.WriteLine("PASS: " + checks + " Navigator organization, settings and WPF model checks.");
     }
     private static void GameActions()
@@ -310,6 +310,122 @@ internal static class NavigatorOrganizationTests
         Check(prefs.VisibleGroupingModes.Distinct().Count() == initial.Length && list.Items.Count == NavigatorOrganization.Groups.Length,
             "Clearing search keeps every choice without duplicates");
     }
+    private static void CompletionStatusAccents()
+    {
+        var builtIn = Guid.NewGuid();
+        var customStatus = Guid.NewGuid();
+        var disabled = Guid.NewGuid();
+        var prefs = new Preferences {
+            Width = 280,
+            DimUninstalledGameIcons = true,
+            CompletionStatusIndicatorColors = new List<CompletionStatusIndicatorPreference> {
+                new CompletionStatusIndicatorPreference { StatusId = builtIn.ToString("B"), Color = "#78c58e", IsEnabled = true },
+                new CompletionStatusIndicatorPreference { StatusId = builtIn.ToString(), Color = "#000000", IsEnabled = true },
+                new CompletionStatusIndicatorPreference { StatusId = customStatus.ToString(), Color = "#E7C969", IsEnabled = true },
+                new CompletionStatusIndicatorPreference { StatusId = disabled.ToString(), Color = "#000000" },
+                new CompletionStatusIndicatorPreference { StatusId = Guid.NewGuid().ToString(), Color = "invalid", IsEnabled = true },
+                new CompletionStatusIndicatorPreference { StatusId = "invalid", Color = "#000000", Enabled = "invalid" },
+                null
+            }
+        };
+        Check(CompletionStatusIndicators.CreateBrushes(prefs).Count == 0, "The global indicator defaults off");
+        prefs.ShowCompletionStatusIndicators = true;
+        prefs.MigrateNavigation();
+        var brushes = CompletionStatusIndicators.CreateBrushes(prefs);
+        Check(brushes.Count == 2 && !brushes.ContainsKey(disabled) && !brushes.ContainsKey(Guid.Empty),
+            "Only configured and enabled status IDs produce a brush");
+        Check(prefs.CompletionStatusIndicatorColors.Count == 3 &&
+            ((SolidColorBrush)brushes[builtIn]).Color == Color.FromRgb(120, 197, 142) &&
+            ((SolidColorBrush)brushes[customStatus]).Color == Color.FromRgb(231, 201, 105),
+            "Configured built-in and custom statuses use independent colors; invalid and duplicate entries are discarded");
+        var game = Game(13);
+        game.GroupNames = new[] { "Synthetic group A", "Synthetic group B" };
+        game.CompletionStatus = "Custom";
+        game.CompletionStatusId = customStatus;
+        var before = Build(new[] { game }, (int)NavigatorGroupPolicy.Category);
+        Check(before.Count == 2 && before.All(row => row.CompletionStatusId == customStatus),
+            "Every projected occurrence carries the same status ID");
+        Check(Build(new[] { game }, 8).Single().CompletionStatusId == customStatus,
+            "Recent Activity carries the same status ID");
+        game.CompletionStatus = "Renamed custom";
+        var renamed = Build(new[] { game }, (int)NavigatorGroupPolicy.Category);
+        Check(renamed.All(row => ReferenceEquals(brushes[row.CompletionStatusId], brushes[customStatus])),
+            "Renaming a status leaves the color linked by ID");
+        game.CompletionStatusId = builtIn;
+        var after = Build(new[] { game }, (int)NavigatorGroupPolicy.Category);
+        Check(NavigatorRefreshDecision.ClassifyRows(before, after) == NavigatorRowChange.None,
+            "A status-only presentation change does not trigger a rebuild in another grouping");
+
+        var occurrences = before.Select(row => new GameRow { Id = row.Id }).ToArray();
+        int notifications = 0;
+        foreach (var row in occurrences) {
+            row.ApplyCompletionStatus(customStatus, brushes);
+            row.PropertyChanged += (sender, args) => {
+                if (args.PropertyName == nameof(GameRow.CompletionStatusBrush)) notifications++;
+            };
+            row.ApplyCompletionStatus(builtIn, brushes);
+            row.ApplyCompletionStatus(builtIn, brushes);
+        }
+        Check(notifications == occurrences.Length && occurrences.All(row => ReferenceEquals(row.CompletionStatusBrush, brushes[builtIn])),
+            "Both occurrences repaint in place and repeated updates avoid redundant notifications");
+        occurrences[0].ApplyCompletionStatus(Guid.Empty, brushes);
+        Check(occurrences[0].CompletionStatusBrush == null && occurrences[1].CompletionStatusBrush != null,
+            "An unset or deleted status leaves the affected row unchanged visually");
+        var largeLibrary = Enumerable.Range(0, 2500).Select(_ => new GameRow()).ToArray();
+        foreach (var row in largeLibrary) row.ApplyCompletionStatus(customStatus, brushes);
+        Check(brushes[customStatus].IsFrozen && largeLibrary.All(row => ReferenceEquals(row.CompletionStatusBrush, brushes[customStatus])),
+            "A synthetic 2500-row library shares one frozen brush per configured status");
+        prefs.BeginEdit();
+        prefs.ShowCompletionStatusIndicators = false;
+        prefs.CompletionStatusIndicatorColors[0].Color = "#000000";
+        prefs.CancelEdit();
+        Check(prefs.ShowCompletionStatusIndicators && prefs.CompletionStatusIndicatorColors[0].Color == "#78C58E",
+            "Cancel restores both the global toggle and per-status colors");
+        prefs.EndEdit();
+        var serializer = new XmlSerializer(typeof(Preferences));
+        using (var writer = new StringWriter()) {
+            serializer.Serialize(writer, prefs);
+            var xml = writer.ToString();
+            var restored = (Preferences)serializer.Deserialize(new StringReader(xml));
+            restored.MigrateNavigation();
+            Check(restored.ShowCompletionStatusIndicators &&
+                restored.CompletionStatusIndicatorColors.Single(option => option.StatusId == customStatus.ToString()).Color == "#E7C969",
+                "Status colors and the global toggle survive a settings reload");
+            var corrupt = (Preferences)serializer.Deserialize(new StringReader(xml
+                .Replace("<ShowCompletionStatusIndicators>true", "<ShowCompletionStatusIndicators>invalid")
+                .Replace("#E7C969", "#invalid")));
+            corrupt.MigrateNavigation();
+            Check(!corrupt.ShowCompletionStatusIndicators && corrupt.Width == 280 && corrupt.DimUninstalledGameIcons &&
+                !corrupt.CompletionStatusIndicatorColors.Any(option => option.StatusId == customStatus.ToString()),
+                "Malformed indicator values preserve other Navigator settings");
+        }
+        var settings = new NavigatorSettingsView(() => new[] {
+            new CompletionStatus { Id = builtIn, Name = "Synthetic native status" },
+            new CompletionStatus { Id = customStatus, Name = "Synthetic custom status" }
+        }) { DataContext = prefs };
+        var tabs = (TabControl)settings.Content;
+        tabs.SelectedIndex = 1;
+        var window = new Window { Content = settings, Width = 320, Height = 430, ShowInTaskbar = false };
+        window.Show();
+        try {
+            window.UpdateLayout();
+            var page = (StackPanel)((ScrollViewer)((TabItem)tabs.SelectedItem).Content).Content;
+            var section = (StackPanel)page.Children.OfType<GroupBox>().Last().Content;
+            var statusRows = section.Children.OfType<StackPanel>().Single();
+            var statusToggle = statusRows.Children.OfType<DockPanel>().Select(row => row.Children.OfType<CheckBox>().Single())
+                .Single(box => System.Windows.Automation.AutomationProperties.GetName(box) ==
+                "Show indicator for Synthetic custom status");
+            Check(statusToggle.IsChecked == true, "The Appearance page lists a custom status and its saved toggle");
+            statusToggle.IsChecked = false;
+            Check(!prefs.CompletionStatusIndicatorColors.Single(option => option.StatusId == customStatus.ToString()).IsEnabled,
+                "A custom status can be disabled independently in Appearance");
+            section.Children.OfType<Button>().Single().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(prefs.CompletionStatusIndicatorColors.All(option => option.Color == null) &&
+                ((SolidColorBrush)CompletionStatusIndicators.CreateBrushes(prefs)[builtIn]).Color == Color.FromRgb(103, 179, 255),
+                "Reset keeps per-status toggles and restores the default accent");
+        } finally { window.Close(); }
+    }
+
     private static void NavigatorRowAppearance(ListBox list)
     {
         var model = new GameRow { Name = "Synthetic title", Favorite = true };
@@ -332,12 +448,23 @@ internal static class NavigatorOrganizationTests
         Check(star.FontSize == 16 && star.Visibility == Visibility.Visible && container.DesiredSize.Height == 26,
             "The larger favorite star fits the compact row");
         var outline = (Border)container.Template.FindName("ContextOutline", container);
+        var accent = (Border)container.Template.FindName("CompletionStatusAccent", container);
+        var statusId = Guid.NewGuid();
+        model.ApplyCompletionStatus(statusId, new Dictionary<Guid, Brush> { { statusId, Brushes.LightGreen } });
+        container.Measure(new Size(180, 100));
+        Check(accent.Background == Brushes.LightGreen && !accent.IsHitTestVisible && accent.Width == 3 &&
+            container.DesiredSize.Height == 26 && star.Visibility == Visibility.Visible,
+            "The narrow accent fits beside selected Compact rows without affecting the star");
+        container.SetValue(NavigatorGameTitle.IsExpandedProperty, true);
+        Check(accent.Background == Brushes.LightGreen && container.IsSelected, "Title expansion and selection preserve the accent");
+        container.ClearValue(NavigatorGameTitle.IsExpandedProperty);
         Check(outline.Visibility == Visibility.Collapsed, "A selected row starts without a context outline");
         model.IsContextTarget = true;
         Check(outline.Visibility == Visibility.Visible && container.IsSelected && !outline.IsHitTestVisible &&
             container.DesiredSize.Height == 26, "The contextual outline is independent of selection and row height");
         container.DataContext = new GameRow();
-        Check(outline.Visibility == Visibility.Collapsed, "Recycling the container clears the old outline");
+        Check(outline.Visibility == Visibility.Collapsed && accent.Background == null,
+            "Recycling the container clears the previous outline and status accent");
         container.DataContext = model;
         model.IsContextTarget = false;
         Check(outline.Visibility == Visibility.Collapsed && container.IsSelected, "Closing the menu clears only the outline");

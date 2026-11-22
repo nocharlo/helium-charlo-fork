@@ -27,6 +27,7 @@ namespace HeliumNavigator
         internal int? CommunityScore { get; set; }
         internal int? CriticScore { get; set; }
         internal string CompletionStatus { get; set; }
+        internal Guid CompletionStatusId { get; set; }
     }
 
     internal sealed class NavigatorProjectedRow
@@ -41,6 +42,7 @@ namespace HeliumNavigator
         internal string IconPath { get; set; }
         internal bool IsInstalled { get; set; }
         internal bool Favorite { get; set; }
+        internal Guid CompletionStatusId { get; set; }
         internal ulong? SortValue { get; set; }
         internal string SortText { get; set; }
     }
@@ -133,7 +135,7 @@ namespace HeliumNavigator
                     rows.Add(new NavigatorProjectedRow {
                         Id = game.Id, Name = game.Name ?? "Untitled", Key = Logic.SearchKey(game.Name),
                         Group = group.Label, GroupIdentity = group, GroupOrder = group.Order, IconPath = iconPath,
-                        IsInstalled = game.IsInstalled, Favorite = game.Favorite,
+                        IsInstalled = game.IsInstalled, Favorite = game.Favorite, CompletionStatusId = game.CompletionStatusId,
                         SortValue = NavigatorSortPolicy.Value(game, sortMode, clock),
                         SortText = NavigatorSortPolicy.Text(game, sortMode)
                     });
@@ -188,7 +190,7 @@ namespace HeliumNavigator
                     Id = game.Id, Name = game.Name ?? "Untitled", Key = Logic.SearchKey(game.Name),
                     Group = label, GroupIdentity = new NavigatorGroupIdentity("activity:" + order, label), GroupOrder = order, ActivityTicks = activity?.Ticks ?? 0,
                     IconPath = string.IsNullOrWhiteSpace(game.Icon) ? null : resolveIcon(game.Icon),
-                    IsInstalled = game.IsInstalled, Favorite = game.Favorite,
+                    IsInstalled = game.IsInstalled, Favorite = game.Favorite, CompletionStatusId = game.CompletionStatusId,
                     SortValue = NavigatorSortPolicy.Value(game, sortMode, now),
                     SortText = NavigatorSortPolicy.Text(game, sortMode)
                 });

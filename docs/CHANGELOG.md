@@ -7,6 +7,7 @@ A history of changes to Helium (charlo fork), from the original Navigator protot
 ### v0.3.4 — Navigator maintenance candidate
 
 - Added the optional **Dim uninstalled game icons** setting under Appearance. It dims the icons of uninstalled games to 65% opacity. The option is off by default.
+- Added optional **Completion Status Indicators** under Appearance. Enable a narrow row accent and choose a color for each status from your Playnite library, including custom statuses.
 - Truncated Navigator titles expand in place on hover or keyboard focus, keeping the original row height.
 - Native Playnite game menus now share the Navigator menu colors, spacing, and visual hierarchy.
 - Mouse Back returns from Navigator-opened Full Details without also advancing the view history.

@@ -103,6 +103,7 @@ namespace HeliumNavigator
         private Guid[] lastOrderIds = new Guid[0];
         private NavigatorViewSnapshot lastViewState;
         private List<GameRow> rows = new List<GameRow>();
+        private Dictionary<Guid, Brush> completionStatusBrushes = new Dictionary<Guid, Brush>();
         private ListCollectionView view;
         private int rebuildGeneration;
         private HashSet<Guid> revealAfterExplicitReorganization;
@@ -651,6 +652,7 @@ namespace HeliumNavigator
             if (active) return; active = true;
             plugin.SelectionChanged += NativeSelectionChanged;
             plugin.SettingsChanged += SettingsUpdated;
+            completionStatusBrushes = CompletionStatusIndicators.CreateBrushes(prefs);
             api.Database.Games.ItemUpdated += GamesUpdated;
             api.Database.Games.ItemCollectionChanged += GamesChanged;
             api.Database.Series.ItemUpdated += MetadataUpdated;
@@ -753,6 +755,10 @@ namespace HeliumNavigator
         {
             if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(SettingsUpdated)); return; }
             if (!active) return;
+            var brushes = CompletionStatusIndicators.CreateBrushes(prefs);
+            if (brushes.Count != 0 || completionStatusBrushes.Count != 0)
+                foreach (var row in rows) row.RefreshCompletionStatusBrush(brushes);
+            completionStatusBrushes = brushes;
             prefs.Width = Logic.ClampWidth(prefs.Width);
             ApplySize(); RecomputeLayout();
             PopulateOrganizationChoices();
@@ -911,9 +917,13 @@ namespace HeliumNavigator
                     library.ResolveIcon, sortMode: SortMode, descending: prefs.SortDescending);
                 var movedSelected = selectedRow != null && library.IsSelected(selectedRow.Id) &&
                     NavigatorRefreshDecision.SelectedGroupMoved(selectedRow.Id, selectedRow.GroupIdentity, projected);
-                rows = projected.Select(row => new GameRow {
-                    Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group, GroupIdentity = row.GroupIdentity, IconPath = row.IconPath, ActivityTicks = row.ActivityTicks, GroupOrder = row.GroupOrder,
-                    IsInstalled = row.IsInstalled, Favorite = row.Favorite, SortValue = row.SortValue, SortText = row.SortText
+                rows = projected.Select(row => {
+                    var model = new GameRow {
+                        Id = row.Id, Name = row.Name, Key = row.Key, Group = row.Group, GroupIdentity = row.GroupIdentity, IconPath = row.IconPath, ActivityTicks = row.ActivityTicks, GroupOrder = row.GroupOrder,
+                        IsInstalled = row.IsInstalled, Favorite = row.Favorite, SortValue = row.SortValue, SortText = row.SortText
+                    };
+                    model.ApplyCompletionStatus(row.CompletionStatusId, completionStatusBrushes);
+                    return model;
                 }).ToList();
                 var projectionMs = diagnostics.Enabled ? NavigatorDiagnostics.MillisecondsSince(projectionStart) : 0;
                 var viewStart = diagnostics.Enabled ? Stopwatch.GetTimestamp() : 0;
@@ -995,13 +1005,17 @@ namespace HeliumNavigator
                 });
                 var kind = NavigatorRefreshDecision.ClassifyRows(prior, projected);
                 if (kind == NavigatorRowChange.Structural) return true;
-                if (kind == NavigatorRowChange.Visual) {
-                    diagnostics.VisualUpdate(existing.Count);
-                    foreach (var row in existing) {
-                        row.IsInstalled = game.IsInstalled;
-                        row.Favorite = game.Favorite;
-                    }
+                var visual = kind == NavigatorRowChange.Visual;
+                var indicatorChanged = false;
+                var completionStatusId = projected[0].CompletionStatusId;
+                foreach (var row in existing) {
+                    indicatorChanged |= row.ApplyCompletionStatus(completionStatusId, completionStatusBrushes);
+                    if (!visual) continue;
+                    row.IsInstalled = game.IsInstalled;
+                    row.Favorite = game.Favorite;
                 }
+                if (visual || indicatorChanged)
+                    diagnostics.VisualUpdate(existing.Count);
             }
             return false;
         }
