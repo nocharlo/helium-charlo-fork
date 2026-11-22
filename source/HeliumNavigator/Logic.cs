@@ -31,6 +31,16 @@ namespace HeliumNavigator
             saved == selected ? (int?)null : selected;
         public static bool ShouldRestoreSelection(Guid desired, IEnumerable<Guid> current, Func<bool> stillVisible) =>
             desired != Guid.Empty && (current == null || !current.Any()) && stillVisible();
+        internal static bool IsBackReleaseOrCommand(int message, long wParam, long lParam)
+        {
+            const int xButtonUp = 0x020C, appCommand = 0x0319;
+            const int xButton1 = 1, browseBack = 1, commandMask = 0x0FFF;
+            return message == xButtonUp && ((wParam >> 16) & 0xFFFF) == xButton1 ||
+                message == appCommand && ((lParam >> 16) & commandMask) == browseBack;
+        }
+        internal static bool RouteLibraryBack(bool inDetails, bool openedFromGrid,
+            Func<bool> returnToGrid, Func<bool> dismissGridPanel) =>
+            inDetails ? openedFromGrid && returnToGrid() : dismissGridPanel();
         public static double ClampWidth(double width) { return double.IsNaN(width) || double.IsInfinity(width) ? 230 : Math.Max(180, Math.Min(380, width)); }
         // The available library width is measured in WPF device-independent pixels.
         public static bool Compact(int mode, bool wasCompact, double width)

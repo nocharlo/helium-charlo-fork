@@ -9,6 +9,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -77,6 +78,7 @@ namespace HeliumNavigator
         private readonly Preferences prefs;
         private bool active, syncing, reportedError;
         private bool compact, navigatedDetails;
+        private HwndSource navigationWindowSource;
         private FrameworkElement detailsBorder;
         private FrameworkElement observedOverview;
         private DispatcherOperation pendingPanelAnchor;
@@ -600,7 +602,7 @@ namespace HeliumNavigator
         }
         private bool ReturnToGrid()
         {
-            if (!active || IsCollapsed() || library.ActiveDesktopView != DesktopView.Details) return false;
+            if (!active || library.ActiveDesktopView != DesktopView.Details) return false;
             var switchButton = FindNamed(window, "HeliumCharlo_SwitchGrid") as Button;
             if (switchButton?.Command == null || !switchButton.Command.CanExecute(null)) return false;
             switchButton.Command.Execute(null);
@@ -682,6 +684,8 @@ namespace HeliumNavigator
                 window.LocationChanged += WindowLocationChanged;
                 window.PreviewKeyDown += WindowPreviewKeyDown;
                 window.KeyDown += WindowKeyDown;
+                navigationWindowSource = PresentationSource.FromVisual(window) as HwndSource;
+                navigationWindowSource?.AddHook(WindowBackMessage);
             }
             RecomputeLayout();
             Interlocked.Exchange(ref dirty, 1); Refresh(); RefreshGlobalFilterUi(); timer.Start();
@@ -693,6 +697,9 @@ namespace HeliumNavigator
             if (list.ContextMenu != null) list.ContextMenu.IsOpen = false;
             SetContextTarget(null);
             if (!active) return; active = false; timer.Stop(); searchTimer.Stop(); coverClickTimer.Stop(); sidebarClickTimer.Stop(); sidebarDownItem = null; panelRequested = false; UnbindGridClicks();
+            if (navigationWindowSource?.IsDisposed == false)
+                navigationWindowSource.RemoveHook(WindowBackMessage);
+            navigationWindowSource = null;
             EndNeutralSelection();
             plugin.SelectionChanged -= NativeSelectionChanged;
             InputManager.Current.PreProcessInput -= BeforeOrganizationInput;
@@ -827,11 +834,10 @@ namespace HeliumNavigator
         private void BeforeOrganizationInput(object sender, PreProcessInputEventArgs args)
         {
             var input = args.StagingItem.Input.RoutedEvent;
-            if (input == Mouse.PreviewMouseDownEvent && args.StagingItem.Input is MouseButtonEventArgs back &&
-                back.ChangedButton == MouseButton.XButton1 && window?.IsActive == true && IsVisible) {
-                var handled = false;
-                Safe(() => handled = DismissMouseBack());
-                if (handled) args.Cancel();
+            // Navigator popups can have their own HWND, outside the main window hook.
+            if (input == Mouse.PreviewMouseUpEvent && args.StagingItem.Input is MouseButtonEventArgs back &&
+                back.ChangedButton == MouseButton.XButton1 && window?.IsActive == true) {
+                Safe(() => { if (DismissNavigatorPopup()) back.Handled = true; });
                 return;
             }
             if (input != Mouse.PreviewMouseDownEvent && input != Keyboard.PreviewKeyDownEvent) return;
@@ -1115,19 +1121,36 @@ namespace HeliumNavigator
             if (args.Key != Key.Escape || !CanHandleWindowKey(args)) return;
             Safe(() => args.Handled = BackToLibrary());
         }
-        private bool BackToLibrary() => library.ActiveDesktopView == DesktopView.Details
-            ? navigatedDetails && ReturnToGrid()
-            : ClearGridDetailsSelection();
+        private bool BackToLibrary() => Logic.RouteLibraryBack(library.ActiveDesktopView == DesktopView.Details,
+            navigatedDetails, ReturnToGrid, ClearGridDetailsSelection);
 
-        private bool DismissMouseBack()
+        private IntPtr WindowBackMessage(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (!active || window?.IsActive != true ||
+                !Logic.IsBackReleaseOrCommand(message, wParam.ToInt64(), lParam.ToInt64())) return IntPtr.Zero;
+            var consumed = false;
+            Safe(() => consumed = DismissMouseBack());
+            if (!consumed) return IntPtr.Zero;
+            // Handling the release prevents DefWindowProc from issuing BrowseBack for the same press.
+            handled = true;
+            return new IntPtr(1);
+        }
+
+        private bool DismissNavigatorPopup()
         {
             if (list.ContextMenu?.IsOpen == true) { list.ContextMenu.IsOpen = false; return true; }
             if (sortGroupPopup.IsOpen) { DismissSortGroupLevel(); return true; }
             if (filtersPopup.IsOpen) { filtersPopup.IsOpen = false; return true; }
-            // The staged event has not been routed yet. Use the mouse hit instead of OriginalSource.
-            if (Mouse.DirectlyOver is Visual source && PresentationSource.FromVisual(source) == PresentationSource.FromVisual(window) &&
-                CanHandleWindowInput(Keyboard.FocusedElement)) return BackToLibrary();
             return false;
+        }
+
+        private bool DismissMouseBack()
+        {
+            if (DismissNavigatorPopup()) return true;
+            // Switching views can leave keyboard focus on a detached Grid item until WPF restores it.
+            if (Keyboard.FocusedElement is TextBoxBase || Keyboard.FocusedElement is PasswordBox ||
+                Keyboard.FocusedElement is MenuItem) return false;
+            return CanHandleWindowInput(Mouse.DirectlyOver ?? window) && BackToLibrary();
         }
         private bool ClearGridDetailsSelection()
         {
