@@ -19,6 +19,22 @@ namespace HeliumNavigator
         public long GroupOrder { get; set; }
         public ulong? SortValue { get; set; }
         public string SortText { get; set; }
+        private Guid completionStatusId;
+        public Brush CompletionStatusBrush { get; private set; }
+
+        internal bool ApplyCompletionStatus(Guid id, Dictionary<Guid, Brush> brushes)
+        {
+            completionStatusId = id;
+            brushes.TryGetValue(id, out var brush);
+            if (ReferenceEquals(CompletionStatusBrush, brush)) return false;
+            CompletionStatusBrush = brush;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CompletionStatusBrush)));
+            return true;
+        }
+
+        internal void RefreshCompletionStatusBrush(Dictionary<Guid, Brush> brushes) =>
+            ApplyCompletionStatus(completionStatusId, brushes);
+
         private bool isInstalled, favorite, isContextTarget;
         public bool IsContextTarget
         {

@@ -32,7 +32,8 @@ namespace HeliumNavigator
             });
         }
         public override ISettings GetSettings(bool firstRunSettings) => Settings;
-        public override UserControl GetSettingsView(bool firstRunView) => new NavigatorSettingsView();
+        public override UserControl GetSettingsView(bool firstRunView) =>
+            new NavigatorSettingsView(() => PlayniteApi.Database.CompletionStatuses);
         internal void SaveSettings()
         {
             if (!canSaveSettings) {

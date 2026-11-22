@@ -74,15 +74,18 @@ namespace HeliumNavigator
         {
             var libraries = grouping == (int)NavigatorGroupPolicy.Library
                 ? api.Addons.Plugins.OfType<LibraryPlugin>().ToDictionary(p => p.Id, p => p.Name) : null;
-            return games.Select(game => new NavigatorSource {
-                Id = game.Id, Name = game.Name, SortingName = game.SortingName,
-                Icon = game.Icon, Groups = Groups(game, grouping, libraries),
-                IsInstalled = game.IsInstalled, Favorite = game.Favorite,
-                LastActivity = game.LastActivity, Playtime = game.Playtime,
-                ReleaseDate = game.ReleaseDate?.Date, Added = game.Added, Modified = game.Modified,
-                PlayCount = game.PlayCount, InstallSize = game.InstallSize, UserScore = game.UserScore,
-                CommunityScore = game.CommunityScore, CriticScore = game.CriticScore,
-                CompletionStatus = game.CompletionStatus?.Name
+            return games.Select(game => {
+                var status = game.CompletionStatus;
+                return new NavigatorSource {
+                    Id = game.Id, Name = game.Name, SortingName = game.SortingName,
+                    Icon = game.Icon, Groups = Groups(game, grouping, libraries),
+                    IsInstalled = game.IsInstalled, Favorite = game.Favorite,
+                    LastActivity = game.LastActivity, Playtime = game.Playtime,
+                    ReleaseDate = game.ReleaseDate?.Date, Added = game.Added, Modified = game.Modified,
+                    PlayCount = game.PlayCount, InstallSize = game.InstallSize, UserScore = game.UserScore,
+                    CommunityScore = game.CommunityScore, CriticScore = game.CriticScore,
+                    CompletionStatus = status?.Name, CompletionStatusId = status?.Id ?? Guid.Empty
+                };
             });
         }
 

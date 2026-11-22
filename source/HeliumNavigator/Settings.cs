@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Xml.Serialization;
 using Playnite.SDK;
+using Playnite.SDK.Models;
 
 namespace HeliumNavigator
 {
@@ -53,6 +55,14 @@ namespace HeliumNavigator
             }
         }
         public event PropertyChangedEventHandler PropertyChanged;
+        [XmlIgnore] public bool ShowCompletionStatusIndicators { get; set; }
+        [XmlElement(nameof(ShowCompletionStatusIndicators))]
+        public string SerializedCompletionStatusIndicators
+        {
+            get => ShowCompletionStatusIndicators ? "true" : "false";
+            set => ShowCompletionStatusIndicators = bool.TryParse(value, out var enabled) && enabled;
+        }
+        public List<CompletionStatusIndicatorPreference> CompletionStatusIndicatorColors { get; set; }
         // Older XML fields are read for migration but omitted when saving the new format.
         public bool SteamMode { get; set; }
         public bool ShouldSerializeSteamMode() => false;
@@ -82,6 +92,7 @@ namespace HeliumNavigator
             VisibleSortingModes = NavigatorOrganization.Normalize(VisibleSortingModesSpecified ? VisibleSortingModes : null, false);
             VisibleGroupingModesSpecified = VisibleSortingModesSpecified = true;
             FilterWorkspace = FilterWorkspaceSettings.Normalize(FilterWorkspace);
+            CompletionStatusIndicatorColors = CompletionStatusIndicators.Normalize(CompletionStatusIndicatorColors);
             if (!HasFilterPopupSize) FilterPopupWidth = FilterPopupHeight = 0;
             if (!HasFilterPopupPosition) FilterPopupX = FilterPopupY = null;
         }
@@ -108,6 +119,7 @@ namespace HeliumNavigator
             VisibleSortingModes = NavigatorOrganization.Normalize(VisibleSortingModes, false);
             VisibleGroupingModesSpecified = VisibleSortingModesSpecified = true;
             FilterWorkspace = FilterWorkspaceSettings.Normalize(FilterWorkspace);
+            CompletionStatusIndicatorColors = CompletionStatusIndicators.Normalize(CompletionStatusIndicatorColors);
             backup = null;
             Save?.Invoke();
             Changed?.Invoke();
@@ -128,6 +140,8 @@ namespace HeliumNavigator
             FilterPopupX = FilterPopupX, FilterPopupY = FilterPopupY,
             VisibleGroupingModesSpecified = VisibleGroupingModesSpecified, VisibleSortingModesSpecified = VisibleSortingModesSpecified,
             LayoutMode = LayoutMode, DimUninstalledGameIcons = DimUninstalledGameIcons,
+            ShowCompletionStatusIndicators = ShowCompletionStatusIndicators,
+            CompletionStatusIndicatorColors = CompletionStatusIndicators.Normalize(CompletionStatusIndicatorColors),
             SteamMode = SteamMode, OpenFromGridCover = OpenFromGridCover,
             SidebarClickAction = SidebarClickAction, GridCoverClickAction = GridCoverClickAction,
             PreserveGridScroll = PreserveGridScroll, AutomaticallyRevealSelectedGame = AutomaticallyRevealSelectedGame,
@@ -147,6 +161,8 @@ namespace HeliumNavigator
             VisibleSortingModesSpecified = value.VisibleSortingModesSpecified;
             LayoutMode = value.LayoutMode;
             DimUninstalledGameIcons = value.DimUninstalledGameIcons;
+            ShowCompletionStatusIndicators = value.ShowCompletionStatusIndicators;
+            CompletionStatusIndicatorColors = CompletionStatusIndicators.Normalize(value.CompletionStatusIndicatorColors);
             SteamMode = value.SteamMode;
             OpenFromGridCover = value.OpenFromGridCover; PreserveGridScroll = value.PreserveGridScroll;
             AutomaticallyRevealSelectedGame = value.AutomaticallyRevealSelectedGame;
@@ -158,7 +174,9 @@ namespace HeliumNavigator
 
     public sealed class NavigatorSettingsView : UserControl
     {
-        public NavigatorSettingsView()
+        public NavigatorSettingsView() : this(null) { }
+
+        internal NavigatorSettingsView(Func<IEnumerable<CompletionStatus>> completionStatuses)
         {
             var clicks = new StackPanel();
             var clickActions = new[] { "Open Full Details View", "Open Grid Details Panel" };
@@ -205,10 +223,98 @@ namespace HeliumNavigator
             tabs.Items.Add(Page("Appearance", Section("Grid details panel",
                 Choice("Display mode", "LayoutMode", "Automatic", "Always hidden", "Always visible")),
                 Section("Sidebar width", width),
-                Section("Game icons", BoundCheck("Dim uninstalled game icons", nameof(Preferences.DimUninstalledGameIcons)))));
+                Section("Game icons", BoundCheck("Dim uninstalled game icons", nameof(Preferences.DimUninstalledGameIcons))),
+                CompletionStatusSection(completionStatuses)));
             tabs.Items.Add(Page("Organization", activity, nativeOrganization, organization));
             tabs.Items.Add(Page("Filters", automaticSize, filters));
             Content = tabs;
+        }
+
+        private FrameworkElement CompletionStatusSection(Func<IEnumerable<CompletionStatus>> completionStatuses)
+        {
+            var panel = new StackPanel();
+            panel.Children.Add(BoundCheck("Show completion status indicators", nameof(Preferences.ShowCompletionStatusIndicators)));
+            var rows = new StackPanel { Margin = new Thickness(0, 4, 0, 4) };
+            panel.Children.Add(rows);
+            var reset = new Button { Content = "Reset colors", HorizontalAlignment = HorizontalAlignment.Left };
+            panel.Children.Add(reset);
+            void Populate()
+            {
+                rows.Children.Clear();
+                reset.IsEnabled = false;
+                if (!(DataContext is Preferences prefs) || completionStatuses == null) return;
+                var options = prefs.CompletionStatusIndicatorColors ?? (prefs.CompletionStatusIndicatorColors =
+                    new List<CompletionStatusIndicatorPreference>());
+                foreach (var status in completionStatuses().OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)) {
+                    var id = status.Id.ToString("D");
+                    var option = options.Find(item => item.StatusId == id);
+                    if (option == null) {
+                        option = new CompletionStatusIndicatorPreference { StatusId = id };
+                        options.Add(option);
+                    }
+                    var row = CompletionStatusColorRow(status.Name, option, () =>
+                        reset.IsEnabled = options.Any(item => !string.IsNullOrEmpty(item.Color)));
+                    rows.Children.Add(row);
+                }
+                reset.IsEnabled = options.Any(item => !string.IsNullOrEmpty(item.Color));
+            }
+            reset.Click += (sender, args) => {
+                if (!(DataContext is Preferences prefs)) return;
+                foreach (var option in prefs.CompletionStatusIndicatorColors) option.Color = null;
+                Populate();
+            };
+            panel.Loaded += (sender, args) => Populate();
+            panel.DataContextChanged += (sender, args) => { if (panel.IsLoaded) Populate(); };
+            return Section("Completion Status Indicators", panel);
+        }
+
+        private static FrameworkElement CompletionStatusColorRow(string status, CompletionStatusIndicatorPreference option,
+            Action colorChanged)
+        {
+            var row = new DockPanel { Margin = new Thickness(0, 2, 0, 2) };
+            var swatch = new Border { Width = 16, Height = 12, CornerRadius = new CornerRadius(2) };
+            var colorButton = new Button { Content = swatch, MinWidth = 34, MinHeight = 24, Margin = new Thickness(8, 0, 0, 0) };
+            System.Windows.Automation.AutomationProperties.SetName(colorButton, "Color for " + status);
+            void UpdateSwatch()
+            {
+                var hex = option.Color ?? CompletionStatusIndicators.DefaultColor;
+                var color = CompletionStatusIndicators.ParseColor(hex).Value;
+                swatch.Background = new System.Windows.Media.SolidColorBrush(color);
+                colorButton.ToolTip = hex;
+            }
+            UpdateSwatch();
+            colorButton.Click += (sender, args) => {
+                var color = ((System.Windows.Media.SolidColorBrush)swatch.Background).Color;
+                using (var picker = new System.Windows.Forms.ColorDialog {
+                    FullOpen = true,
+                    Color = System.Drawing.Color.FromArgb(color.R, color.G, color.B),
+                    CustomColors = new[] { 0xE87979, 0x78C58E, 0xE7C969, 0xDC91BF, 0xA3AEBB, 0x67B3FF, 0xE5A36D }
+                        .Select(rgb => System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.FromArgb(unchecked((int)0xFF000000) | rgb)))
+                        .ToArray()
+                }) {
+                    var window = Window.GetWindow(colorButton);
+                    var owner = window == null ? null : new ColorDialogOwner(new System.Windows.Interop.WindowInteropHelper(window).Handle);
+                    if (picker.ShowDialog(owner) != System.Windows.Forms.DialogResult.OK) return;
+                    option.Color = $"#{picker.Color.R:X2}{picker.Color.G:X2}{picker.Color.B:X2}";
+                    UpdateSwatch();
+                    colorChanged();
+                }
+            };
+            DockPanel.SetDock(colorButton, Dock.Right);
+            row.Children.Add(colorButton);
+            var enabled = new CheckBox { Content = new TextBlock { Text = status, TextTrimming = TextTrimming.CharacterEllipsis },
+                ToolTip = status, IsChecked = option.IsEnabled, VerticalAlignment = VerticalAlignment.Center };
+            System.Windows.Automation.AutomationProperties.SetName(enabled, "Show indicator for " + status);
+            enabled.Checked += (sender, args) => option.IsEnabled = true;
+            enabled.Unchecked += (sender, args) => option.IsEnabled = false;
+            row.Children.Add(enabled);
+            return row;
+        }
+
+        private sealed class ColorDialogOwner : System.Windows.Forms.IWin32Window
+        {
+            internal ColorDialogOwner(IntPtr handle) { Handle = handle; }
+            public IntPtr Handle { get; }
         }
 
         internal static GroupBox Section(string title, FrameworkElement content) => new GroupBox {
