@@ -39,6 +39,21 @@ class LogicTests
         Check(!Logic.ShouldRestoreSelection(gameA, new[] { gameA }, () => true), "Keep selection already restored by Playnite");
         Check(!Logic.ShouldRestoreSelection(gameA, new[] { gameB }, () => true), "Do not override a newer selection");
         Check(!Logic.ShouldRestoreSelection(Guid.Empty, new Guid[0], () => true), "Do not select an unknown game");
+        Check(!Logic.IsBackReleaseOrCommand(0x020B, 1L << 16, 0), "Back mouse down is left alone");
+        Check(Logic.IsBackReleaseOrCommand(0x020C, 1L << 16, 0), "Handle XButton1 release before native BrowseBack promotion");
+        Check(!Logic.IsBackReleaseOrCommand(0x020C, 2L << 16, 0), "Mouse Forward is left alone");
+        Check(Logic.IsBackReleaseOrCommand(0x0319, 0, 0x8001L << 16), "Handle BrowseBack app commands with a mouse device flag");
+        Check(!Logic.IsBackReleaseOrCommand(0x0319, 0, 2L << 16), "BrowseForward is left alone");
+        var gridReturns = 0;
+        bool ReturnToGrid() { gridReturns++; return true; }
+        for (var cycle = 0; cycle < 6; cycle++) {
+            var escape = cycle % 2 == 0;
+            var handled = (escape || Logic.IsBackReleaseOrCommand(0x020C, 1L << 16, 0)) &&
+                Logic.RouteLibraryBack(true, true, ReturnToGrid, () => false);
+            Check(handled && gridReturns == cycle + 1, "Each Escape or mouse release owns one Grid return");
+            Check(!Logic.RouteLibraryBack(true, false, ReturnToGrid, () => false) && gridReturns == cycle + 1,
+                "Native Details opened independently remains outside Navigator's routing");
+        }
         Console.WriteLine("PASS: " + assertions + " checks; 50,000-game scenario: " + watch.ElapsedMilliseconds + " ms.");
     }
 }
