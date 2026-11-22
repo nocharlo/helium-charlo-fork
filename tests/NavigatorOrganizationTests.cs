@@ -101,29 +101,52 @@ internal static class NavigatorOrganizationTests
         var game = new Game("Synthetic action target") { Id = Guid.NewGuid() };
         var current = game;
         var executions = new List<GameAction>();
+        var launchedGames = new List<Guid>();
         var errors = 0;
         var target = Guid.Empty;
         var actions = new NavigatorGameActions(id => current?.Id == id ? current : null,
-            null, null, null, _ => { throw new Exception("Actions must not modify metadata"); },
+            launchedGames.Add, null, null, _ => { throw new Exception("Actions must not modify metadata"); },
             (id, action) => { target = id; executions.Add(action); });
-        var menu = new MenuItem();
-        void Populate() => actions.PopulateCustomActions(menu, game.Id, _ => errors++);
-        void Click(int index) => ((MenuItem)menu.Items[index]).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        List<MenuItem> items = null;
+        void Populate() => items = actions.CreateAuxiliaryActionItems(current?.Id == game.Id ? current : null, _ => errors++);
+        void Click(int index) => items[index].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
         Populate();
-        Check(menu.Items.Count == 0 && menu.Visibility == Visibility.Collapsed, "No auxiliary actions means no empty menu");
+        Check(items.Count == 0, "No auxiliary actions means no action menu items");
+        game.IsInstalled = true;
         game.GameActions = new System.Collections.ObjectModel.ObservableCollection<GameAction> {
             new GameAction { Name = "Play", IsPlayAction = true },
-            new GameAction { Name = "Same", Type = GameActionType.File, Path = "first", Arguments = "{InstallDir}" },
+            new GameAction { Name = "Same", Type = GameActionType.File, Path = "first", Arguments = "{InstallDir}",
+                WorkingDir = "{InstallDir}", TrackingPath = "synthetic tracker", InitialTrackingDelay = 2 },
             new GameAction { Name = "Same", Type = GameActionType.Script, Script = "synthetic" },
             new GameAction { Name = "Emulator", Type = GameActionType.Emulator },
             new GameAction { Name = "URL", Type = GameActionType.URL }
         };
+        Check(NavigatorGameActions.LaunchHeader(game, actions.LaunchAction(game.Id)) == "Play",
+            "A single Play action and auxiliary actions keep the standard Play label");
+        actions.Launch(game.Id, NavigatorLaunchAction.Play);
+        var alternate = new GameAction { Name = "Alternate", Type = GameActionType.File, IsPlayAction = true };
+        game.GameActions.Add(alternate);
+        Check(NavigatorGameActions.LaunchHeader(game, actions.LaunchAction(game.Id)) == "Play…",
+            "Multiple direct Play actions indicate the native chooser");
+        actions.Launch(game.Id, NavigatorLaunchAction.Play);
+        game.PluginId = Guid.NewGuid();
+        game.IncludeLibraryPluginAction = true;
+        alternate.Type = GameActionType.Emulator;
+        Check(NavigatorGameActions.LaunchHeader(game, actions.LaunchAction(game.Id)) == "Play",
+            "The menu leaves unresolved emulator and library choices to Playnite");
+        actions.Launch(game.Id, NavigatorLaunchAction.Play);
+        Check(launchedGames.SequenceEqual(new[] { game.Id, game.Id, game.Id }) && executions.Count == 0 &&
+            game.IncludeLibraryPluginAction && NavigatorGameActions.LaunchHeader(game, NavigatorLaunchAction.Install) == "Install",
+            "Single, multiple and integration launches defer to Playnite with game identity and preserve Install");
+        game.GameActions.Remove(alternate);
         Populate();
-        Check(menu.Visibility == Visibility.Visible && menu.Items.Cast<MenuItem>().Select(item => (string)item.Header)
-            .SequenceEqual(new[] { "Same", "Same", "Emulator", "URL" }), "All auxiliary types preserve order and duplicate names");
+        Check(items.Select(item => (string)item.Header).SequenceEqual(new[] { "Same", "Same", "Emulator", "URL" }),
+            "Only auxiliary actions become menu items, preserving order and duplicate names");
         for (var i = 0; i < 4; i++) Click(i);
         Check(executions.Count == 4 && target == game.Id && ReferenceEquals(executions[1], game.GameActions[2]) &&
-            ReferenceEquals(executions[0], game.GameActions[1]), "Exact game and action instances reach the native executor once");
+            ReferenceEquals(executions[0], game.GameActions[1]) && executions[0].Arguments == "{InstallDir}" &&
+            executions[0].WorkingDir == "{InstallDir}" && executions[0].TrackingPath == "synthetic tracker" &&
+            executions[0].InitialTrackingDelay == 2, "The native executor receives the exact action with its launch and tracking options");
         game.GameActions[1].WorkingDir = "changed";
         Click(0);
         Check(executions.Count == 4, "An edited action invalidates the open menu");
@@ -136,12 +159,12 @@ internal static class NavigatorOrganizationTests
         Check(executions.Count == 5, "Deleted games do not execute stale actions");
         current = new Game("Another synthetic target") { Id = Guid.NewGuid() };
         Populate();
-        Check(menu.Items.Count == 0, "Switching to a missing target clears the old menu");
+        Check(items.Count == 0, "Switching to a missing target clears the old menu items");
         current = game;
         game.GameActions.Clear();
         game.GameActions.Add(new GameAction { Name = "Only", Type = GameActionType.URL });
         Populate();
-        Check(menu.Items.Count == 1, "A single auxiliary action is offered");
+        Check(items.Count == 1, "A single auxiliary action is offered");
         game.IsLaunching = true; Click(0);
         Check(executions.Count == 5 && errors == 0, "Busy-state changes safely suppress execution");
         game.IsLaunching = false;
@@ -150,7 +173,7 @@ internal static class NavigatorOrganizationTests
         game.GameActions.Add(new GameAction { Name = "Only", Type = GameActionType.File });
         var failing = new NavigatorGameActions(_ => game, null, null, null, null,
             (id, action) => { throw new InvalidOperationException("synthetic failure"); });
-        failing.PopulateCustomActions(menu, game.Id, _ => errors++);
+        items = failing.CreateAuxiliaryActionItems(game, _ => errors++);
         Click(0);
         Check(errors == 1, "An executor failure is contained and reported once");
     }

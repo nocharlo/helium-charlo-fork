@@ -265,7 +265,8 @@ namespace HeliumNavigator
             var database = api.Database;
             var menu = new ContextMenu { Style = (Style)root.FindResource("NavigatorContextMenuStyle") };
             menu.Resources.MergedDictionaries.Add(root.Resources);
-            var customActions = new MenuItem { Header = "Actions" };
+            var auxiliaryActions = new List<MenuItem>();
+            var auxiliarySeparator = new Separator { Visibility = Visibility.Collapsed };
             var launch = new MenuItem { Header = "Play" };
             var edit = new MenuItem { Header = "Edit Game", InputGestureText = "F3" };
             var favorite = new MenuItem();
@@ -284,7 +285,7 @@ namespace HeliumNavigator
             var extensions = new MenuItem { Header = "Extensions" };
             var extensionsSeparator = new Separator();
             menu.Items.Add(launch);
-            menu.Items.Add(customActions);
+            menu.Items.Add(auxiliarySeparator);
             menu.Items.Add(links);
             menu.Items.Add(filesSeparator);
             menu.Items.Add(folder);
@@ -346,13 +347,17 @@ namespace HeliumNavigator
                 menuRow = row;
                 target = row.Id;
                 offered = gameActions.LaunchAction(target);
-                launch.Header = offered == NavigatorLaunchAction.Install ? "Install" : "Play";
-                launch.IsEnabled = offered != NavigatorLaunchAction.Unavailable;
-                NavigatorMenuIcons.Set(this, launch, offered == NavigatorLaunchAction.Install ? "InstallIcon" : "PlayIcon");
                 var gameId = target;
                 var game = database.Games.Get(gameId);
-                gameActions.PopulateCustomActions(customActions, gameId,
+                launch.Header = NavigatorGameActions.LaunchHeader(game, offered);
+                launch.IsEnabled = offered != NavigatorLaunchAction.Unavailable;
+                NavigatorMenuIcons.Set(this, launch, offered == NavigatorLaunchAction.Install ? "InstallIcon" : "PlayIcon");
+                foreach (var item in auxiliaryActions) menu.Items.Remove(item);
+                auxiliaryActions = gameActions.CreateAuxiliaryActionItems(game,
                     error => LogManager.GetLogger().Warn("Navigator game action error: " + error.GetType().Name));
+                var auxiliaryIndex = menu.Items.IndexOf(auxiliarySeparator);
+                foreach (var item in auxiliaryActions) menu.Items.Insert(auxiliaryIndex++, item);
+                auxiliarySeparator.Visibility = auxiliaryActions.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
                 PopulateGameLinks(links, game);
                 foreach (var action in nativeActions) {
                     var command = NativeGameCommand(action.Name);

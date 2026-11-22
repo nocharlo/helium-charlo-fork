@@ -10,7 +10,7 @@ A history of changes to Helium (charlo fork), from the original Navigator protot
 - Truncated Navigator titles expand in place on hover or keyboard focus, keeping the original row height.
 - Native Playnite game menus now share the Navigator menu colors, spacing, and visual hierarchy.
 
-- Added an Actions submenu for auxiliary per-game actions using the public Playnite SDK 6.19 execution pipeline. Names, duplicates and order are preserved. A changed action list invalidates its open menu instead of executing a replacement.
+- Auxiliary game actions appear directly in the Navigator context menu and run through Playnite SDK 6.19. Play uses Playnite's native selection and startup flow. The menu shows **Play…** when the configured actions guarantee multiple choices.
 - Requires Playnite 10.65 or newer. Existing theme and extension IDs and settings are preserved.
 - Preserve a visible cover as the Grid Details Panel closes and the native Grid changes its number of columns.
 - Refined Navigator row states and its context menus with scoped blue-gray resources.

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Windows.Controls;
 using System.Windows.Input;
 using Playnite.SDK;
 using Playnite.SDK.Models;
@@ -34,31 +35,44 @@ namespace HeliumNavigator
             return mainView == null ? null : new Func<Guid, bool?>(mainView.OpenEditDialog);
         }
 
-        internal void PopulateCustomActions(System.Windows.Controls.MenuItem menu, Guid gameId, Action<Exception> report)
+        internal static string LaunchHeader(Game game, NavigatorLaunchAction offered)
         {
-            menu.Items.Clear();
-            var offered = findGame(gameId)?.GameActions?.Select(action => action?.GetCopy()).ToArray()
-                ?? new GameAction[0];
+            if (offered == NavigatorLaunchAction.Install) return "Install";
+            // Playnite may resolve additional library actions, emulator profiles or ROMs at launch.
+            var knownChoices = game?.GameActions?.Count(action => IsSupported(action) &&
+                action.IsPlayAction && action.Type != GameActionType.Emulator);
+            return offered == NavigatorLaunchAction.Play && knownChoices > 1 ? "Play…" : "Play";
+        }
+
+        private static bool IsSupported(GameAction action) =>
+            action != null && Enum.IsDefined(typeof(GameActionType), action.Type);
+
+        internal List<MenuItem> CreateAuxiliaryActionItems(Game game, Action<Exception> report)
+        {
+            var items = new List<MenuItem>();
+            if (startAction == null || game?.GameActions == null) return items;
+            var gameId = game.Id;
+            var offered = game.GameActions.Select(action => action?.GetCopy()).ToArray();
             for (var index = 0; index < offered.Length; index++) {
                 var action = offered[index];
-                if (action == null || action.IsPlayAction || !Enum.IsDefined(typeof(GameActionType), action.Type)) continue;
+                if (!IsSupported(action) || action.IsPlayAction) continue;
                 var capturedIndex = index;
-                var item = new System.Windows.Controls.MenuItem { Header = action.Name };
+                var item = new MenuItem { Header = action.Name };
                 item.Click += (s, e) => {
                     e.Handled = true;
                     try {
-                        var game = findGame(gameId);
-                        var current = game?.GameActions;
+                        var currentGame = findGame(gameId);
+                        var current = currentGame?.GameActions;
                         // Actions have no persistent ID. Reject a stale menu instead of matching by name.
-                        if (startAction == null || game == null || game.IsRunning || game.IsLaunching ||
-                            game.IsInstalling || game.IsUninstalling || current == null || current.Count != offered.Length ||
+                        if (currentGame == null || currentGame.IsRunning || currentGame.IsLaunching ||
+                            currentGame.IsInstalling || currentGame.IsUninstalling || current == null || current.Count != offered.Length ||
                             !current.Zip(offered, (left, right) => GameAction.Equals(left, right)).All(equal => equal)) return;
                         startAction(gameId, current[capturedIndex]);
                     } catch (Exception error) { report(error); }
                 };
-                menu.Items.Add(item);
+                items.Add(item);
             }
-            menu.Visibility = menu.HasItems ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+            return items;
         }
 
         internal bool HasNativeEditor => edit != null;
