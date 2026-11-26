@@ -2,23 +2,22 @@
 
 A history of changes to Helium (charlo fork), from the original Navigator prototype to the current release.
 
-## Unreleased
+## v0.3.4 — Navigator Refinements
 
-### v0.3.4 — Navigator maintenance candidate
+- **Completion Status Indicators** add an optional color accent beside a game. Enable individual statuses in **Appearance → Customize indicators…** and choose from eight named colors or pick a custom color. Blue is the initial and reset color. Resetting colors preserves status visibility choices. The editor is available only while the feature is enabled. [#13](https://github.com/nocharlo/helium-charlo-fork/issues/13)
+- **Dim uninstalled game icons** reduces their opacity to 65% while preserving title colors. The setting is off by default. [#14](https://github.com/nocharlo/helium-charlo-fork/issues/14)
+- Redesigned the Navigation, Appearance, Organization, and Filters settings tabs. Related controls share a compact layout, and reorder controls appear when a mode is selected or a filter row is hovered or focused. Keyboard reordering is available with Alt + Up and Alt + Down.
+- Truncated titles expand after a short hover delay or when focused with the keyboard. Icons retain their position and rows keep their height.
+- Auxiliary custom game actions appear directly in the Navigator context menu. **Play** uses Playnite's native startup flow, and **Play…** signals when the configured actions guarantee a choice.
+- Aligned native game menus with the Navigator's menu styling.
+- Mouse Back returns from Full Details opened through the Navigator without a second step through Playnite's history. Closing the Grid Details Panel preserves a visible cover as the Grid changes width.
+- Requires Playnite 10.65 or newer. Update the theme and extension together. Existing component IDs and settings are preserved.
 
-- Added the optional **Dim uninstalled game icons** setting under Appearance. It dims the icons of uninstalled games to 65% opacity. The option is off by default.
-- Added optional **Completion Status Indicators** under Appearance. Enable a narrow row accent and choose a color for each status from your Playnite library, including custom statuses.
-- Truncated Navigator titles expand in place on hover or keyboard focus, keeping the original row height.
-- Native Playnite game menus now share the Navigator menu colors, spacing, and visual hierarchy.
-- Mouse Back returns from Navigator-opened Full Details without also advancing the view history.
+### Validation
 
-- Auxiliary game actions appear directly in the Navigator context menu and run through Playnite SDK 6.19. Play uses Playnite's native selection and startup flow. The menu shows **Play…** when the configured actions guarantee multiple choices.
-- Requires Playnite 10.65 or newer. Existing theme and extension IDs and settings are preserved.
-- Preserve a visible cover as the Grid Details Panel closes and the native Grid changes its number of columns.
-- Refined Navigator row states and its context menus with scoped blue-gray resources.
-- Truncated game titles expand beside their row on hover or keyboard focus. The non-interactive label closes on scrolling, resizing, menu opening, recycling and loss of highlight. Exceptionally long titles wrap within the screen bounds.
-
-Candidate checks passed six C# suites, including 398 organization/settings/WPF checks, and 29 Python tests. Portable Playnite verified an auxiliary script action with duplicate names against a non-selected target, full-title expansion, and Grid anchoring on Escape and the native close button. Other action types, Mouse Back, alternative DPI settings and grouped/zoomed Grid layouts still need broader runtime acceptance.
+- The final Settings revision passed 447 organization, Settings, and WPF checks, 54 filter checks, and the settings persistence suite. The Release build completed with zero errors and warnings. Package validation and the artifact OPSEC scanner passed.
+- The maintainer reported passing portable Playnite acceptance for status colors and visibility, persistence after restart, Reset Colors, the narrow Appearance layout, and mouse and keyboard reordering with saved order. The maintainer also confirmed manual execution of custom game actions.
+- Earlier portable validation covered the physical Mouse Back button, truncated title expansion, and Grid anchoring on Escape and the native close button. Alternative display scaling and large real libraries remain outside that coverage.
 
 ### Maintenance
 

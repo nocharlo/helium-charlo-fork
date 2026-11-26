@@ -23,6 +23,18 @@ namespace HeliumNavigator
     internal static class CompletionStatusIndicators
     {
         internal const string DefaultColor = "#67B3FF";
+        // Playnite creates its built-in statuses with library-specific IDs. The SDK's
+        // configurable assignment roles do not identify the original built-in statuses.
+        internal static IReadOnlyList<KeyValuePair<string, string>> Palette { get; } = Array.AsReadOnly(new[] {
+            new KeyValuePair<string, string>("Not Played", "#8792A2"),
+            new KeyValuePair<string, string>("Plan to Play", "#7599D5"),
+            new KeyValuePair<string, string>("Played", "#9C91B9"),
+            new KeyValuePair<string, string>("Playing", "#58B4E5"),
+            new KeyValuePair<string, string>("On Hold", "#D5A052"),
+            new KeyValuePair<string, string>("Abandoned", "#C97076"),
+            new KeyValuePair<string, string>("Beaten", "#4FB5A5"),
+            new KeyValuePair<string, string>("Completed", "#70B981")
+        });
 
         internal static Color? ParseColor(string value)
         {

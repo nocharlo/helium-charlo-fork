@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 
 namespace HeliumNavigator
 {
@@ -61,7 +62,7 @@ namespace HeliumNavigator
             foreach (var group in groups.Where(group => known.ContainsKey(group.Id))) {
                 var catalog = known[group.Id];
                 var fields = catalog.Fields.ToDictionary(field => field.Id);
-                var fieldList = new StackPanel { Margin = new Thickness(20, 2, 0, 6) };
+                var fieldList = new StackPanel { Margin = new Thickness(14, 1, 0, 4) };
                 var fieldControls = new Dictionary<string, FrameworkElement>();
                 foreach (var id in group.FieldOrder.Where(fields.ContainsKey)) {
                     var field = fields[id];
@@ -71,9 +72,12 @@ namespace HeliumNavigator
                     }, delta => MoveAndArrange(fieldList, group.FieldOrder, fieldControls, id, delta));
                 }
                 Arrange(fieldList, group.FieldOrder, fieldControls);
-                var expander = new Expander { Content = fieldList, Margin = new Thickness(0, 2, 0, 3) };
-                expander.Header = Row(catalog.Label, !group.Hidden, visible => group.Hidden = !visible,
+                var expander = new Expander { Content = fieldList, Margin = new Thickness(0, 1, 0, 2),
+                    HorizontalContentAlignment = HorizontalAlignment.Stretch };
+                var header = Row(catalog.Label, !group.Hidden, visible => group.Hidden = !visible,
                     delta => MoveAndArrange(host, groups, groupControls, group, delta));
+                System.Windows.Documents.TextElement.SetFontWeight(header, FontWeights.SemiBold);
+                expander.Header = header;
                 groupControls[group] = expander;
             }
             Arrange(host, groups, groupControls);
@@ -107,20 +111,29 @@ namespace HeliumNavigator
 
         private static DockPanel Row(string label, bool visible, Action<bool> toggle, Action<int> move)
         {
-            var row = new DockPanel { MinWidth = 170, Margin = new Thickness(2) };
+            var row = new DockPanel { Background = System.Windows.Media.Brushes.Transparent,
+                MinHeight = 25, Margin = new Thickness(1, 0, 1, 0) };
             var buttons = new StackPanel { Orientation = Orientation.Horizontal };
             DockPanel.SetDock(buttons, Dock.Right);
             row.Children.Add(buttons);
-            foreach (var delta in new[] { -1, 1 }) {
-                var direction = delta;
-                var caption = delta < 0 ? "Move " + label + " up" : "Move " + label + " down";
-                var button = new Button { Content = delta < 0 ? "↑" : "↓", ToolTip = caption,
-                    MinWidth = 26, Margin = new Thickness(2, 0, 0, 0) };
-                AutomationProperties.SetName(button, caption);
-                button.Click += (s, e) => { move(direction); e.Handled = true; };
-                buttons.Children.Add(button);
+            var up = NavigatorOrganizationControls.ReorderButton(-1, label, move);
+            var down = NavigatorOrganizationControls.ReorderButton(1, label, move);
+            up.TabIndex = 1;
+            down.TabIndex = 2;
+            buttons.Children.Add(up);
+            buttons.Children.Add(down);
+            var style = new Style(typeof(StackPanel));
+            style.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Hidden));
+            foreach (var property in new[] { nameof(UIElement.IsMouseOver), nameof(UIElement.IsKeyboardFocusWithin) }) {
+                var trigger = new DataTrigger { Binding = new Binding(property) { Source = row }, Value = true };
+                trigger.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Visible));
+                style.Triggers.Add(trigger);
             }
-            var check = new CheckBox { Content = label, IsChecked = visible, VerticalAlignment = VerticalAlignment.Center };
+            buttons.Style = style;
+            row.PreviewKeyDown += (s, e) => NavigatorOrganizationControls.HandleReorderKey(e, up, down, move);
+            var check = new CheckBox { Content = new TextBlock { Text = label, TextTrimming = TextTrimming.CharacterEllipsis },
+                IsChecked = visible, TabIndex = 0, ToolTip = label, VerticalAlignment = VerticalAlignment.Center };
+            AutomationProperties.SetName(check, label);
             check.Click += (s, e) => { toggle(check.IsChecked == true); e.Handled = true; };
             row.Children.Add(check);
             return row;

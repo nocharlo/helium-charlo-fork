@@ -2,9 +2,9 @@
 
 For installation, current features and known limitations, start with the [project README](../README.md).
 
-## Current release — v0.3.3
+## Current release — v0.3.4
 
-- [Release and downloads](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.3.3)
+- [Release and downloads](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.3.4)
 - [Changelog](CHANGELOG.md)
 - [Navigator UX conventions](NAVIGATOR-UX.md)
 - [Development guidelines](../AGENTS.md)
