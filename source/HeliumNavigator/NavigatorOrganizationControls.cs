@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Input;
 
 namespace HeliumNavigator
 {
@@ -49,7 +50,13 @@ namespace HeliumNavigator
         {
             var panel = new StackPanel();
             var search = new TextBox { MinHeight = 26, Padding = new Thickness(6, 2, 6, 2) };
-            panel.Children.Add(SearchField(search, grouping ? "Search grouping modes" : "Search sorting modes"));
+            var toolbar = new DockPanel { Margin = new Thickness(0, 0, 0, 4) };
+            var reorder = new StackPanel { Orientation = Orientation.Horizontal, Visibility = Visibility.Hidden,
+                Margin = new Thickness(4, 0, 0, 0) };
+            DockPanel.SetDock(reorder, Dock.Right);
+            toolbar.Children.Add(reorder);
+            toolbar.Children.Add(SearchField(search, grouping ? "Search grouping modes" : "Search sorting modes"));
+            panel.Children.Add(toolbar);
             var modes = grouping ? NavigatorOrganization.Groups : NavigatorOrganization.Sorts;
             Func<List<int>> get = () => grouping ? prefs.VisibleGroupingModes : prefs.VisibleSortingModes;
             Action changed = null;
@@ -62,9 +69,11 @@ namespace HeliumNavigator
             var options = modes.Select(mode => new OrganizationVisibilityOption(mode, get, set)).ToList();
             var view = new ListCollectionView(options);
             view.SortDescriptions.Add(new SortDescription("Order", ListSortDirection.Ascending));
-            var list = new ListBox { ItemsSource = view, Height = 210, BorderThickness = new Thickness(0), Padding = new Thickness(2) };
+            var list = new ListBox { IsSynchronizedWithCurrentItem = false, ItemsSource = view,
+                Height = 168, BorderThickness = new Thickness(0), Padding = new Thickness(2) };
             var rowStyle = new Style(typeof(ListBoxItem));
             rowStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(3, 1, 3, 1)));
+            rowStyle.Setters.Add(new Setter(FrameworkElement.MinHeightProperty, 24.0));
             rowStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
             // Keep keyboard focus distinct from the checkbox's visibility state.
             var template = new ControlTemplate(typeof(ListBoxItem));
@@ -90,34 +99,39 @@ namespace HeliumNavigator
             list.SetValue(VirtualizingPanel.VirtualizationModeProperty, VirtualizationMode.Recycling);
             var checkbox = new FrameworkElementFactory(typeof(CheckBox));
             checkbox.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Left);
-            checkbox.SetValue(FrameworkElement.MarginProperty, new Thickness(2, 3, 2, 3));
+            checkbox.SetValue(FrameworkElement.MarginProperty, new Thickness(2, 1, 2, 1));
             checkbox.SetBinding(CheckBox.ContentProperty, new Binding("Label"));
             checkbox.SetBinding(CheckBox.IsCheckedProperty, new Binding("Visible") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
             checkbox.SetBinding(UIElement.IsEnabledProperty, new Binding(nameof(OrganizationVisibilityOption.CanToggle)));
             list.ItemTemplate = new DataTemplate { VisualTree = checkbox };
             panel.Children.Add(list);
             search.TextChanged += (s, e) => { var key = Logic.SearchKey(search.Text); view.Filter = item => Logic.SearchKey(((OrganizationVisibilityOption)item).Label).Contains(key); };
-            var buttons = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
-            Func<string, Action, Button> add = (label, action) => {
-                var button = new Button { Content = label, Margin = new Thickness(0, 0, 6, 4), Padding = new Thickness(8, 4, 8, 4) };
+            var buttons = new WrapPanel { Margin = new Thickness(0, 5, 0, 0) };
+            void AddAction(string label, Action action)
+            {
+                var button = new Button { Content = label, Margin = new Thickness(0, 0, 6, 3),
+                    MinHeight = 26, Padding = new Thickness(7, 2, 7, 2) };
                 button.Click += (s, e) => action();
                 buttons.Children.Add(button);
-                return button;
-            };
-            add("Show All", () => set(modes.Select(m => m.Id).ToList()));
-            add("Restore Defaults", () => set(NavigatorOrganization.Normalize(null, grouping)));
+            }
+            AddAction("Show All", () => set(modes.Select(m => m.Id).ToList()));
+            AddAction("Restore Defaults", () => set(NavigatorOrganization.Normalize(null, grouping)));
             Action<int> move = delta => {
                 if (!(list.SelectedItem is OrganizationVisibilityOption selected)) return;
                 set(NavigatorOrganization.Move(get(), selected.Id, delta));
             };
-            var up = add("Move Up", () => move(-1));
-            var down = add("Move Down", () => move(1));
+            var up = ReorderButton(-1, "selected mode", move);
+            var down = ReorderButton(1, "selected mode", move);
+            reorder.Children.Add(up);
+            reorder.Children.Add(down);
             Action updateMoves = () => {
                 var ids = get();
                 var index = list.SelectedItem is OrganizationVisibilityOption option ? ids.IndexOf(option.Id) : -1;
+                reorder.Visibility = index >= 0 ? Visibility.Visible : Visibility.Hidden;
                 up.IsEnabled = index > 0;
                 down.IsEnabled = index >= 0 && index < ids.Count - 1;
             };
+            list.PreviewKeyDown += (s, e) => HandleReorderKey(e, up, down, move);
             list.SelectionChanged += (s, e) => updateMoves();
             changed = () => {
                 foreach (var option in options) option.Refresh();
@@ -132,7 +146,7 @@ namespace HeliumNavigator
         private static Grid SearchField(TextBox search, string label)
         {
             AutomationProperties.SetName(search, label);
-            var field = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            var field = new Grid();
             var placeholder = new TextBlock {
                 Text = label + "…", Opacity = 0.65, Margin = new Thickness(8, 0, 8, 0),
                 VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false
@@ -146,6 +160,28 @@ namespace HeliumNavigator
             field.Children.Add(search);
             field.Children.Add(placeholder);
             return field;
+        }
+
+        internal static Button ReorderButton(int delta, string label, Action<int> move)
+        {
+            var caption = delta < 0 ? "Move " + label + " up" : "Move " + label + " down";
+            var button = new Button {
+                Content = delta < 0 ? "↑" : "↓", ToolTip = caption,
+                Width = 25, MinHeight = 24, Margin = new Thickness(2, 0, 0, 0)
+            };
+            AutomationProperties.SetName(button, caption);
+            button.Click += (s, e) => { move(delta); e.Handled = true; };
+            return button;
+        }
+
+        internal static void HandleReorderKey(KeyEventArgs e, Button up, Button down, Action<int> move)
+        {
+            if (e.KeyboardDevice.Modifiers != ModifierKeys.Alt) return;
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (key != Key.Up && key != Key.Down) return;
+            e.Handled = true;
+            var button = key == Key.Up ? up : down;
+            if (button.IsEnabled) move(key == Key.Up ? -1 : 1);
         }
     }
     internal sealed class OrganizationVisibilityOption : INotifyPropertyChanged

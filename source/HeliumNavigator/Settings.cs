@@ -55,7 +55,18 @@ namespace HeliumNavigator
             }
         }
         public event PropertyChangedEventHandler PropertyChanged;
-        [XmlIgnore] public bool ShowCompletionStatusIndicators { get; set; }
+        private bool showCompletionStatusIndicators;
+        [XmlIgnore]
+        public bool ShowCompletionStatusIndicators
+        {
+            get => showCompletionStatusIndicators;
+            set
+            {
+                if (showCompletionStatusIndicators == value) return;
+                showCompletionStatusIndicators = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ShowCompletionStatusIndicators)));
+            }
+        }
         [XmlElement(nameof(ShowCompletionStatusIndicators))]
         public string SerializedCompletionStatusIndicators
         {
@@ -186,13 +197,15 @@ namespace HeliumNavigator
             selection.Children.Add(BoundCheck("Restore grid scroll position when returning", "PreserveGridScroll"));
             selection.Children.Add(BoundCheck("Automatically reveal selected game", "AutomaticallyRevealSelectedGame"));
 
-            var width = new TextBox { Width = 96, MinHeight = 26, HorizontalAlignment = HorizontalAlignment.Left, ToolTip = "180–380 px" };
+            var width = new TextBox { Width = 80, MinHeight = 26, HorizontalAlignment = HorizontalAlignment.Left, ToolTip = "180–380 px" };
             System.Windows.Automation.AutomationProperties.SetName(width, "Sidebar width");
-            width.SetBinding(TextBox.TextProperty, new Binding("Width") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
+            width.SetBinding(TextBox.TextProperty, new Binding(nameof(Preferences.Width)) { Mode = BindingMode.TwoWay, StringFormat = "F0" });
+            var layout = new StackPanel();
+            layout.Children.Add(Choice("Grid details panel", nameof(Preferences.LayoutMode), "Automatic", "Always hidden", "Always visible"));
+            layout.Children.Add(SettingRow("Sidebar width", width));
 
             var activity = Section("Recent Activity", ActivityStyle());
             var nativeOrganization = BoundCheck("Apply Sort & Group changes to Playnite", nameof(Preferences.ApplySortGroupToPlaynite));
-            nativeOrganization.Margin = new Thickness(4, 0, 0, 12);
             var organization = new Grid();
             var filters = new ContentControl();
             var automaticSize = new Button { Content = "Use automatic filter panel size", HorizontalAlignment = HorizontalAlignment.Left,
@@ -220,12 +233,10 @@ namespace HeliumNavigator
 
             var tabs = new TabControl();
             tabs.Items.Add(Page("Navigation", Section("Click actions", clicks), Section("Selection and scroll", selection)));
-            tabs.Items.Add(Page("Appearance", Section("Grid details panel",
-                Choice("Display mode", "LayoutMode", "Automatic", "Always hidden", "Always visible")),
-                Section("Sidebar width", width),
+            tabs.Items.Add(Page("Appearance", Section("Layout", layout),
                 Section("Game icons", BoundCheck("Dim uninstalled game icons", nameof(Preferences.DimUninstalledGameIcons))),
                 CompletionStatusSection(completionStatuses)));
-            tabs.Items.Add(Page("Organization", activity, nativeOrganization, organization));
+            tabs.Items.Add(Page("Organization", activity, Section("Sort & Group", nativeOrganization), organization));
             tabs.Items.Add(Page("Filters", automaticSize, filters));
             Content = tabs;
         }
@@ -233,11 +244,21 @@ namespace HeliumNavigator
         private FrameworkElement CompletionStatusSection(Func<IEnumerable<CompletionStatus>> completionStatuses)
         {
             var panel = new StackPanel();
-            panel.Children.Add(BoundCheck("Show completion status indicators", nameof(Preferences.ShowCompletionStatusIndicators)));
+            var toggle = BoundCheck("Show completion status indicators", nameof(Preferences.ShowCompletionStatusIndicators));
+            panel.Children.Add(toggle);
+            var customize = new Button { Content = "Customize indicators…", HorizontalAlignment = HorizontalAlignment.Left,
+                MinHeight = 26, Margin = new Thickness(0, 4, 0, 0), Visibility = Visibility.Collapsed };
+            panel.Children.Add(customize);
+            var editor = new StackPanel { Visibility = Visibility.Collapsed };
+            panel.Children.Add(editor);
             var rows = new StackPanel { Margin = new Thickness(0, 4, 0, 4) };
-            panel.Children.Add(rows);
-            var reset = new Button { Content = "Reset colors", HorizontalAlignment = HorizontalAlignment.Left };
-            panel.Children.Add(reset);
+            editor.Children.Add(rows);
+            var footer = new WrapPanel { Margin = new Thickness(0, 3, 0, 0) };
+            var reset = new Button { Content = "Reset Colors", MinHeight = 26, Margin = new Thickness(0, 0, 6, 3) };
+            var done = new Button { Content = "Done", MinHeight = 26 };
+            footer.Children.Add(reset);
+            footer.Children.Add(done);
+            editor.Children.Add(footer);
             void Populate()
             {
                 rows.Children.Clear();
@@ -258,13 +279,36 @@ namespace HeliumNavigator
                 }
                 reset.IsEnabled = options.Any(item => !string.IsNullOrEmpty(item.Color));
             }
+            void CloseEditor()
+            {
+                editor.Visibility = Visibility.Collapsed;
+                rows.Children.Clear();
+                customize.Visibility = toggle.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+            }
+            customize.Click += (sender, args) => {
+                if (toggle.IsChecked != true) return;
+                Populate();
+                customize.Visibility = Visibility.Collapsed;
+                editor.Visibility = Visibility.Visible;
+                if (rows.Children.Count == 0) done.Focus();
+                else ((DockPanel)rows.Children[0]).Children.OfType<CheckBox>().First().Focus();
+            };
+            done.Click += (sender, args) => { CloseEditor(); customize.Focus(); };
+            editor.PreviewKeyDown += (sender, args) => {
+                if (args.Key != System.Windows.Input.Key.Escape) return;
+                CloseEditor();
+                customize.Focus();
+                args.Handled = true;
+            };
             reset.Click += (sender, args) => {
                 if (!(DataContext is Preferences prefs)) return;
                 foreach (var option in prefs.CompletionStatusIndicatorColors) option.Color = null;
                 Populate();
+                done.Focus();
             };
-            panel.Loaded += (sender, args) => Populate();
-            panel.DataContextChanged += (sender, args) => { if (panel.IsLoaded) Populate(); };
+            toggle.Checked += (sender, args) => CloseEditor();
+            toggle.Unchecked += (sender, args) => CloseEditor();
+            panel.Loaded += (sender, args) => CloseEditor();
             return Section("Completion Status Indicators", panel);
         }
 
@@ -283,23 +327,48 @@ namespace HeliumNavigator
                 colorButton.ToolTip = hex;
             }
             UpdateSwatch();
-            colorButton.Click += (sender, args) => {
+            void SetColor(string color)
+            {
+                option.Color = color;
+                UpdateSwatch();
+                colorChanged();
+            }
+            var menu = new ContextMenu {
+                PlacementTarget = colorButton, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom
+            };
+            void AddColor(string label, string value)
+            {
+                var sample = CompletionStatusIndicators.ParseColor(value ?? CompletionStatusIndicators.DefaultColor).Value;
+                var item = new MenuItem { Header = label, Icon = new Border {
+                    Width = 12, Height = 12, CornerRadius = new CornerRadius(2),
+                    Background = new System.Windows.Media.SolidColorBrush(sample)
+                }};
+                item.Click += (sender, args) => SetColor(value);
+                menu.Items.Add(item);
+            }
+            AddColor("Default accent", null);
+            foreach (var suggestion in CompletionStatusIndicators.Palette) AddColor(suggestion.Key, suggestion.Value);
+            menu.Items.Add(new Separator());
+            var custom = new MenuItem { Header = "Custom color…" };
+            custom.Click += (sender, args) => {
                 var color = ((System.Windows.Media.SolidColorBrush)swatch.Background).Color;
                 using (var picker = new System.Windows.Forms.ColorDialog {
                     FullOpen = true,
                     Color = System.Drawing.Color.FromArgb(color.R, color.G, color.B),
-                    CustomColors = new[] { 0xE87979, 0x78C58E, 0xE7C969, 0xDC91BF, 0xA3AEBB, 0x67B3FF, 0xE5A36D }
-                        .Select(rgb => System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.FromArgb(unchecked((int)0xFF000000) | rgb)))
+                    CustomColors = CompletionStatusIndicators.Palette.Select(suggestion => CompletionStatusIndicators.ParseColor(suggestion.Value).Value)
+                        .Select(suggestion => System.Drawing.ColorTranslator.ToOle(
+                            System.Drawing.Color.FromArgb(suggestion.R, suggestion.G, suggestion.B)))
                         .ToArray()
                 }) {
                     var window = Window.GetWindow(colorButton);
                     var owner = window == null ? null : new ColorDialogOwner(new System.Windows.Interop.WindowInteropHelper(window).Handle);
                     if (picker.ShowDialog(owner) != System.Windows.Forms.DialogResult.OK) return;
-                    option.Color = $"#{picker.Color.R:X2}{picker.Color.G:X2}{picker.Color.B:X2}";
-                    UpdateSwatch();
-                    colorChanged();
+                    SetColor($"#{picker.Color.R:X2}{picker.Color.G:X2}{picker.Color.B:X2}");
                 }
             };
+            menu.Items.Add(custom);
+            colorButton.ContextMenu = menu;
+            colorButton.Click += (sender, args) => menu.IsOpen = true;
             DockPanel.SetDock(colorButton, Dock.Right);
             row.Children.Add(colorButton);
             var enabled = new CheckBox { Content = new TextBlock { Text = status, TextTrimming = TextTrimming.CharacterEllipsis },
@@ -319,8 +388,8 @@ namespace HeliumNavigator
 
         internal static GroupBox Section(string title, FrameworkElement content) => new GroupBox {
             Header = new TextBlock { Text = title, FontWeight = FontWeights.SemiBold },
-            Content = content, Margin = new Thickness(0, 0, 0, 12),
-            Padding = new Thickness(12, 8, 12, 10), HorizontalContentAlignment = HorizontalAlignment.Stretch
+            Content = content, Margin = new Thickness(0, 0, 0, 9),
+            Padding = new Thickness(10, 4, 10, 7), HorizontalContentAlignment = HorizontalAlignment.Stretch
         };
 
         private static ListBox ActivityStyle()
@@ -347,7 +416,7 @@ namespace HeliumNavigator
             panel.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold });
             panel.Children.Add(new TextBlock { Text = description, TextWrapping = TextWrapping.Wrap, FontSize = 11, Margin = new Thickness(0, 3, 0, 0) });
             var card = new ListBoxItem {
-                Content = panel, MinHeight = 68, HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                Content = panel, MinHeight = 46, HorizontalContentAlignment = HorizontalAlignment.Stretch,
                 VerticalContentAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 4)
             };
             System.Windows.Automation.AutomationProperties.SetName(card, title + ". " + description);
@@ -356,7 +425,7 @@ namespace HeliumNavigator
 
         private static TabItem Page(string title, params FrameworkElement[] sections)
         {
-            var panel = new StackPanel { Margin = new Thickness(14) };
+            var panel = new StackPanel { Margin = new Thickness(12, 8, 12, 8) };
             foreach (var section in sections) panel.Children.Add(section);
             return new TabItem { Header = title, Content = new ScrollViewer {
                 Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -364,20 +433,42 @@ namespace HeliumNavigator
             }};
         }
 
-        private static StackPanel Choice(string title, string path, params string[] options)
+        private static FrameworkElement Choice(string title, string path, params string[] options)
         {
-            var group = new StackPanel { Margin = new Thickness(0, 4, 0, 8) };
-            group.Children.Add(new TextBlock { Text = title });
-            var choice = new ComboBox { MinWidth = 160, MaxWidth = 260, MinHeight = 26, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 5, 0, 0) };
+            var choice = new ComboBox { MinHeight = 26 };
             System.Windows.Automation.AutomationProperties.SetName(choice, title);
             foreach (var option in options) choice.Items.Add(option);
             choice.SetBinding(ComboBox.SelectedIndexProperty, new Binding(path) { Mode = BindingMode.TwoWay });
-            group.Children.Add(choice);
-            return group;
+            return SettingRow(title, choice);
+        }
+
+        private static Grid SettingRow(string title, FrameworkElement control)
+        {
+            var row = new Grid { Margin = new Thickness(0, 2, 0, 2) };
+            var labels = new ColumnDefinition();
+            row.ColumnDefinitions.Add(labels);
+            row.ColumnDefinitions.Add(new ColumnDefinition { MaxWidth = 260 });
+            row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var label = new TextBlock { Text = title, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+            row.Children.Add(label);
+            row.Children.Add(control);
+            void Arrange(bool stacked)
+            {
+                labels.Width = new GridLength(stacked ? 0 : 142);
+                Grid.SetColumn(label, stacked ? 1 : 0);
+                Grid.SetColumn(control, 1);
+                Grid.SetRow(control, stacked ? 1 : 0);
+                label.Margin = stacked ? new Thickness(0, 0, 0, 2) : new Thickness(0, 0, 8, 0);
+            }
+            Arrange(true);
+            row.SizeChanged += (s, e) => Arrange(e.NewSize.Width < 334);
+            return row;
         }
         private static CheckBox BoundCheck(string title, string path)
         {
-            var box = new CheckBox { Content = title, Margin = new Thickness(0,4,0,4) };
+            var box = new CheckBox { Content = new TextBlock { Text = title, TextWrapping = TextWrapping.Wrap },
+                Margin = new Thickness(0, 3, 0, 3) };
             box.SetBinding(CheckBox.IsCheckedProperty, new Binding(path) { Mode = BindingMode.TwoWay });
             return box;
         }

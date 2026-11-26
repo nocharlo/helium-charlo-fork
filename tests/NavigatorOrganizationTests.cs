@@ -298,13 +298,16 @@ internal static class NavigatorOrganizationTests
         var prefs = new Preferences(); prefs.MigrateNavigation();
         var editor = (GroupBox)NavigatorOrganizationControls.VisibilityEditor(prefs, true);
         var panel = (StackPanel)editor.Content;
-        var search = ((Grid)panel.Children[0]).Children.OfType<TextBox>().Single();
+        var toolbar = panel.Children.OfType<DockPanel>().Single();
+        var search = toolbar.Children.OfType<Grid>().Single().Children.OfType<TextBox>().Single();
         var list = panel.Children.OfType<ListBox>().Single();
-        var buttons = panel.Children.OfType<WrapPanel>().Single().Children.OfType<Button>().ToArray();
+        var reorder = toolbar.Children.OfType<StackPanel>().Single();
         var initial = prefs.VisibleGroupingModes.ToArray();
+        Check(reorder.Visibility == Visibility.Hidden, "Reorder buttons are hidden when there is no selection");
         search.Text = "Category";
         list.SelectedIndex = 0;
-        buttons[2].RaiseEvent(new System.Windows.RoutedEventArgs(Button.ClickEvent));
+        Check(reorder.Visibility == Visibility.Visible, "Selecting a mode exposes reorder buttons");
+        reorder.Children.OfType<Button>().First().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         search.Text = "";
         Check(prefs.VisibleGroupingModes.SequenceEqual(NavigatorOrganization.Move(initial, 2, -1)), "Filtered reorder updates canonical order");
         Check(prefs.VisibleGroupingModes.Distinct().Count() == initial.Length && list.Items.Count == NavigatorOrganization.Groups.Length,
@@ -411,7 +414,16 @@ internal static class NavigatorOrganizationTests
             window.UpdateLayout();
             var page = (StackPanel)((ScrollViewer)((TabItem)tabs.SelectedItem).Content).Content;
             var section = (StackPanel)page.Children.OfType<GroupBox>().Last().Content;
-            var statusRows = section.Children.OfType<StackPanel>().Single();
+            var show = section.Children.OfType<CheckBox>().Single();
+            var customize = section.Children.OfType<Button>().Single();
+            var statusEditor = section.Children.OfType<StackPanel>().Single();
+            var statusRows = statusEditor.Children.OfType<StackPanel>().Single();
+            var actions = statusEditor.Children.OfType<WrapPanel>().Single().Children.OfType<Button>().ToArray();
+            Check(customize.Visibility == Visibility.Visible && statusEditor.Visibility == Visibility.Collapsed &&
+                statusRows.Children.Count == 0, "Enabling indicators offers customization without opening the editor");
+            customize.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(statusEditor.Visibility == Visibility.Visible && statusRows.Children.Count == 2,
+                "Opening customization fetches the current library statuses");
             var statusToggle = statusRows.Children.OfType<DockPanel>().Select(row => row.Children.OfType<CheckBox>().Single())
                 .Single(box => System.Windows.Automation.AutomationProperties.GetName(box) ==
                 "Show indicator for Synthetic custom status");
@@ -419,10 +431,34 @@ internal static class NavigatorOrganizationTests
             statusToggle.IsChecked = false;
             Check(!prefs.CompletionStatusIndicatorColors.Single(option => option.StatusId == customStatus.ToString()).IsEnabled,
                 "A custom status can be disabled independently in Appearance");
-            section.Children.OfType<Button>().Single().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            show.SetCurrentValue(CheckBox.IsCheckedProperty, false);
+            Check(!prefs.ShowCompletionStatusIndicators && customize.Visibility == Visibility.Collapsed &&
+                statusRows.Children.Count == 0 && prefs.CompletionStatusIndicatorColors[0].Color == "#78C58E",
+                "Turning off indicators closes customization and preserves its settings");
+            show.SetCurrentValue(CheckBox.IsCheckedProperty, true);
+            customize.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            actions[0].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(prefs.CompletionStatusIndicatorColors.All(option => option.Color == null) &&
                 ((SolidColorBrush)CompletionStatusIndicators.CreateBrushes(prefs)[builtIn]).Color == Color.FromRgb(103, 179, 255),
                 "Reset keeps per-status toggles and restores the default accent");
+            actions[1].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(customize.Visibility == Visibility.Visible && statusEditor.Visibility == Visibility.Collapsed,
+                "Done returns to the collapsed customization action");
+            var width = ((StackPanel)page.Children.OfType<GroupBox>().First().Content).Children.OfType<Grid>()
+                .SelectMany(row => row.Children.OfType<TextBox>()).Single();
+            prefs.Width = 281.25;
+            width.GetBindingExpression(TextBox.TextProperty).UpdateTarget();
+            Check(width.Text == "281" && prefs.Width == 281.25, "Whole pixels are displayed without changing the stored width");
+            customize.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            var colorButton = statusRows.Children.OfType<DockPanel>().SelectMany(row => row.Children.OfType<Button>())
+                .Single(button => System.Windows.Automation.AutomationProperties.GetName(button) == "Color for Synthetic native status");
+            var palette = colorButton.ContextMenu.Items.OfType<MenuItem>().ToArray();
+            Check(palette.Length == 10 && CompletionStatusIndicators.Palette.Select(color => color.Value).Distinct().Count() == 8,
+                "The menu offers eight named palette colors, the default accent, and a custom color");
+            palette.Single(item => Equals(item.Header, "Beaten")).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            Check(prefs.CompletionStatusIndicatorColors.Single(option => option.StatusId == builtIn.ToString()).Color == "#4FB5A5" &&
+                ((SolidColorBrush)CompletionStatusIndicators.CreateBrushes(prefs)[builtIn]).Color == Color.FromRgb(79, 181, 165),
+                "Choosing a named palette color updates both preferences and the Navigator's indicator brush");
         } finally { window.Close(); }
     }
 
@@ -765,7 +801,7 @@ internal static class NavigatorOrganizationTests
             "Activity selection is bound to the existing persisted setting");
         Check(style.Items.Cast<ListBoxItem>().Select(item => ((TextBlock)((StackPanel)item.Content).Children[0]).Text)
             .SequenceEqual(new[] { "Hybrid", "Detailed" }), "Activity cards preserve the stored index order");
-        var nativeCheck = (CheckBox)page.Children[1];
+        var nativeCheck = (CheckBox)((GroupBox)page.Children[1]).Content;
         Check(BindingOperations.GetBinding(nativeCheck, CheckBox.IsCheckedProperty).Path.Path ==
             nameof(Preferences.ApplySortGroupToPlaynite), "Native organization setting bound in Organization tab");
         var editors = ((Grid)page.Children[2]).Children.Cast<GroupBox>().ToArray();
@@ -787,36 +823,41 @@ internal static class NavigatorOrganizationTests
         layout.Children.Add(editors[0]); layout.Children.Add(editors[1]);
         NavigatorOrganizationControls.ArrangeEditors(layout, 420);
         Check(Grid.GetRow(layout.Children[1]) == 1, "Reopened narrow editors do not overlap");
-        Check(style.Items.Cast<ListBoxItem>().All(card => double.IsNaN(card.Width) && card.MinHeight == 68), "Equal activity cards stretch to available width");
+        Check(style.Items.Cast<ListBoxItem>().All(card => double.IsNaN(card.Width) && card.MinHeight == 46), "Compact activity cards stretch to available width");
         Check(style.Items.Cast<ListBoxItem>().All(card => !((TextBlock)((StackPanel)card.Content).Children[1]).Text.EndsWith(".")), "Short card descriptions omit terminal periods");
         foreach (var editor in editors) {
             var panel = (StackPanel)editor.Content;
             var list = panel.Children.OfType<ListBox>().Single();
-            Check(list.Height == 210, "Visibility lists have bounded height");
-            var actions = panel.Children.OfType<WrapPanel>().Single().Children.OfType<Button>().ToArray();
-            Check(actions.Length == 4,
-                "Each visibility list owns its customization actions");
+            Check(list.Height == 168, "Visibility lists have compact bounded height");
+            var toolbar = panel.Children.OfType<DockPanel>().Single();
+            var reorder = toolbar.Children.OfType<StackPanel>().Single();
+            var actions = reorder.Children.OfType<Button>().ToArray();
+            var defaults = panel.Children.OfType<WrapPanel>().Single().Children.OfType<Button>().ToArray();
+            Check(actions.Length == 2 && defaults.Length == 2,
+                "Each visibility list owns its reorder and reset actions");
             list.SelectedIndex = 0;
-            Check(!actions[2].IsEnabled && actions[3].IsEnabled, "First visible mode can only move down");
+            Check(!actions[0].IsEnabled && actions[1].IsEnabled && reorder.Visibility == Visibility.Visible,
+                "First visible mode can only move down");
             list.SelectedIndex = -1;
-            Check(!actions[2].IsEnabled && !actions[3].IsEnabled, "Reordering requires a selected mode");
+            Check(!actions[0].IsEnabled && !actions[1].IsEnabled && reorder.Visibility == Visibility.Hidden,
+                "Reordering requires a selected mode");
             bool grouping = editor == editors[0];
             Func<List<int>> visible = () => grouping ? prefs.VisibleGroupingModes : prefs.VisibleSortingModes;
             var before = visible().ToArray();
-            var search = ((Grid)panel.Children[0]).Children.OfType<TextBox>().Single();
+            var search = toolbar.Children.OfType<Grid>().Single().Children.OfType<TextBox>().Single();
             search.Text = grouping ? "Series" : "Playtime";
             Check(list.Items.Count == 1 && visible().SequenceEqual(before), "Search does not change visibility");
             search.Text = "";
             list.SelectedIndex = 1;
             int moved = ((OrganizationVisibilityOption)list.SelectedItem).Id;
-            actions[2].RaiseEvent(new System.Windows.RoutedEventArgs(Button.ClickEvent));
+            actions[0].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(visible()[0] == moved, "Move Up preserves the selected option identity");
-            actions[3].RaiseEvent(new System.Windows.RoutedEventArgs(Button.ClickEvent));
+            actions[1].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(visible().SequenceEqual(before), "Move Down restores the previous sequence");
             var other = (grouping ? prefs.VisibleSortingModes : prefs.VisibleGroupingModes).ToArray();
-            actions[0].RaiseEvent(new System.Windows.RoutedEventArgs(Button.ClickEvent));
+            defaults[0].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(visible().Count == (grouping ? 20 : 16), "Show All affects the complete catalog");
-            actions[1].RaiseEvent(new System.Windows.RoutedEventArgs(Button.ClickEvent));
+            defaults[1].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(visible().SequenceEqual(NavigatorOrganization.Normalize(null, grouping)), "Restore Defaults restores only its list");
             Check((grouping ? prefs.VisibleSortingModes : prefs.VisibleGroupingModes).SequenceEqual(other), "Management actions preserve the other panel");
         }

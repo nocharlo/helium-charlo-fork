@@ -10,9 +10,9 @@ Its main addition is **Helium Navigator**, a customizable sidebar for browsing, 
 
 The idea is to bring some of Steam's library navigation into Playnite without replacing the library system underneath it.
 
-**Latest release: v0.3.3 — Navigator Controls**
+**Latest release: v0.3.4 — Navigator Refinements**
 
-[Download](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.3.3) · [Changelog](docs/CHANGELOG.md) · [Documentation](docs/README.md) · [Report an Issue](https://github.com/nocharlo/helium-charlo-fork/issues)
+[Download](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.3.4) · [Changelog](docs/CHANGELOG.md) · [Documentation](docs/README.md) · [Report an Issue](https://github.com/nocharlo/helium-charlo-fork/issues)
 
 ---
 
@@ -34,14 +34,14 @@ I'm sharing it because I figured I probably wasn't the only person who wanted so
 
 ## Installation
 
-**Requires Playnite 10 Desktop on Windows.**
+**Requires Playnite 10.65 or newer in Desktop mode on Windows.**
 
-Download both packages from the [latest release](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.3.3):
+Download both packages from the latest release.
 
-- [Helium Theme (.pthm)](https://github.com/nocharlo/helium-charlo-fork/releases/download/v0.3.3/Helium-charlo-fork-v0.3.3.pthm)
-- [Helium Navigator (.pext)](https://github.com/nocharlo/helium-charlo-fork/releases/download/v0.3.3/Helium-Navigator-v0.3.3.pext)
+- [Helium Theme (.pthm)](https://github.com/nocharlo/helium-charlo-fork/releases/download/v0.3.4/Helium-charlo-fork-v0.3.4.pthm)
+- [Helium Navigator (.pext)](https://github.com/nocharlo/helium-charlo-fork/releases/download/v0.3.4/Helium-Navigator-v0.3.4.pext)
 
-Open both packages with Playnite, confirm the installation, and restart the application. Then select **Helium (charlo fork) v0.3.3** under **Settings → Appearance → Desktop**.
+Open both packages with Playnite, confirm the installation, and restart the application. Then select **Helium (charlo fork) v0.3.4** under **Settings → Appearance → Desktop**.
 
 The theme and Navigator extension must be on matching versions. The Navigator currently depends on the theme for its integrated layout.
 
@@ -59,8 +59,8 @@ A compact, resizable game list that works alongside Playnite's existing library 
 - **Sort & Group:** Organize games by series, platform, category, recent activity, and other metadata. Follow Playnite's current organization or configure the Navigator independently.
 - **Recent Activity:** Browse recently played games using hybrid or detailed chronological groups.
 - **Library Filters:** A floating panel with 27 native filter fields, searchable metadata, multiselection, and removable active-filter chips.
-- **Game Indicators:** See installed status, favorites, and game icons directly in the list.
-- **Context Menu:** Play, install, edit, and manage games without changing the Grid selection or scroll position.
+- **Game Indicators:** See installed status and favorites, optionally dim uninstalled game icons, and choose a color for each Completion Status you want to highlight.
+- **Context Menu:** Play, install, edit, and manage games without changing the Grid selection or scroll position. Auxiliary custom actions appear directly in the menu, and Play opens Playnite's action selector when appropriate.
 - **Navigation:** Move between games and groups using the keyboard, and use Escape or the mouse's Back button to return from supported views and panels.
 - **Customization:** Adjust sidebar width, visible sorting and grouping modes, filter layout, and other preferences.
 
@@ -107,7 +107,7 @@ The project consists of two components:
 
 The current codebase targets **.NET Framework 4.6.2** and **PlayniteSDK 6.19.0**.
 
-The v0.3.4 candidate requires **Playnite 10.65 or newer** for its native per-game action execution API. The published v0.3.3 download links above remain available for older Playnite installations.
+v0.3.4 uses the per-game action API introduced in Playnite 10.65. If you use an older Playnite version, see the requirements for [v0.3.3](https://github.com/nocharlo/helium-charlo-fork/releases/tag/v0.3.3).
 
 Development includes automated tests, regression checks, release validation, and testing in an isolated portable Playnite installation.
 
@@ -134,7 +134,7 @@ So, if you know Playnite or C# and spot something questionable, feel free to ope
 
 Development is currently focused on stabilizing and improving the Navigator before moving on to larger changes to the Helium theme.
 
-- **v0.3.4 — Architecture & Performance:** Refactor tightly coupled components, investigate performance bottlenecks, and improve reliability in larger libraries.
+- **v0.3.5 — Architecture & Performance:** Consolidate closely coupled code, investigate performance bottlenecks, and improve reliability in larger libraries.
 - **v0.4.0 — Adaptive Navigator (Exploratory):** Investigate making Navigator less dependent on Helium and potentially compatible with other Desktop themes.
 - **v0.5.x — Theme Redesign (Proposed):** Revisit Full Details, Grid, Hybrid layouts, and explore a customizable genre and tag icon system.
 - **Longer-term — Helium Home:** Explore a more complete library homepage with features such as Continue Playing and customizable game shelves.
@@ -146,7 +146,6 @@ These plans are subject to change as technical limitations and development prior
 - The Grid Details Panel may briefly appear blank while Playnite rebuilds its view.
 - Some mouse interactions and smaller window configurations still need broader testing.
 - Compatibility with every extension and library setup hasn't been established.
-- Custom per-game Actions in the v0.3.4 candidate use Playnite 10.65's public `StartGameAction` API. Earlier Playnite versions cannot load this candidate.
 - Performance testing has included synthetic libraries with up to 2,500 games, but larger real libraries with artwork and store integrations need further testing.
 
 I primarily develop and test on my own setup, so feedback from other configurations is particularly useful.
