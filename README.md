@@ -170,12 +170,10 @@ This project is based on Helium and its KKCD fork. The inherited theme code is d
 
 Helium (charlo fork) is an unofficial community project and is not affiliated with Playnite, Valve, or Steam.
 
+## Support the Project
+
+If you'd like to support the development of Helium, you can [buy me a coffee on Ko-fi](https://ko-fi.com/notcharlo).
+
 ---
 
 *Made by someone who enjoys organizing their games as much as playing them.*
-
-## Support the Project
-
-If you enjoy using Helium Navigator and would like to support its development, you can buy me a coffee on Ko-fi.
-
-[![Support me on Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20the%20project-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white)](https://ko-fi.com/notcharlo)
